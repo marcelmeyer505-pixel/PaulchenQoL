@@ -1,0 +1,39 @@
+## Interface: 16001
+## Title: Paulchen QoL
+## Notes: Begleiter, Logbuch, Upgrades, Auktionsscan und Questabgaben
+## Version: 0.3.5
+## SavedVariables: PaulchenQoLSettings, PaulchenQoLAuctionDB
+## SavedVariablesPerCharacter: PaulchenQoLDB, PaulchenQoLTimelineDB, PaulchenQoLUpgradesDB
+## OptionalDeps: Details, Polestar, AtlasLootClassic, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan
+## IconTexture: Interface\AddOns\PaulchenQOL\Textures\paulchen_idle.tga
+
+Core.lua
+Style.lua
+Modules.lua
+Memory.lua
+Dialogue.lua
+Personality.lua
+Flight.lua
+Config.lua
+MountGloves.lua
+QuestMap.lua
+UI.lua
+Events.lua
+Window.lua
+Modules\Auction\Scanner.lua
+Modules\Upgrades\Catalog.lua
+Modules\Upgrades\Sources.lua
+Modules\Upgrades\Upgrades.lua
+Modules\Upgrades\Loot.lua
+Modules\Upgrades\Window.lua
+Modules\DTL\History.lua
+Modules\DTL\OpponentProfiles.lua
+Modules\DTL\CritRecordsData.lua
+Modules\DTL\CritRecords.lua
+Modules\DTL\FarmLoot.lua
+Modules\DTL\FarmRounds.lua
+Modules\DTL\FarmArchive.lua
+Modules\DTL\LevelSummary.lua
+Modules\DTL\QuestExperience.lua
+Modules\DTL\Experience.lua
+Modules\DTL\Window.lua

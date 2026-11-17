@@ -1,0 +1,1 @@
+-- Legacy SavedVariables are loaded by the game after this file.

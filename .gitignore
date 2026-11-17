@@ -1,0 +1,6 @@
+__pycache__/
+*.zip
+SavedVariables/
+Logs/
+Modules/DTL/CritLive.sqlite3*
+Modules/DTL/CritFonts/
