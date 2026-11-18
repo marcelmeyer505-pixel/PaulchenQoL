@@ -1,8 +1,10 @@
-# Paulchen QoL v0.3.5
+# Paulchen QoL v0.3.6
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Der Reise-Check, die Taschen-Merkliste, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
 **Paulchens Logbuch** zeigt die letzten zehn Kämpfe, eigene DPS mit Durchschnitt, Crit-Rekorde, Gegnerprofile sowie EP-Statistiken und Farmrunden. Die Kompaktansicht zeigt zwei wählbare Kennzahlen und die Steuerung für Farmrunden. **Paulchen Upgrades** vergleicht Ausrüstung inklusive manuell geplanter Charakterstufe, Spalten, Filtern und Loot-Alarm. Der Auktionsscan liefert Marktangebote an das Upgrade-Fenster.
+
+Das Bewertungsprofil **Feral Katze** verwendet 0,95 Punkte pro Beweglichkeit, 0,80 pro Stärke, 0,40 pro Angriffskraft und 5,60 pro Waffen-DPS. Dazu kommen 10,20 pro Prozent Krit, 8,77 pro Prozent Trefferchance, 4,78 pro Prozent Angriffstempo, 0,85 pro Waffenkundewertung und 0,13 pro Rüstungsdurchschlag. Beim ersten Login mit Version 0.3.6 werden Stärke, Beweglichkeit und Waffen-DPS im vorhandenen Profil angepasst.
 
 ## Installation
 

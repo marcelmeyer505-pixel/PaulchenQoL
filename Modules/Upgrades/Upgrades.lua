@@ -170,14 +170,38 @@ end
 
 local previousCatScale = '( Pawn: v1: "Feral Katze": Class=Druid, Agility=1, Strength=0.98, HitRatingPoints=0.88, '
     .. 'ExpertiseRating=0.85, CritRatingPoints=0.73, HasteRating=0.48, Ap=0.40, ArmorPenetration=0.13 )'
-local catScale = '( Pawn: v1: "Feral Katze": Class=Druid, Agility=1, Strength=0.98, HitRating=8.77, '
-    .. 'ExpertiseRating=0.85, CritRating=10.2, MeleeHastePercent=4.78, Ap=0.40, ArmorPenetration=0.13 )'
+local catScale = '( Pawn: v1: "Feral Katze": Class=Druid, Agility=0.95, Strength=0.80, HitRating=8.77, '
+    .. 'ExpertiseRating=0.85, CritRating=10.2, MeleeHastePercent=4.78, Ap=0.40, MeleeDps=5.60, ArmorPenetration=0.13 )'
+
+local function updateCatDamageWeights(db, scales)
+    if db.paulchenFeralCatWeaponDpsUpdated then return end
+    for _, scale in ipairs(scales.List("DRUID")) do
+        if scale.name:lower() == "feral katze" then
+            local wasEdited = scale.edited
+            local parsed = pawn.Parse(scale.original or scale.source)
+            local original = parsed and pawn.Weights(parsed)
+            local updates = { str = 0.80, agi = 0.95, dps = 5.60 }
+            for key, value in pairs(updates) do
+                if not scales.SetWeight("DRUID", scale.id, key, value) then return end
+                if original then original[key] = value end
+            end
+            scale.original = original and pawn.Build(scale.name, "DRUID", original) or scale.source
+            scale.edited = wasEdited
+            db.paulchenFeralCatWeaponDpsUpdated = true
+            return
+        end
+    end
+end
+
 pole.OnLogin(function()
     gear.Invalidate("items")
     local db = pole.DB()
-    if db.paulchenFeralCatPercentUpdated then return end
-
     local scales = gear.Scales
+    if db.paulchenFeralCatPercentUpdated then
+        updateCatDamageWeights(db, scales)
+        return
+    end
+
     for _, scale in ipairs(scales.List("DRUID")) do
         if scale.name:lower() == "feral katze" then
             if scale.original == previousCatScale then
@@ -194,6 +218,7 @@ pole.OnLogin(function()
                 end
             end
             db.paulchenFeralCatPercentUpdated = true
+            updateCatDamageWeights(db, scales)
             return
         end
     end
@@ -201,6 +226,7 @@ pole.OnLogin(function()
     local ok, result = scales.Import(catScale, "DRUID")
     if ok then
         db.paulchenFeralCatPercentUpdated = true
+        updateCatDamageWeights(db, scales)
         if not db.paulchenFeralCatImported and selected and selected.name == "Katze (Schaden)" then
             pole.Set("gear.spec.DRUID", "custom:" .. result.scale.id)
         end
