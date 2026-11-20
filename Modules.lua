@@ -11,7 +11,7 @@ local legacyUpgrades = oldModuleIsActive("PaulchenUpgrades")
 local legacyAuction = oldModuleIsActive("PaulchenAuktionsscan")
 
 if not legacyTimeline then app.timeline = {} end
-if not legacyUpgrades and Polestar and Polestar.Gear and Polestar.ItemDB then app.upgrades = {} end
+if not legacyUpgrades then app.upgrades = {} end
 if not legacyAuction then app.auction = {} end
 
 local function import(target, previous)
@@ -64,7 +64,7 @@ function app.OpenModulesMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return app.ToggleDashboard() end
     MenuUtil.CreateContextMenu(owner, function(_, menu)
         menu:CreateTitle("Paulchen QoL")
-        menu:CreateButton("Reise-Check und Taschen", function() app.OpenDashboard("travel") end)
+        menu:CreateButton("Übersicht und Reise-Check", function() app.OpenDashboard("travel") end)
         menu:CreateButton(app.logbookName, function() app.OpenModule("dtl") end)
         menu:CreateButton("Logbuch · Kompaktansicht", function() app.OpenModule("dtl", "mini") end)
         menu:CreateButton("Logbuch · EP und Farmrunden", function() app.OpenModule("dtl", "farm") end)

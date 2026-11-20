@@ -32,6 +32,8 @@ end
 function app.Settings()
     if type(PaulchenQoLDB) ~= "table" then PaulchenQoLDB = {} end
     if type(PaulchenQoLDB.marks) ~= "table" then PaulchenQoLDB.marks = {} end
+    -- Discard progress from the retired minigame mode on character load.
+    PaulchenQoLDB.pet = nil
     return PaulchenQoLDB
 end
 
@@ -113,6 +115,8 @@ local function itemKey(id, link)
     if suffix == 0 and bonuses == "" then return tostring(id) end
     return ("%d:%d:%s"):format(id, suffix, bonuses)
 end
+
+app.BagItemKey = itemKey
 
 local function canClearSlot(bag, slot)
     local questInfo = container.GetContainerItemQuestInfo and readable(container.GetContainerItemQuestInfo(bag, slot))

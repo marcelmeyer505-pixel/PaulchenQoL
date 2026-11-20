@@ -403,6 +403,13 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
         Render = render,
         Toggle = toggle,
         Stop = stop,
+        Snapshot = function()
+            local run = data.active
+            if not run then return { ready = ready == true } end
+            return { ready = ready == true, active = true, paused = run.paused,
+                area = run.area, name = run.name, elapsed = elapsed(run), xp = run.xp, partial = run.partial,
+                goal = run.goal, item = run.itemLabel or run.item, itemCount = run.itemCount or 0 }
+        end,
         Mini = function()
             local run = data.active
             if run and run.goal then

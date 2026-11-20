@@ -2,11 +2,15 @@ local _, suite = ...
 local app = suite.upgrades
 if not app then return end
 local style = suite.style
+local gear = app.gear
 local width, height, rowHeight, rowCount = 910, 628, 32, 13
 local tableMargin, maxTableWidth = 53, 1400
 local tableLeft, tableTop, headerHeight = 17, -137, 25
 local tableHeight = headerHeight + rowCount * rowHeight
 local GOLD, MUTED, TEXT, GREEN = style.gold, style.muted, style.cream, style.green
+-- Native textures avoid missing arrow glyphs in the Forever UI fonts.
+local downArrow = " |TInterface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up:12:12:0:0|t"
+local upArrow = " |TInterface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up:12:12:0:0|t"
 local columns = {
     { key = "name", text = "Gegenstand", w = 214 },
     { key = "slot", text = "Slot", w = 100 },
@@ -39,35 +43,38 @@ local columns = {
     { key = "heal", text = "Heilbonus", option = "Heilbonus", w = 92 },
 }
 local sources = {
-    { "all", "Alle Quellen" }, { "quest", "Quests" }, { "boe", "BoE / Handel" },
+    { "all", "Alle Quellen" }, { "bag", "Eigene Taschen" }, { "quest", "Quests" }, { "boe", "BoE / Handel" },
     { "dungeon", "Instanzen" }, { "raid", "Raids" }, { "drop", "Sonstige Drops" }, { "vendor", "Händler" },
     { "craft", "Herstellung" },
-    { "auction", "Auktionshaus · gescannt" },
+    { "auction", "Auktionshaus" },
 }
 local qualities = { { 2, "Grün", { 0.38, 0.85, 0.38 } }, { 3, "Blau", { 0.34, 0.67, 1 } }, { 4, "Lila", { 0.77, 0.54, 1 } } }
 local slots = { { 0, "Alle Slots" } }
 for _, slot in ipairs(app.slots) do slots[#slots + 1] = slot end
 local automatic = "auto"
 
-local window, db, scan, finished
+local window, db, scan, finished, exportDialog, profileEditor
 local generation, refreshPending = 0, false
 local plannedLevel
+local autoReady, autoWaiting, autoToken = false, false, 0
+local queueAutomatic, deltaPending
 local scanFailure, displayFailure
 local display, offset = {}, 0
+local hoveredRow, renderingRows
 local extraColumns = {}
 local search = ""
 
 local function searchLevel()
-    return math.max(Polestar.Gear.PlayerLevel(), plannedLevel or 0)
+    return math.max(gear.PlayerLevel(), plannedLevel or 0)
 end
 
 local function matchesSearchLevel(current)
-    return current.level == searchLevel() and current.playerLevel == Polestar.Gear.PlayerLevel()
+    return current.level == searchLevel() and current.playerLevel == gear.PlayerLevel()
 end
 
 local function instanceSelection()
     local current = scan or finished
-    return app.CurrentInstance(current and current.atlas)
+    return app.CurrentInstance(current and current.atlas, current and current.journal)
 end
 
 local function instanceCaption()
@@ -97,6 +104,48 @@ local function sourceTitle(source)
     return app.sourceNames[source.kind] .. " · " .. source.title
 end
 
+local function exportCell(text)
+    if type(text) ~= "string" then return "" end
+    text = text:gsub("|[TA].-|[ta]", ""):gsub("|H.-|h(.-)|h", "%1")
+        :gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("%c", " "):match("^%s*(.-)%s*$")
+    -- A copied title must stay text when pasted into a spreadsheet.
+    return text:match("^[=+@%-]") and "'" .. text or text
+end
+
+local function exportNumber(value, places, percent)
+    if type(value) ~= "number" then return "" end
+    return number(value, places) .. (percent and "%" or "")
+end
+
+local function exportResults()
+    local headers = { "Gegenstand", "Slot", "Quelle", "Ort / Details", "Preis (Kupfer)", "Dropchance",
+        "Punkte", "Zugewinn (Punkte)", "Zugewinn (%)", "Aufwand (1–10)" }
+    for _, col in ipairs(extraColumns) do headers[#headers + 1] = col.option end
+    headers[#headers + 1] = "Item-ID"
+    headers[#headers + 1] = "Item-Link"
+    local lines = { table.concat(headers, "\t") }
+    for _, entry in ipairs(display) do
+        local item, source = entry.item, entry.source
+        local details = source.zone and source.detail and (source.zone .. " · " .. source.detail)
+            or source.zone or source.detail
+        local row = { exportCell(item.name), exportCell(app.slotNames[item.slot]), exportCell(sourceTitle(source)),
+            exportCell(details), exportNumber(source.price, 0), exportNumber(source.pct, 1, true),
+            exportNumber(item.new, 2), exportNumber(item.delta, 2), exportNumber(item.pct, 1, true),
+            exportNumber(source.effort, 0) }
+        for _, col in ipairs(extraColumns) do
+            row[#row + 1] = exportNumber(app.ItemColumnValue(item, col.key), col.places or 0, col.percent)
+        end
+        row[#row + 1] = tostring(item.id)
+        row[#row + 1] = item.link and (item.link:match("|H(item:[^|]+)|h") or item.link:match("^item:[%d:%-]+$")) or ""
+        lines[#lines + 1] = table.concat(row, "\t")
+    end
+    return table.concat(lines, "\n")
+end
+
+local function exportReady()
+    return #display > 0 and not scan and not refreshPending and not scanFailure and not displayFailure
+end
+
 local function auctionPrice(source)
     if GetCoinTextureString then return GetCoinTextureString(source.price) end
     return ("%d G %02d S %02d K"):format(math.floor(source.price / 10000), math.floor(source.price / 100) % 100, source.price % 100)
@@ -118,9 +167,10 @@ local function rowAction(entry)
 end
 
 local function startQuestRoute(source)
-    local lookup = Polestar.Lookup
+    local lookup = Polestar and Polestar.Lookup
+    local compat = Polestar and Polestar.Compat
     local message
-    if Polestar.Compat.IsQuestCompleted(source.quest) then
+    if compat and compat.IsQuestCompleted(source.quest) then
         message = "Diese Quest ist bereits abgeschlossen."
     elseif lookup and lookup.Guide then
         local ok, guide, reason = pcall(lookup.Guide, "quest", source.quest)
@@ -135,7 +185,13 @@ local function startQuestRoute(source)
             message = "Aktiviere die Suche in den Polestar-Einstellungen."
         end
     end
-    print("Paulchen Upgrades · " .. (message or ("Polestar hat keine Route für „" .. source.title .. "“ gefunden.")))
+    if not message and C_QuestLog and C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(source.quest)
+        and QuestMapFrame_OpenToQuestDetails then
+        suite.CloseDashboard("upgrades")
+        QuestMapFrame_OpenToQuestDetails(source.quest)
+        return
+    end
+    print("Paulchen Upgrades · " .. (message or ("Kein Wegpunkt für „" .. source.title .. "“ verfügbar.")))
 end
 
 local function searchAuctionHouse(item)
@@ -163,22 +219,27 @@ local function tip(row)
     if not entry or (GameTooltip.IsForbidden and GameTooltip:IsForbidden()) then return end
     local item, source = entry.item, entry.source
     GameTooltip:SetOwner(row, "ANCHOR_CURSOR")
-    if not pcall(GameTooltip.SetHyperlink, GameTooltip, item.link) then
+    app.showingUpgradeRow = true
+    local linked = pcall(GameTooltip.SetHyperlink, GameTooltip, item.link)
+    app.showingUpgradeRow = nil
+    if not linked then
         GameTooltip:SetText(item.name, unpack(TEXT))
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Paulchen Upgrades", unpack(GOLD))
+    GameTooltip:AddLine("Paulchen Upgrades · " .. app.ProfileName(), unpack(GOLD))
     local gain = "+" .. number(item.delta, 2)
     if item.pct then gain = gain .. " Punkte · +" .. number(item.pct, 1) .. " %"
     else gain = gain .. " Punkte" end
     local equipped = item.empty and "Freier Slot" or number(item.old, 2)
-    GameTooltip:AddDoubleLine(equipped .. " → " .. number(item.new, 2) .. " Punkte", gain, 0.8, 0.83, 0.88, unpack(GREEN))
+    GameTooltip:AddDoubleLine(equipped .. " -> " .. number(item.new, 2) .. " Punkte", gain, 0.8, 0.83, 0.88, unpack(GREEN))
     if item.future then GameTooltip:AddLine("Tragbar ab Charakterstufe " .. item.requiredLevel, unpack(GOLD)) end
     local action, quest = rowAction(entry)
     if isAuction(source) then
         if source.kind == "auction" then
-            GameTooltip:AddDoubleLine("Sofortkauf pro Stück", auctionPrice(source))
-            GameTooltip:AddLine("Erfasst am " .. date("%d.%m. um %H:%M", source.at), unpack(MUTED))
+            if source.price then
+                GameTooltip:AddDoubleLine(source.at and "Sofortkauf pro Stück" or "Preis in der AH-Übersicht", auctionPrice(source))
+            end
+            if source.at then GameTooltip:AddLine("Erfasst am " .. date("%d.%m. um %H:%M", source.at), unpack(MUTED)) end
         else
             GameTooltip:AddLine("BoE", unpack(MUTED))
         end
@@ -200,7 +261,7 @@ local function tip(row)
         if alternative ~= source then addSource(alternative) end
     end
     if action == "quest" then
-        GameTooltip:AddLine("Rechtsklick · Polestar-Route für " .. quest.title, unpack(GOLD))
+        GameTooltip:AddLine("Rechtsklick · Quest öffnen · " .. quest.title, unpack(GOLD))
     elseif action == "auction" then
         GameTooltip:AddLine("Rechtsklick · Im Auktionshaus suchen", unpack(GOLD))
     end
@@ -208,6 +269,8 @@ local function tip(row)
 end
 
 local function renderRows()
+    renderingRows = true
+    local refreshTooltip
     local maxOffset = math.max(0, #display - rowCount)
     offset = math.min(offset, maxOffset)
     window.slider:SetMinMaxValues(0, math.max(1, maxOffset))
@@ -215,8 +278,14 @@ local function renderRows()
     window.slider:SetShown(maxOffset > 0)
     for i, row in ipairs(window.rows) do
         local entry = display[offset + i]
-        if row.entry ~= entry and GameTooltip:IsOwned(row) then GameTooltip:Hide() end
+        local previous = row.entry
+        local ownsTooltip = GameTooltip:IsOwned(row)
+        local changed = not previous or not entry or previous.item ~= entry.item or previous.source ~= entry.source
         row.entry = entry
+        if ownsTooltip then
+            if not entry then GameTooltip:Hide()
+            elseif changed then refreshTooltip = row end
+        end
         row:SetShown(entry ~= nil)
         if entry then
             local item, source = entry.item, entry.source
@@ -239,12 +308,27 @@ local function renderRows()
             end
         end
     end
+    renderingRows = false
+    if refreshTooltip then tip(refreshTooltip) end
 end
 
 local function updateAuctionScanButton()
     local scanner = PaulchenAuktionsscan
     local auctions = db.tab == "overview" and db.source == "auction"
     window.auctionScan:SetShown(auctions and scanner and scanner.IsOpen() or false)
+end
+
+local function scanStatus(current)
+    local status = ("Suche läuft · %d / %d Gegenstände geprüft"):format(math.min(current.cursor - 1, #current.ids), #current.ids)
+    local outstanding = current.count + #current.deferred - current.nextDeferred + 1
+    if outstanding > 0 then status = status .. (" · %d Itemdaten offen"):format(outstanding) end
+    if current.errors > 0 then status = status .. (" · %d Datenfehler"):format(current.errors) end
+    if current.limited then status = status .. " · Nachladen begrenzt" end
+    status = status .. (" · %d neu bewertet · %d übernommen"):format(current.compared or 0, current.reused or 0)
+    if (current.skippedContent or 0) > 0 then
+        status = status .. (" · %d gesperrt übersprungen"):format(current.skippedContent)
+    end
+    return status
 end
 
 local function render(reset)
@@ -256,18 +340,23 @@ local function render(reset)
     if instances then
         instance = db.instanceSelection
         if instance == automatic then instance = instanceSelection() or "" end
-        window.instanceFilter.text:SetText(instanceCaption() .. "  ▾")
+        window.instanceFilter.text:SetText(instanceCaption() .. downArrow)
     end
     local crafting = not instances and db.source == "craft"
     local sortKey = db.sortKey == "price" and (auctions and "price" or "effort") or db.sortKey
-    display = app.VisibleRows(current and current.rows or {}, db.slot, db.source, search, sortKey, db.ascending,
-        instance, {
-            quality = db.quality, profession = crafting and db.profession ~= "" and db.profession or nil,
-            maxRequiredLevel = searchLevel(),
-        })
+    -- Search steps may add higher-scoring rows. Keep the displayed items stable
+    -- while one is being read; explicit filter/sort changes still apply at once.
+    if reset or not (hoveredRow and hoveredRow.entry and GameTooltip:IsOwned(hoveredRow)) then
+        display = app.VisibleRows(current and current.rows or {}, db.slot, db.source, search, sortKey, db.ascending,
+            instance, {
+                quality = db.quality, profession = crafting and db.profession ~= "" and db.profession or nil,
+                maxRequiredLevel = searchLevel(),
+            })
+    end
     window.sourceFilter:SetShown(not instances)
     window.instanceFilter:SetShown(instances)
     window.professionFilter:SetShown(crafting)
+    window.contentButton:SetShown(not crafting and not auctions)
     updateAuctionScanButton()
     style.SetButtonState(window.overviewTab, not instances)
     style.SetButtonState(window.instancesTab, instances)
@@ -279,21 +368,23 @@ local function render(reset)
     window.lootToggle.text:SetTextColor(unpack(alerts and GREEN or MUTED))
     local status
     if scan then
-        status = ("Suche läuft · %d / %d Gegenstände geprüft"):format(math.min(scan.cursor - 1, #scan.ids), #scan.ids)
-        if scan.count > 0 then status = status .. (" · %d Itemdaten offen"):format(scan.count) end
-        if scan.errors > 0 then status = status .. (" · %d Datenfehler"):format(scan.errors) end
+        status = scanStatus(scan)
     elseif scanFailure then
         status = "Suche abgebrochen · Details mit /pu diagnose"
     elseif refreshPending then
         status = "Suche wird nach dem Kampf aktualisiert."
     elseif finished then
         status = instances and ("%d Instanz-Upgrades"):format(#display) or ("%d / %d Upgrades"):format(#display, #finished.rows)
-        if not finished.atlas.loaded then status = status .. " · AtlasLoot-Instanzdaten fehlen" end
-        if not finished.itemDBLoaded then status = status .. " · Polestar-Itemdaten fehlen" end
-        if not finished.codexLoaded then status = status .. " · Polestar-Codex fehlt" end
-        if not finished.questDBLoaded then status = status .. " · Questvoraussetzungen teilweise unbekannt" end
+        if instances and not finished.atlas.loaded and not finished.journal.loaded then
+            status = status .. " · Keine zusätzlichen Instanzdaten"
+        end
         if finished.unavailable > 0 then status = status .. (" · %d ohne vollständige Itemdaten"):format(finished.unavailable) end
         if finished.errors > 0 then status = status .. (" · %d Datenfehler"):format(finished.errors) end
+        if finished.limited then status = status .. " · Teilergebnis, mit Aktualisieren weiterladen" end
+        status = status .. (" · %d neu bewertet · %d übernommen"):format(finished.compared or 0, finished.reused or 0)
+        if (finished.skippedContent or 0) > 0 then
+            status = status .. (" · %d gesperrt übersprungen"):format(finished.skippedContent)
+        end
     else
         status = "Daten werden vorbereitet."
     end
@@ -301,19 +392,25 @@ local function render(reset)
         status = status .. " · AH-Stand " .. date("%d.%m. %H:%M", current.auctionAt)
     end
     window.status:SetText(status)
-    window.profile:SetText(current and ("Polestar · " .. current.profile .. "   |") or "Polestar   |")
+    local canExport = exportReady()
+    window.exportButton:SetEnabled(canExport)
+    window.exportButton.text:SetTextColor(unpack(canExport and TEXT or MUTED))
+    window.profile:SetText("Profil · " .. app.ProfileName() .. "   |")
     window.profile:SetWidth(math.min(260, window.profile:GetStringWidth() + 2))
     if not window.levelInput:HasFocus() then window.levelInput:SetText(tostring(searchLevel())) end
-    window.autoLevel:SetShown(searchLevel() > Polestar.Gear.PlayerLevel())
+    window.autoLevel:SetShown(searchLevel() > gear.PlayerLevel())
     window.empty:SetShown(#display == 0 and not scan and not refreshPending and not scanFailure)
     local empty = finished and #finished.rows > 0 and "Keine Treffer für diese Filter." or "Keine erreichbaren Upgrades in den geladenen Daten."
+    if finished and #finished.rows == 0 and finished.unavailable > 0 then
+        empty = "Noch keine Upgrades gefunden. Itemdaten fehlen; mit Aktualisieren weiterladen."
+    end
     if instances and type(instance) == "table" and db.slot == 0 and search == "" then
         empty = "Für die aktuelle Instanz sind keine erreichbaren Boss-Upgrades erfasst."
     elseif auctions then
         if not PaulchenAuktionsscan then
             empty = "Aktiviere Paulchen Auktionsscan in der Addon-Liste."
         elseif not current or not current.auctionAt then
-            empty = "Starte am Auktionshaus einen Scan mit /pah. Klicke danach auf „Aktualisieren“."
+            empty = "Lade Treffer im Auktionshaus und klicke auf „Aktualisieren“. Ein Vollscan ist mit /pah möglich."
         else
             empty = "Im gespeicherten AH-Stand gibt es keine Upgrades für diese Filter."
         end
@@ -321,8 +418,8 @@ local function render(reset)
     window.empty:SetText(empty)
     for _, col in ipairs(columns) do
         local key = auctions and col.key == "source" and "price" or col.key
-        local arrow = key == sortKey and (db.ascending and " ▲" or " ▼") or ""
-        local title = auctions and col.key == "source" and "Sofortkauf"
+        local arrow = key == sortKey and (db.ascending and upArrow or downArrow) or ""
+        local title = auctions and col.key == "source" and "AH-Preis"
             or instances and col.key == "source" and "Boss / Instanz" or col.text
         local header = window.headers[col.key]
         style.SetButtonState(header, key == sortKey)
@@ -334,14 +431,21 @@ end
 
 local function draw(reset)
     if not window or not window:IsVisible() then return end
+    displayFailure = nil
     local ok, err = pcall(render, reset)
     if not ok then
+        renderingRows = false
         displayFailure = tostring(err)
+        window.exportButton:SetEnabled(false)
+        window.exportButton.text:SetTextColor(unpack(MUTED))
         window.status:SetText("Anzeigefehler · Details mit /pu diagnose")
     end
 end
 
-local function refresh()
+local function refresh(keepResults)
+    keepResults = keepResults == true
+    deltaPending = false
+    autoToken, autoWaiting = autoToken + 1, false
     if InCombatLockdown() then
         refreshPending = true
         draw()
@@ -358,7 +462,7 @@ local function refresh()
         return
     end
     scan = result
-    local lastDraw
+    local lastDraw, lastRows
     local function step()
         if token ~= generation then return end
         local now = GetTime()
@@ -371,20 +475,90 @@ local function refresh()
         if complete then
             finished, scan = scan, nil
             draw()
+            if deltaPending then deltaPending = false; queueAutomatic(0.3) end
             return
         end
-        C_Timer.After(0.025, step)
-        if not lastDraw or now - lastDraw >= 0.25 then
-            draw()
+        C_Timer.After(0.05, step)
+        if not lastDraw or now - lastDraw >= 0.5 then
+            if lastRows ~= #scan.rows then draw(); lastRows = #scan.rows
+            elseif window and window:IsVisible() then window.status:SetText(scanStatus(scan)) end
             lastDraw = now
         end
     end
     C_Timer.After(0.01, step)
-    draw(true)
+    draw(not keepResults)
+end
+
+local function equipmentReady()
+    local player = gear.GetPlayer()
+    if not player.class or not player.level or player.level < 1 then return false end
+    for slot = 1, 18 do
+        if slot ~= 4 then
+            local id = GetInventoryItemID and suite.Readable(GetInventoryItemID("player", slot))
+            local link = gear.Client.InventoryLink(slot)
+            if (id and id > 0 and not link) or (link and not gear.GetItemInfo(link)) then
+                if id and C_Item and C_Item.RequestLoadItemDataByID then
+                    C_Item.RequestLoadItemDataByID(gear.ItemID(link) or id)
+                end
+                return false
+            end
+        end
+    end
+    return true
+end
+
+queueAutomatic = function(delay)
+    if not autoReady then return end
+    autoToken = autoToken + 1
+    local token, attempts = autoToken, 0
+    autoWaiting = true
+    local function check()
+        if token ~= autoToken then return end
+        if InCombatLockdown() then refreshPending = true; return end
+        local ok, ready = pcall(equipmentReady)
+        if not ok then
+            autoWaiting, scanFailure = false, "Ausrüstungsdaten: " .. tostring(ready)
+            return
+        end
+        if not ready then
+            attempts = attempts + 1
+            -- Item arrival events re-arm the check after this bounded retry.
+            if attempts < 20 then C_Timer.After(0.5, check) end
+            return
+        end
+        refresh(true)
+    end
+    C_Timer.After(delay or 0.1, check)
+end
+
+local function queueDelta()
+    if not autoReady then return end
+    if scan then deltaPending = true else queueAutomatic(0.3) end
+end
+
+function app.CheckUpgrades()
+    autoReady = true
+    queueAutomatic()
+end
+
+function app.OverviewUpgrade()
+    local current = scan or finished
+    local best
+    for _, row in ipairs(current and current.rows or {}) do
+        if not row.future and (row.requiredLevel or 0) <= gear.PlayerLevel() then
+            local score = row.empty and math.huge or row.pct or 0
+            local previous = best and (best.empty and math.huge or best.pct or 0)
+            if not best or score > previous or score == previous and row.delta > best.delta then best = row end
+        end
+    end
+    return { best = best, profile = current and current.profile or app.ProfileName(),
+        state = scan and "scanning" or refreshPending and "combat" or autoWaiting and "waiting"
+            or scanFailure and "error" or finished and "ready" or "idle",
+        error = scanFailure, partial = current and ((current.errors or 0) > 0 or (current.unavailable or 0) > 0) }
 end
 
 local function setSearchLevel(level)
-    plannedLevel = level and level > Polestar.Gear.PlayerLevel() and level or nil
+    plannedLevel = level and level > gear.PlayerLevel() and level or nil
     local current = scan or finished
     if not current or not matchesSearchLevel(current) then
         refresh()
@@ -402,11 +576,145 @@ local function button(parent, caption, x, y, w, h)
     return b
 end
 
+local function createProfileEditor(parent)
+    local f = CreateFrame("Frame", "PaulchenStatProfilesFrame", parent, "BackdropTemplate")
+    f:SetSize(700, 414)
+    f:SetPoint("CENTER")
+    f:SetFrameLevel(parent:GetFrameLevel() + 25)
+    f:EnableMouse(true)
+    style.Panel(f, style.background, style.accent)
+    f:Hide()
+    label(f, "GameFontNormalLarge", GOLD, 16, -11, 420, 27):SetText("Statprofile")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -3, -3)
+    close:SetScript("OnClick", function() f:Hide() end)
+    local selector = button(f, "", 16, -45, 224, 26)
+    local hint = label(f, "GameFontHighlightSmall", MUTED, 16, -76, 658, 19)
+    hint:SetText("Punkte pro Attribut. Bei %-Werten gilt das Gewicht pro Prozentpunkt.")
+    local boxes = {}
+    for i, field in ipairs(app.weightFields) do
+        local x = 16 + math.floor((i - 1) / 9) * 229
+        local y = -108 - ((i - 1) % 9) * 26
+        label(f, "GameFontHighlightSmall", TEXT, x, y, 150, 21):SetText(field[2])
+        local box = style.EditBox(f)
+        box:SetPoint("TOPLEFT", x + 151, y)
+        box:SetSize(55, 21)
+        box:SetMaxLetters(12)
+        box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+        box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+        box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        boxes[field[1]] = box
+    end
+    local tooltip = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    tooltip:SetPoint("TOPLEFT", 13, -346)
+    tooltip:SetSize(23, 23)
+    label(f, "GameFontHighlightSmall", TEXT, 40, -346, 222, 23):SetText("Vergleich im Item-Tooltip")
+    local feedback = label(f, "GameFontHighlightSmall", GOLD, 16, -378, 380, 24)
+    local function drawProfile()
+        selector.text:SetText(app.ProfileName() .. downArrow)
+        local weights = app.ProfileWeights()
+        for key, box in pairs(boxes) do box:SetText((tostring(weights[key] or 0):gsub("%.", ","))) end
+        tooltip:SetChecked(db.statTooltip ~= false)
+        feedback:SetText("")
+    end
+    selector:SetScript("OnClick", function(owner)
+        MenuUtil.CreateContextMenu(owner, function(_, menu)
+            for _, profile in ipairs(app.ProfileChoices()) do
+                local choice = profile
+                menu:CreateRadio(choice.name, function() return app.ActiveProfile() == choice end, function()
+                    app.SelectProfile(choice.key)
+                    drawProfile()
+                end)
+            end
+        end)
+    end)
+    tooltip:SetScript("OnClick", function(self) db.statTooltip = not not self:GetChecked() end)
+    local reset = button(f, "Standardwerte", 439, -378, 115, 24)
+    reset:SetScript("OnClick", function()
+        local choice = app.ActiveProfile()
+        if not choice then return end
+        for key, box in pairs(boxes) do box:SetText((tostring(choice.weights[key] or 0):gsub("%.", ","))) end
+        feedback:SetText("Zum Übernehmen speichern.")
+    end)
+    local save = button(f, "Speichern", 563, -378, 119, 24)
+    save:SetScript("OnClick", function()
+        local weights = {}
+        for key, box in pairs(boxes) do weights[key] = tonumber((box:GetText():gsub(",", "."))) end
+        if app.SaveProfileWeights(weights) then
+            f:Hide()
+        else
+            feedback:SetText("Bitte Gewichte von 0 bis 1.000.000 eingeben.")
+        end
+    end)
+    f:SetScript("OnShow", drawProfile)
+    return f
+end
+
+local function createExportDialog(parent)
+    local f = CreateFrame("Frame", "PaulchenUpgradesExportFrame", parent, "BackdropTemplate")
+    f:SetSize(730, 405)
+    f:SetPoint("CENTER")
+    f:SetFrameLevel(parent:GetFrameLevel() + 25)
+    f:EnableMouse(true)
+    style.Panel(f, style.background, style.accent)
+    f:Hide()
+    label(f, "GameFontNormalLarge", GOLD, 16, -12, 664, 24):SetText("Upgrade-Export")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -3, -3)
+    close:SetScript("OnClick", function() f:Hide() end)
+    local summary = label(f, "GameFontHighlightSmall", MUTED, 16, -40, 696, 18)
+    local scroll = CreateFrame("ScrollFrame", "$parentScroll", f, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 16, -65)
+    scroll:SetSize(674, 286)
+    local box = style.EditBox(scroll, GameFontHighlightSmall)
+    box:SetPoint("TOPLEFT")
+    box:SetWidth(674)
+    box:SetMultiLine(true)
+    box:SetMaxBytes(0)
+    box:SetTextInsets(8, 8, 6, 6)
+    scroll:SetScrollChild(box)
+    local measure = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    measure:SetWidth(658)
+    measure:SetWordWrap(true)
+    measure:Hide()
+    local text
+    local function selectAll()
+        box:SetFocus()
+        box:HighlightText()
+    end
+    box:SetScript("OnEscapePressed", function() f:Hide() end)
+    box:SetScript("OnTextChanged", function(self, userInput)
+        if userInput and self:GetText() ~= text then
+            self:SetText(text or "")
+            self:HighlightText()
+        end
+    end)
+    f:SetScript("OnHide", function() box:ClearFocus() end)
+    button(f, "Alles markieren", 16, -364, 142, 25):SetScript("OnClick", selectAll)
+    label(f, "GameFontHighlightSmall", TEXT, 170, -364, 530, 25)
+        :SetText("Strg+C kopiert den Text. In Excel oder Google Sheets ab A1 einfügen.")
+
+    function f.ShowResults()
+        text = exportResults()
+        measure:SetText(text)
+        box:SetHeight(math.max(286, measure:GetStringHeight() + 12, (#display + 1) * 13 + 12))
+        box:SetText(text)
+        box:SetCursorPosition(0)
+        scroll:UpdateScrollChildRect()
+        scroll:SetVerticalScroll(0)
+        summary:SetText(("%d %s · Aktuelle Filter und Sortierung · Tabulatorgetrennt (TSV)")
+            :format(#display, #display == 1 and "Upgrade" or "Upgrades"))
+        f:Show()
+        selectAll()
+    end
+    return f
+end
+
 local function dropdown(parent, options, key, x, w, currentLabel, y)
     local function caption()
-        if currentLabel then return currentLabel() .. "  ▾" end
+        if currentLabel then return currentLabel() .. downArrow end
         for _, option in ipairs(options) do
-            if option[1] == db[key] then return option[2] .. "  ▾" end
+            if option[1] == db[key] then return option[2] .. downArrow end
         end
     end
     local b = button(parent, caption(), x, y or -69, w, 27)
@@ -447,8 +755,16 @@ local function makeRow(parent, index)
             (col.numeric or col.option) and "RIGHT" or "LEFT")
         if isSource then row.where = label(row, "GameFontHighlightSmall", MUTED, padding, -16, w, 13) end
     end
-    row:SetScript("OnEnter", tip)
-    row:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
+    row:SetScript("OnEnter", function(self) hoveredRow = self; tip(self) end)
+    row:SetScript("OnLeave", function(self)
+        if hoveredRow == self then hoveredRow = nil end
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+        if not renderingRows then draw() end
+    end)
+    row:SetScript("OnHide", function(self)
+        if hoveredRow == self then hoveredRow = nil end
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
     row:SetScript("OnClick", function(self, mouseButton)
         if not self.entry then return end
         if mouseButton == "RightButton" then
@@ -554,6 +870,11 @@ local function createPage(parent)
     style.Portrait(titlebar, 42, 10, -7)
     label(titlebar, "GameFontNormalLarge", GOLD, 59, -5, 390, 30):SetText("Paulchen Upgrades")
     f.profile = label(titlebar, "GameFontHighlightSmall", MUTED, 59, -34, 260, 17)
+    f.profilesButton = button(titlebar, "Statprofile", 347, -12, 103, 27)
+    f.profilesButton:SetScript("OnClick", function()
+        profileEditor = profileEditor or createProfileEditor(f)
+        profileEditor:SetShown(not profileEditor:IsShown())
+    end)
     local levelControl = CreateFrame("Frame", nil, titlebar)
     levelControl:SetSize(120, 22)
     levelControl:SetPoint("LEFT", f.profile, "RIGHT", 6, 0)
@@ -607,6 +928,20 @@ local function createPage(parent)
     f.professionFilter = dropdown(f, app.professionChoices, "profession", 17, 210, nil, -103)
     f.auctionScan = button(f, "AH scannen", 17, -103, 141, 27)
     f.auctionScan:SetScript("OnClick", function() PaulchenAuktionsscan.Start() end)
+    f.contentButton = button(f, "Spielinhalte" .. downArrow, 17, -103, 210, 27)
+    f.contentButton:SetScript("OnClick", function(self)
+        MenuUtil.CreateContextMenu(self, function(_, menu)
+            if menu.CreateTitle then menu:CreateTitle("Auf deinem Server freigeschaltet") end
+            for _, choice in ipairs(app.content.choices) do
+                local key, caption = choice[1], choice[2]
+                menu:CreateCheckbox(caption, function() return app.content.Snapshot()[key] end, function()
+                    app.content.SetEnabled(key, not app.content.Snapshot()[key])
+                    -- Source eligibility changes; cached stat comparisons stay reusable.
+                    refresh()
+                end)
+            end
+        end)
+    end)
 
     f.qualityChecks = {}
     for i, entry in ipairs(qualities) do
@@ -623,6 +958,7 @@ local function createPage(parent)
         f.qualityChecks[id] = check
     end
     local box = style.EditBox(f, GameFontHighlight)
+    f.searchBox = box
     box:SetPoint("TOPLEFT", 392, -69)
     box:SetSize(364, 27)
     box:SetTextInsets(8, 8, 0, 0)
@@ -637,7 +973,14 @@ local function createPage(parent)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     local reload = button(f, "Aktualisieren", 764, -69, 128, 27)
     reload:SetScript("OnClick", refresh)
-    f.columnsMenu = button(f, "Spalten  ▾", 764, -103, 128, 27)
+    f.exportButton = button(f, "Exportieren", 350, -103, 118, 27)
+    f.exportButton:SetEnabled(false)
+    f.exportButton:SetScript("OnClick", function()
+        if not exportReady() then return end
+        exportDialog = exportDialog or createExportDialog(f)
+        exportDialog.ShowResults()
+    end)
+    f.columnsMenu = button(f, "Spalten" .. downArrow, 764, -103, 128, 27)
     f.columnsMenu:SetScript("OnClick", function(self)
         MenuUtil.CreateContextMenu(self, function(_, menu)
             if menu.SetScrollMode then menu:SetScrollMode(390) end
@@ -741,6 +1084,12 @@ local function createPage(parent)
         end
     end)
     f:SetScript("OnHide", function()
+        if hoveredRow then
+            if GameTooltip:IsOwned(hoveredRow) then GameTooltip:Hide() end
+            hoveredRow = nil
+        end
+        if exportDialog then exportDialog:Hide() end
+        if profileEditor then profileEditor:Hide() end
         box:ClearFocus()
         levelInput:ClearFocus()
     end)
@@ -790,6 +1139,17 @@ function app.Open()
     suite.OpenDashboard("upgrades")
 end
 
+function app.OpenOverviewUpgrade()
+    local best = app.OverviewUpgrade().best
+    suite.OpenDashboard("upgrades")
+    if best and window then
+        db.tab, db.slot, db.source, db.profession = "overview", 0, "all", ""
+        db.quality[best.quality] = true
+        window.searchBox:SetText(best.name)
+        draw(true)
+    end
+end
+
 function app.UpdateMinimap(shown)
     local broker = LibStub and LibStub("LibDataBroker-1.1", true)
     local icons = broker and LibStub("LibDBIcon-1.0", true)
@@ -801,6 +1161,15 @@ function app.UpdateMinimap(shown)
         createMinimapButton(broker, icons)
     end
 end
+
+app.On("GEAR_UPDATED", function(reason)
+    if reason == "bags" or reason == "bagItems" then queueDelta(); return end
+    if reason ~= "profile" and reason ~= "equipment" and reason ~= "level" and reason ~= "skills" then return end
+    generation = generation + 1
+    scan, finished, deltaPending = nil, nil, false
+    if window and window:IsVisible() then refresh() else queueAutomatic() end
+end)
+app.On("PAULCHEN_VARIANT_ADDED", queueDelta)
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
@@ -827,13 +1196,20 @@ events:SetScript("OnEvent", function(_, event, id, success)
     elseif event == "AUCTION_HOUSE_SHOW" or event == "AUCTION_HOUSE_CLOSED" then
         if window and window:IsVisible() then C_Timer.After(0, updateAuctionScanButton) end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+        if event == "PLAYER_ENTERING_WORLD" and (id or success or not autoReady) then
+            autoReady = true
+            queueAutomatic()
+        end
         if window and window:IsVisible() and db.tab == "instances" and db.instanceSelection == automatic then
             draw(true)
         end
     elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
-        if scan and id and success == false then app.ItemFailed(scan, id) end
+        if scan and id then app.ItemDataReady(scan, id, success) end
+        if autoWaiting and success ~= false then queueAutomatic() end
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if refreshPending then refresh() end
+        if refreshPending then
+            if autoWaiting then queueAutomatic() else refresh() end
+        end
     elseif event == "PLAYER_REGEN_DISABLED" and scan then
         generation = generation + 1
         scan, refreshPending = nil, true

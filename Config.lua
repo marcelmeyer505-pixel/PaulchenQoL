@@ -3,7 +3,7 @@ local _, app = ...
 local defaults = {
     show = true, size = 128, opacity = 1, bubbles = true, comments = true,
     frequency = 2, sarcasm = 2, hideCombat = true, memory = true, debug = false, moduleIcons = false,
-    questTurnIns = true, mountGloves = true,
+    questTurnIns = true, mountGloves = true, levelUpSound = true,
 }
 local profile, window
 
@@ -45,6 +45,7 @@ local function write(key, value)
     if key == "moduleIcons" then app.UpdateModuleIcons() end
     if key == "questTurnIns" then app.RefreshQuestMap() end
     if key == "mountGloves" then app.RefreshMountGloves() end
+    if key == "levelUpSound" then app.ApplyLevelUpSound() end
     if app.RestartIdle and (key == "frequency" or key == "comments" or key == "show" or key == "bubbles") then
         app.RestartIdle()
     end
@@ -128,8 +129,8 @@ app.RefreshSettings = refreshSettings
 local function createWindow()
     local f = CreateFrame("Frame", "PaulchenQoLConfig", UIParent, "BackdropTemplate")
     f:Hide()
-    f:SetSize(485, 423)
-    f:SetScale(math.min(1, (UIParent:GetWidth() - 20) / 485, (UIParent:GetHeight() - 20) / 423))
+    f:SetSize(485, 452)
+    f:SetScale(math.min(1, (UIParent:GetWidth() - 20) / 485, (UIParent:GetHeight() - 20) / 452))
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
@@ -152,14 +153,18 @@ local function createWindow()
         checkbox(f, "moduleIcons", "Separate Modul-Minimapknöpfe", -257),
         checkbox(f, "questTurnIns", "Questabgaben auf der Weltkarte", -286),
         checkbox(f, "mountGloves", "Reithandschuhe automatisch wechseln", -315),
+        checkbox(f, "levelUpSound", "Eigener Level-up-Sound", -344),
         slider(f, "size", "Größe", -90, 64, 256, 1, 1, "px"),
         slider(f, "opacity", "Deckkraft", -137, 20, 100, 1, 100, "%"),
         choices(f, "frequency", "Häufigkeit", { "Selten", "Normal", "Gesprächig" }, -184),
         choices(f, "sarcasm", "Sarkasmus", { "Lieb", "Frech", "Gnadenlos" }, -238),
     }
-    button(f, "Position zurücksetzen", 18, -363, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
-    button(f, "Testkommentar", 252, -363, 210):SetScript("OnClick", function() app.TestComment() end)
-    label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -396)
+    button(f, "Level-up-Sound testen", 252, -315, 210):SetScript("OnClick", function()
+        if not app.PlayLevelUpSound() then print("Paulchen QoL · Der Level-up-Sound konnte nicht abgespielt werden.") end
+    end)
+    button(f, "Position zurücksetzen", 18, -392, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
+    button(f, "Testkommentar", 252, -392, 210):SetScript("OnClick", function() app.TestComment() end)
+    label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -425)
     table.insert(UISpecialFrames, f:GetName())
     f:SetScript("OnShow", refreshSettings)
     return f

@@ -5,6 +5,7 @@ local hands = INVSLOT_HAND or 10
 local readable = app.Readable
 local initialized, queued, mountedBefore
 local pending, skipRide, restoreFailed, missingReported
+local automaticLink
 
 local function wornGloves()
     local id = GetInventoryItemID("player", hands)
@@ -46,13 +47,46 @@ local function tell(text)
     print("Paulchen QoL · " .. text)
 end
 
+function app.UpgradeGloveLink()
+    if not (GetInventoryItemID and GetInventoryItemLink) then return end
+    local saved = app.Settings().mountGloveReturn
+    if type(saved) ~= "table" or type(saved.link) ~= "string" then return end
+    local id, known = wornGloves()
+    if known and (id == ridingGloves or pending and not id) then return saved.link end
+end
+
+function app.IsRidingGloveItem(id)
+    return readable(id) == ridingGloves
+end
+
+function app.IsAutomaticMountGloveChange(slot)
+    if readable(slot) ~= hands or not (GetInventoryItemID and GetInventoryItemLink) then return false end
+    local id, known = wornGloves()
+    if not known then return false end
+    local link = readable(GetInventoryItemLink("player", hands))
+    if pending and (not id or pending.riding and id == ridingGloves or not pending.riding and link == pending.item) then
+        if link then automaticLink = link end
+        return true
+    end
+    -- Duplicate notifications may arrive after the asynchronous request is
+    -- confirmed. A different link immediately restores normal gear handling.
+    if automaticLink and link == automaticLink then return true end
+    automaticLink = nil
+    return false
+end
+
 local function equip(item, riding)
-    local request = { item = item, riding = riding }
+    local request = { item = item, riding = riding, before = readable(GetInventoryItemLink("player", hands)) }
     pending = request
     app.SecureCall("Reithandschuhe anlegen", C_Item.EquipItemByName, item, hands)
     C_Timer.After(1.5, function()
         if pending ~= request then return end
         pending = nil
+        local id, known = wornGloves()
+        if known and not id and request.before then
+            local gear = app.upgrades and app.upgrades.gear
+            if gear and gear.Invalidate then gear.Invalidate("equipment") end
+        end
         if riding then
             if mounted() and canChangeGear() and wornGloves() ~= ridingGloves then
                 tell("Die Handschuhe der Vorhut konnten nicht angelegt werden.")

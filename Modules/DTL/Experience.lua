@@ -365,6 +365,21 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
     end
 
     local session, sampleTimer, pendingLevel, farm, renderArchive
+    addon.OverviewExperience = function()
+        local current = session and session.last
+        if not current then return end
+        local elapsed = math.max(0, GetTime() - session.started)
+        local rate = sessionRate(session, elapsed)
+        local paused = xpIsPaused()
+        local remaining = math.max(0, current.maximum - current.xp)
+        local usable = current.maximum > 0 and not paused
+        return {
+            level = current.level, xp = current.xp, maximum = current.maximum,
+            total = session.total, elapsed = elapsed, rate = rate, partial = session.partial, paused = paused,
+            mobs = usable and enemyEstimate(session, remaining) or nil,
+            eta = usable and not session.partial and rate and rate > 0 and 3600 * remaining / rate or nil,
+        }
+    end
     addon.GetMiniExperience = function()
         local current = session and session.last
         if not current then

@@ -2,10 +2,11 @@ local _, suite = ...
 local app = suite.upgrades
 if not app then return end
 local pole = Polestar
+local availability = app.content
 local moduleName = "AtlasLootClassic_DungeonsAndRaids"
 local sourceNames = {
     quest = "Quest", boe = "BoE", dungeon = "Instanz", raid = "Raid", drop = "Drop", vendor = "Händler",
-    craft = "Herstellung", auction = "Auktionshaus",
+    craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen",
 }
 app.sourceNames = sourceNames
 
@@ -125,9 +126,10 @@ end
 
 local atlasIndex
 local function atlasSources(faction)
-    if atlasIndex and atlasIndex.faction == faction then return atlasIndex end
-    local result = { items = {}, zones = {}, npcs = {}, locations = {}, faction = faction }
     local atlas = AtlasLoot
+    if atlasIndex and atlasIndex.faction == faction and atlasIndex.api == atlas then return atlasIndex end
+    local result = { items = {}, zones = {}, npcs = {}, locations = {}, faction = faction, api = atlas }
+    if not atlas then atlasIndex = result end
     if not (atlas and atlas.ItemDB) then return result end
     local db = atlas.ItemDB
     if not db:Get(moduleName) and C_AddOns and C_AddOns.LoadAddOn then
@@ -155,7 +157,7 @@ local function atlasSources(faction)
             local phaseOK = not phases or phases:IsActive(content.ContentPhase, classic)
             local map = content.MapID or content.AreaID
             local location = {
-                kind = kind, name = clean(label), map = map, instanceID = content.InstanceID,
+                kind = kind, name = clean(label), key = key, map = map, instanceID = content.InstanceID,
                 min = range and range[1] or 60,
                 suggested = range and (range[2] or range[1]) or 60, active = phaseOK,
             }
@@ -168,7 +170,8 @@ local function atlasSources(faction)
                 if type(boss) == "table" and not boss.IgnoreAsSource and not boss.ExtraList then
                     local bossActive = phaseOK and (not phases or phases:IsActive(boss.ContentPhase, classic))
                     local bossLocation = {
-                        kind = kind, name = location.name, min = location.min, suggested = location.suggested,
+                        kind = kind, name = location.name, key = location.key, map = location.map,
+                        instanceID = location.instanceID, min = location.min, suggested = location.suggested,
                         active = bossActive, boss = type(boss.name) == "string" and clean(boss.name) or nil,
                     }
                     markNPCs(result.npcs, boss.npcID, bossLocation)
@@ -179,6 +182,7 @@ local function atlasSources(faction)
                                 for _, row in pairs(loot) do
                                     local id = type(row) == "table" and row[2]
                                     if type(id) == "number" and id > 0 and not seen[id] then
+                                        availability.NoteItem(id, bossLocation)
                                         seen[id] = true
                                         local pct = dropRate(rates, boss.npcID, id)
                                         add(result.items, id, { location = bossLocation, pct = pct })
@@ -201,27 +205,113 @@ local function normalized(name)
     return clean(name):lower():gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("Ü", "ü"):gsub("[%p%s]", "")
 end
 
-function app.CurrentInstance(atlas)
+local function localizedName(localize, name)
+    if localize then
+        local ok, value = pcall(localize, name)
+        if ok and type(value) == "string" and value ~= "" then return clean(value) end
+    end
+    return name
+end
+
+local journalIndex
+local function journalSources(faction, atlas)
+    local journal = _G.ForeverDungeonJournal_NS
+    if not (journal and type(journal.DB) == "table" and type(journal.ORDER) == "table") then
+        return { items = {}, npcs = {}, locations = {} }
+    end
+    if journalIndex and journalIndex.db == journal.DB and journalIndex.atlas == atlas
+        and journalIndex.faction == faction then return journalIndex end
+    local result = { items = {}, npcs = {}, locations = {}, db = journal.DB, atlas = atlas, faction = faction, loaded = true }
+    local atlasByName, instanceByName = {}, {}
+    for _, location in ipairs(atlas.locations) do
+        atlasByName[normalized(location.name)] = location
+        if location.key then atlasByName[normalized(location.key)] = location end
+    end
+    for id, name in pairs(journal.INSTANCE_ID_TO_DUNGEON or {}) do instanceByName[name] = id end
+    local rates = AtlasLoot and AtlasLoot.Data and AtlasLoot.Data.Droprate
+
+    for _, key in ipairs(journal.ORDER) do
+        local dungeon = journal.DB[key]
+        if type(dungeon) == "table" then
+            local name = localizedName(journal.LocalizeDungeonName, key)
+            local known = atlasByName[normalized(key)] or atlasByName[normalized(name)]
+                or atlasByName[normalized(key:gsub("^The ", ""))]
+            local min = type(dungeon.level) == "string" and tonumber(dungeon.level:match("%d+")) or 1
+            local location = {
+                name = known and known.name or name, key = key, localName = name,
+                kind = known and known.kind or "dungeon", active = not known or known.active,
+                instanceID = known and known.instanceID or instanceByName[key],
+                min = known and known.min or min, suggested = known and known.suggested or min,
+            }
+            result.locations[#result.locations + 1] = location
+            for _, boss in ipairs(dungeon.bosses or {}) do
+                if type(boss) == "table" and not boss.recipeTab and not boss.childOf and not boss.fdjDungeon
+                    and (not boss.factionOnly or boss.factionOnly == faction) then
+                    local fromAtlas = type(boss.npcID) == "number" and atlas.npcs[boss.npcID]
+                    local bossLocation
+                    if fromAtlas and fromAtlas.name == location.name then
+                        bossLocation = fromAtlas
+                    else
+                        bossLocation = {
+                            name = location.name, key = location.key, instanceID = location.instanceID,
+                            kind = location.kind, active = location.active,
+                            min = location.min, suggested = location.suggested,
+                            boss = type(boss.name) == "string" and localizedName(journal.LocalizeBossName, boss.name) or nil,
+                        }
+                    end
+                    markNPCs(result.npcs, boss.npcID, bossLocation)
+                    if bossLocation.active then
+                        local seen = {}
+                        local function addLoot(loot)
+                            for _, entry in ipairs(type(loot) == "table" and loot or {}) do
+                                local id = type(entry) == "table" and tonumber(entry[1])
+                                if id and id > 0 and not seen[id] then
+                                    availability.NoteItem(id, bossLocation)
+                                    seen[id] = true
+                                    add(result.items, id, { location = bossLocation, pct = dropRate(rates, boss.npcID, id) })
+                                end
+                            end
+                        end
+                        addLoot(boss.loot)
+                        if journal.GetBossSharedLoot then
+                            local ok, shared = pcall(journal.GetBossSharedLoot, key, boss)
+                            if ok then addLoot(shared) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    journalIndex = result
+    return result
+end
+
+function app.CurrentInstance(atlas, journal)
     if not GetInstanceInfo then return nil end
-    local readable = pole.Compat.Readable
+    local readable = suite.Readable
     local name, kind, _, _, _, _, _, id = GetInstanceInfo()
     kind, id = readable(kind), readable(id)
     if kind ~= "party" and kind ~= "raid" then return nil end
     name = readable(name)
     if type(name) ~= "string" then name = nil end
     local zone = normalized(name)
-    if not atlas then return nil, name, id end
+    if not atlas and not journal then return nil, name, id end
 
     local result = {}
     local function include(location) result[location.name] = true end
-    for _, location in ipairs(atlas.locations) do
-        if (id and id > 0 and location.instanceID == id) or (zone ~= "" and normalized(location.name) == zone) then
-            include(location)
+    local function matchLocations(index)
+        for _, location in ipairs(index and index.locations or {}) do
+            if (id and id > 0 and location.instanceID == id) or (zone ~= "" and (normalized(location.name) == zone
+                or normalized(location.key) == zone or normalized(location.localName) == zone)) then
+                include(location)
+            end
         end
     end
+    matchLocations(atlas)
+    matchLocations(journal)
     -- Some instances have several loot tables under one world map. Their labels
     -- often include a wing suffix, even when the client's instance name doesn't.
-    if not next(result) and zone ~= "" then
+    if not next(result) and zone ~= "" and atlas then
         for _, location in ipairs(atlas.locations) do
             local candidate = normalized(location.name)
             local area = location.map and C_Map and C_Map.GetAreaInfo and C_Map.GetAreaInfo(location.map)
@@ -242,6 +332,13 @@ local function isAllowed(mask, flag)
 end
 
 local function questSource(scan, id, live)
+    if not availability.QuestAllowed(scan, id) then return end
+    if not (pole and pole.Compat and pole.ItemDB) then
+        if not live then return end
+        local ready = C_QuestLog.ReadyForTurnIn and suite.Readable(C_QuestLog.ReadyForTurnIn(id))
+        return { kind = "quest", title = live.title or ("Quest " .. id), quest = id,
+            detail = ready and "Abgabebereit" or "Im Questlog", effort = ready and 1 or 2 }
+    end
     local compat, db, ctx = pole.Compat, pole.QuestDB, scan.questContext
     local q = pole.ItemDB.Quest(id)
     local record = db and db.QuestRecord(id)
@@ -256,6 +353,7 @@ local function questSource(scan, id, live)
         return nil
     end
     local codexQuest = scan.codexLoaded and pole.Codex.Quest(id)
+    if not availability.QuestAllowed(scan, id, q, codexQuest) then return nil end
     if codexQuest and not active then
         if pole.Lookup and pole.Lookup.QuestBlock and pole.Lookup.QuestBlock(codexQuest, scan.player) then return nil end
         if codexQuest.repFaction and codexQuest.repStanding
@@ -312,10 +410,11 @@ local function liveRewards()
 end
 
 function app.PrepareSources(scan)
-    local db = pole.QuestDB
+    scan.content = availability.Snapshot()
+    local db = pole and pole.QuestDB
     if db and not db.IsLoaded() then db.Load() end
-    scan.codexLoaded = pole.Codex and pole.Codex.Load()
-    scan.player = pole.Lookup and pole.Lookup.PlayerInfo and pole.Lookup.PlayerInfo()
+    scan.codexLoaded = pole and pole.Codex and pole.Codex.Load()
+    scan.player = pole and pole.Lookup and pole.Lookup.PlayerInfo and pole.Lookup.PlayerInfo()
     scan.questContext = db and db.PlayerContext() or { level = scan.level }
     scan.questContext.level = scan.level
     if scan.player and scan.level > scan.playerLevel then
@@ -324,14 +423,16 @@ function app.PrepareSources(scan)
         player.level = scan.level
         scan.player = player
     end
-    scan.questOptions = { lowLevel = true, skillRank = pole.Compat.GetSkillRank }
+    local skillRank = pole and pole.Compat and pole.Compat.GetSkillRank or app.gear.SkillRank
+    scan.questOptions = { lowLevel = true, skillRank = skillRank }
     scan.questMemo = {}
     scan.activeRewards = liveRewards()
     scan.atlas = atlasSources(scan.faction)
+    scan.journal = journalSources(scan.faction, scan.atlas)
     scan.crafting = craftingSources()
     scan.professionRanks = {}
     for _, profession in ipairs(professions) do
-        scan.professionRanks[profession[3]] = pole.Compat.GetSkillRank(profession[3])
+        scan.professionRanks[profession[3]] = skillRank(profession[3])
     end
     scan.questDBLoaded = db and db.IsLoaded()
 end
@@ -348,10 +449,11 @@ local function addQuest(scan, list, seen, id, live)
 end
 
 local function addDrop(scan, list, seen, location, title, pct, worldZone)
+    if not availability.LocationAllowed(scan, location or { name = worldZone }) then return end
     if location and (not location.active or scan.level < location.min) then return end
     local kind = location and location.kind or "drop"
     local zone = location and location.name or worldZone
-    local key = kind .. (zone or "") .. title
+    local key = kind .. "\031" .. normalized(zone) .. "\031" .. normalized(title)
     local prior = seen[key]
     if prior and (prior.pct or 0) >= (pct or 0) then return end
     local group = kind == "raid" and 7 or kind == "dungeon" and 4 or 5
@@ -383,8 +485,51 @@ local function futureCodexSource(scan, route, item)
         or (pole.Compat.GetSkillRank(item.reqSkill) or 0) >= item.reqSkillRank
 end
 
-local function addCodexSources(scan, id, list, quests, drops, crafts)
-    local lookup = pole.Lookup
+local function codexLocation(scan, raw, instanceKey)
+    local location = scan.atlas.npcs[raw.npc] or scan.journal.npcs[raw.npc]
+    if location then return location end
+    local codex = pole and pole.Codex
+    if not codex then return end
+    local npc = raw.npc and codex.Npc and codex.Npc(raw.npc)
+    local key = instanceKey or raw.instance or npc and npc.instance
+    local instance = key and codex.Instance and codex.Instance(key)
+    if instance then
+        local levels, raid = instance.levels, instance.kind == "raid"
+        local minimum = levels and levels[1] or (raid and 60 or scan.level)
+        return { kind = raid and "raid" or "dungeon", name = instance.name, key = key,
+            instanceID = type(key) == "number" and key or nil,
+            min = minimum, suggested = levels and levels[2] or minimum, active = true }
+    end
+end
+
+-- Only known locked IDs need the exception checks. This uses local source
+-- metadata, never item tooltips, score calculations or item-data requests.
+function app.CanSearchItem(scan, id)
+    if availability.ItemAllowed(scan, id) or scan.presentItems and scan.presentItems[id] then return true end
+    local function open(location)
+        return location and location.active and scan.level >= location.min
+            and availability.LocationAllowed(scan, location)
+    end
+    for _, index in ipairs({ scan.atlas, scan.journal }) do
+        for _, drop in ipairs(index.items[id] or {}) do if open(drop.location) then return true end end
+    end
+    for _, source in ipairs(pole and pole.ItemDB and pole.ItemDB.Sources(id) or {}) do
+        if source.kind == "drop" then
+            local location = scan.atlas.npcs[source.npc] or scan.journal.npcs[source.npc] or scan.atlas.zones[source.zone]
+            if open(location) then return true end
+        end
+    end
+    local item = scan.codexLoaded and pole.Codex.Item and pole.Codex.Item(id)
+    for _, source in ipairs(item and item.sources or {}) do
+        if source.type == "drop" or source.type == "world" then
+            if open(codexLocation(scan, source)) then return true end
+        end
+    end
+    return false
+end
+
+local function addCodexSources(scan, id, list, quests, drops, crafts, restricted)
+    local lookup = pole and pole.Lookup
     if not (scan.codexLoaded and lookup and lookup.Sources) then return end
     local ok, routes, item = pcall(lookup.Sources, "item", id, true)
     if not ok then
@@ -394,28 +539,19 @@ local function addCodexSources(scan, id, list, quests, drops, crafts)
     local vendors = {}
     for _, route in ipairs(routes) do
         local raw = route.src
-        if raw and route.type == "craft" then
+        if raw and route.type == "craft" and not restricted then
             addCraft(scan, list, crafts, raw.skillLine, raw.skill, raw.spell)
         elseif raw and (route.available or futureCodexSource(scan, route, item)) then
-            if route.type == "quest" and raw.quest then
+            if route.type == "quest" and raw.quest and not restricted then
                 addQuest(scan, list, quests, raw.quest)
             elseif route.type == "drop" or route.type == "world" then
-                local location = scan.atlas.npcs[raw.npc]
-                if not location and route.instance then
-                    local instance = pole.Codex.Instance(route.instance)
-                    if instance then
-                        local levels = instance.levels
-                        local raid = instance.kind == "raid"
-                        local minimum = levels and levels[1] or (raid and 60 or scan.level)
-                        location = {
-                            kind = raid and "raid" or "dungeon", name = instance.name,
-                            min = minimum, suggested = levels and levels[2] or minimum, active = true,
-                        }
-                    end
-                end
+                local location = codexLocation(scan, raw, route.instance)
                 local title = (location and location.boss) or route.label or "Weltbeute"
-                addDrop(scan, list, drops, location, title, route.chance, route.zone)
-            elseif route.type == "vendor" or route.type == "gift" then
+                availability.NoteItem(id, location)
+                if not restricted or location and not availability.LocationGroup(location) then
+                    addDrop(scan, list, drops, location, title, route.chance, route.zone)
+                end
+            elseif not restricted and (route.type == "vendor" or route.type == "gift") then
                 local key = raw.npc or route.label
                 if not vendors[key] then
                     vendors[key] = true
@@ -434,34 +570,48 @@ end
 
 function app.GetSources(scan, id, item)
     local list, quests, drops, crafts = {}, {}, {}, {}
-    for _, quest in ipairs(scan.activeRewards[id] or {}) do
+    local released = availability.ItemAllowed(scan, id)
+    for _, quest in ipairs(released and scan.activeRewards[id] or {}) do
         addQuest(scan, list, quests, quest.questID, quest)
     end
     for _, drop in ipairs(scan.atlas.items[id] or {}) do
         local location = drop.location
         addDrop(scan, list, drops, location, location.boss or "Instanzbeute", drop.pct)
     end
-    for _, source in ipairs(pole.ItemDB.Sources(id) or {}) do
-        if source.kind == "quest" then
+    for _, drop in ipairs(scan.journal.items[id] or {}) do
+        local location = drop.location
+        addDrop(scan, list, drops, location, location.boss or "Instanzbeute", drop.pct)
+    end
+    for _, source in ipairs(pole and pole.ItemDB and pole.ItemDB.Sources(id) or {}) do
+        if source.kind == "quest" and released then
             addQuest(scan, list, quests, source.quest)
-        elseif source.kind == "craft" then
+        elseif source.kind == "craft" and released then
             addCraft(scan, list, crafts, source.profession, source.skill, source.spell)
         elseif source.kind == "drop" then
-            local location = scan.atlas.npcs[source.npc] or scan.atlas.zones[source.zone]
+            local location = scan.atlas.npcs[source.npc] or scan.journal.npcs[source.npc] or scan.atlas.zones[source.zone]
+            availability.NoteItem(id, location)
             local title = (location and location.boss) or source.npcName or source.zoneName or "Fundort unbekannt"
-            addDrop(scan, list, drops, location, title, source.pct, source.zoneName)
+            if released or location and not availability.LocationGroup(location) then
+                addDrop(scan, list, drops, location, title, source.pct, source.zoneName)
+            end
         end
     end
-    for _, recipe in ipairs(scan.crafting[id] or {}) do
+    for _, recipe in ipairs(released and scan.crafting[id] or {}) do
         addCraft(scan, list, crafts, recipe.profession, recipe.skill, recipe.spell)
     end
-    addCodexSources(scan, id, list, quests, drops, crafts)
+    addCodexSources(scan, id, list, quests, drops, crafts, not released)
+    local key = item and (app.VariantKey(item.link) or id) or id
+    if scan.bagItems and scan.bagItems[key] then
+        list[#list + 1] = { kind = "bag", title = "In deinen Taschen", effort = 1 }
+    end
     local offers = item and scan.auctions and scan.auctions[id]
-    local offer = offers and offers[app.VariantKey(item.link) or id]
+    local offer = offers and offers[key]
     if offer then
         list[#list + 1] = { kind = "auction", title = "Sofortkauf", price = offer.price, at = offer.at, effort = 2 }
+    elseif scan.browseItems and scan.browseItems[key] then
+        list[#list + 1] = { kind = "auction", title = "AH-Übersicht", price = scan.browseItems[key].price, effort = 2 }
     end
-    if item and item.boe then
+    if availability.ItemAllowed(scan, id) and item and item.boe then
         local effort = item.quality >= 4 and 7 or item.quality >= 3 and 5 or 3
         list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = "Bestand und Preis unbekannt", effort = effort }
     end

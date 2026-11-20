@@ -114,6 +114,10 @@ function app.SetCompanionReminder(key, text)
     app.RenderCompanion()
 end
 
+function app.CompanionReminders()
+    return reminders.mark, reminders.pouch
+end
+
 function app.RenderCompanion()
     if bird then
         local settings = app.Profile()
@@ -187,7 +191,7 @@ function app.BootCompanion()
     bird:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("Paulchen")
-        GameTooltip:AddLine("Linksklick · Reise-Check")
+        GameTooltip:AddLine("Linksklick · Paulchen öffnen")
         GameTooltip:AddLine("Rechtsklick · Einstellungen")
         GameTooltip:Show()
     end)

@@ -37,6 +37,17 @@ function style.Row(frame, index)
     style.Fill(frame, "BACKGROUND", unpack(style.rowColors[index % 2 + 1]))
 end
 
+function style.Label(parent, value, x, y, width, height, font, color, justify)
+    local text = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
+    text:SetPoint("TOPLEFT", x, y)
+    text:SetSize(width, height)
+    text:SetJustifyH(justify or "LEFT")
+    text:SetWordWrap(false)
+    text:SetTextColor(unpack(color or style.cream))
+    text:SetText(value)
+    return text
+end
+
 function style.SetButtonState(button, active)
     button:SetBackdropColor(unpack(active and activeButtonColor or buttonColor))
     button:SetBackdropBorderColor(unpack(active and style.accent or style.edge))

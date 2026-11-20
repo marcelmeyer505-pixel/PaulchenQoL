@@ -1,37 +1,25 @@
 local _, app = ...
 
-local width, height, headerHeight, rowHeight, rowCount = 680, 624, 40, 32, 8
+local width, height, headerHeight = 680, 744, 40
 local compactHeaderHeight = 30
 local style = app.style
-local backgrounds = style.rowColors
 local cream, muted = style.cream, style.muted
 local gold, green, orange = style.gold, style.green, style.orange
 local parchment, ink = { 0.94, 0.84, 0.68 }, { 0.20, 0.11, 0.07 }
-local groupLabels = { { "all", "Alle Taschen" }, { "keep", "Behalten" }, { "auction", "AH" }, { "vendor", "Händler" } }
 local pageTabs = {
-    { "travel", "Reise & Taschen", 141, 105, 8, 100 },
-    { "logbook", app.logbookLabel, 252, 71, 112, 59 },
-    { "upgrades", "Upgrades", 329, 81, 175, 65 },
+    { "travel", "Übersicht", 137, 94, 7, 47, "Reise" },
+    { "logbook", app.logbookLabel, 235, 62, 57, 58 },
+    { "upgrades", "Upgrades", 301, 65, 118, 61 },
 }
+local settingsWidth = 88
 local db, dashboard, travelPage, travel
-local items, group, query, offset = {}, "all", "", 0
+local items = {}
 local pendingItems = {}
 local cheapest, bagMarker, bagWatcher
 local refresh
 local merchant, refreshQueued = false, false
 
-local panel, texture, portrait = style.Panel, style.Fill, style.Portrait
-
-local function label(parent, value, x, y, w, h, font, color, justify)
-    local text = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
-    text:SetPoint("TOPLEFT", x, y)
-    text:SetSize(w, h)
-    text:SetJustifyH(justify or "LEFT")
-    text:SetWordWrap(false)
-    text:SetTextColor(unpack(color or cream))
-    text:SetText(value)
-    return text
-end
+local panel, texture, portrait, label = style.Panel, style.Fill, style.Portrait, style.Label
 
 local function button(parent, caption, x, y, w, h)
     local control = style.Button(parent)
@@ -88,7 +76,7 @@ local function paintTravel()
         if count > 0 then
             speech = ("Beim Händler sind %d Stück vorgemerkt. Das gibt ungefähr %s."):format(count, coinText(total))
         else
-            speech = "Du bist beim Händler. Unter „Händler“ liegen deine Verkaufsvormerkungen."
+            speech = "Du bist beim Händler. Deine Vormerkungen findest du in Paulchens Taschen."
         end
     elseif warning then
         speech = warning
@@ -109,6 +97,19 @@ local function paintTravel()
     travelPage.hearth.value:SetText(hearth)
     travelPage.hearth.value:SetTextColor(unpack(color))
     travelPage.hearth.detail:SetText(travel.bind or "Heimatort")
+    for _, key in ipairs({ "keep", "auction", "vendor" }) do
+        local marked, _, total = app.FindItems(items, db.marks, key, "")
+        travelPage[key].value:SetText(#marked == 1 and "1 Gegenstandsart" or (#marked .. " Gegenstandsarten"))
+        if key == "vendor" then
+            local formatMoney = app.inventory and app.inventory.MoneyText or coinText
+            travelPage[key].detail:SetText(formatMoney(total))
+        elseif key == "auction" then
+            local amount = 0
+            for _, item in ipairs(marked) do amount = amount + item.count end
+            travelPage[key].detail:SetText(amount .. " Stück vorgemerkt")
+        end
+    end
+    if app.overview then app.overview.Render() end
 end
 
 app.RefreshDashboardDialogue = paintTravel
@@ -133,104 +134,9 @@ function app.FlightChanged()
     paintStatus()
 end
 
-local function paintItems(reset)
-    if not travelPage or not travelPage:IsVisible() then return end
-    if reset then offset = 0 end
-    local list, vendorCount, vendorTotal = app.FindItems(items, db.marks, group, query)
-    local maxOffset = math.max(0, #list - rowCount)
-    offset = math.min(offset, maxOffset)
-    travelPage.slider:SetMinMaxValues(0, math.max(1, maxOffset))
-    travelPage.slider:SetValue(offset)
-    travelPage.slider:SetShown(maxOffset > 0)
-    for index, row in ipairs(travelPage.rows) do
-        local item = list[offset + index]
-        if item ~= row.item and GameTooltip:IsOwned(row) then GameTooltip:Hide() end
-        row.item = item
-        row:SetShown(item ~= nil)
-        row.lowest:SetShown(item ~= nil and cheapest ~= nil and cheapest.item.key == item.key)
-        if item then
-            row.icon:SetTexture(item.icon)
-            row.itemName:SetText(item.name)
-            local quality = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[item.quality]
-            if quality then row.itemName:SetTextColor(quality.r, quality.g, quality.b) else row.itemName:SetTextColor(unpack(cream)) end
-            row.count:SetText(tostring(item.count))
-            local mark = app.marks[db.marks[item.key]]
-            row.tag.text:SetText(mark and mark[1] or "Markieren")
-            row.tag.text:SetTextColor(unpack(mark and mark[2] or muted))
-        end
-    end
-    for key, tab in pairs(travelPage.tabs) do
-        style.SetButtonState(tab, key == group)
-        tab.text:SetTextColor(unpack(key == group and gold or muted))
-    end
-    travelPage.empty:SetShown(#list == 0)
-    travelPage.empty:SetText(query ~= "" and "Keine Treffer für deine Suche."
-        or group ~= "all" and "Hier liegt aktuell nichts Vorgemerktes in deinen Taschen."
-        or "Deine Taschen sind leer.")
-    local status = ("%d Gegenstandsarten"):format(#list)
-    if group == "vendor" and vendorCount > 0 then
-        status = status .. ("  ·  %d verkaufbare Stück  ·  %s"):format(vendorCount, coinText(vendorTotal))
-    end
-    travelPage.listStatus:SetText(status)
-end
-
-local function chooseGroup(key)
-    group = key
-    paintItems(true)
-end
-
-local function markItem(item, key)
-    db.marks[item.key] = key
-    refresh()
-end
-
-local function createRow(parent, index)
-    local row = CreateFrame("Button", nil, parent)
-    row:SetPoint("TOPLEFT", 18, -278 - (index - 1) * rowHeight)
-    row:SetSize(624, rowHeight - 1)
-    texture(row, "BACKGROUND", unpack(backgrounds[(index % 2) + 1]))
-    row.lowest = row:CreateTexture(nil, "OVERLAY")
-    row.lowest:SetPoint("TOPLEFT")
-    row.lowest:SetPoint("BOTTOMLEFT")
-    row.lowest:SetWidth(3)
-    row.lowest:SetColorTexture(orange[1], orange[2], orange[3], 1)
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(22, 22)
-    row.icon:SetPoint("LEFT", 6, 0)
-    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    row.itemName = label(row, "", 37, 0, 393, 31)
-    row.count = label(row, "", 434, 0, 49, 31, "GameFontHighlightSmall", muted, "RIGHT")
-    row.tag = button(row, "Markieren", 504, -3, 111, 25)
-    row.tag:SetScript("OnClick", function(owner)
-        local item = row.item
-        if not item then return end
-        if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-        GameTooltip:Hide()
-        MenuUtil.CreateContextMenu(owner, function(_, menu)
-            menu:CreateTitle(item.name)
-            for _, key in ipairs(app.markOrder) do
-                menu:CreateRadio(app.marks[key][1], function() return db.marks[item.key] == key end,
-                    function() markItem(item, key) end)
-            end
-            menu:CreateRadio("Ohne Markierung", function() return not db.marks[item.key] end, function() markItem(item, nil) end)
-        end)
-    end)
-    row:SetScript("OnEnter", function(self)
-        if not self.item or GameTooltip:IsForbidden() then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if not pcall(GameTooltip.SetHyperlink, GameTooltip, self.item.link) then GameTooltip:SetText(self.item.name) end
-        if cheapest and cheapest.item.key == self.item.key then
-            GameTooltip:AddLine(("Günstigster Stapel · %d Stück · %s Händlerwert"):format(cheapest.count, coinText(cheapest.value)), unpack(orange))
-        end
-        GameTooltip:Show()
-    end)
-    row:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
-    return row
-end
-
-local function travelCard(parent, x, title, subtitle)
+local function travelCard(parent, x, title, subtitle, y)
     local card = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    card:SetPoint("TOPLEFT", x, -127)
+    card:SetPoint("TOPLEFT", x, y or -127)
     card:SetSize(208, 65)
     panel(card, { 0.15, 0.105, 0.077 })
     label(card, title, 11, -5, 187, 16, "GameFontHighlightSmall", gold)
@@ -240,6 +146,10 @@ local function travelCard(parent, x, title, subtitle)
 end
 
 local function visibleSlot()
+    if app.inventory then
+        local slot = app.inventory.VisibleSlot(cheapest.bag, cheapest.slot)
+        if slot then return slot end
+    end
     local bagnonFrames = Bagnon and Bagnon.Frames
     local inventory = bagnonFrames and bagnonFrames.Get and bagnonFrames:Get("inventory")
     if inventory and inventory.IsVisible and inventory:IsVisible() then
@@ -314,11 +224,12 @@ refresh = function()
     end
     if open then
         paintTravel()
-        paintItems()
     end
     updateBagMarker()
     paintStatus()
 end
+
+app.RefreshOverview = refresh
 
 local function createTravelPage(parent)
     local f = CreateFrame("Frame", nil, parent)
@@ -327,61 +238,28 @@ local function createTravelPage(parent)
     travelPage = f
     local bird = CreateFrame("Button", nil, f)
     bird:SetPoint("TOPLEFT", 16, -4)
-    bird:SetSize(128, 118)
-    f.avatar = portrait(bird, 121, 0, 0)
+    bird:SetSize(88, 80)
+    f.avatar = portrait(bird, 82, 0, 0)
     bird:SetScript("OnClick", app.TestComment)
-    f.speech, f.speechFrame = speaker(f, 151, -18, 511, 84)
-    f.bags = travelCard(f, 18, "Taschenplätze", "Allgemeine Taschen")
-    f.durability = travelCard(f, 236, "Haltbarkeit", "Niedrigster Ausrüstungswert")
-    f.hearth = travelCard(f, 454, "Ruhestein", "Heimatort")
+    f.speech, f.speechFrame = speaker(f, 111, -10, 551, 64)
+    f.bags = travelCard(f, 18, "Taschenplätze", "Allgemeine Taschen", -87)
+    f.durability = travelCard(f, 236, "Haltbarkeit", "Niedrigster Ausrüstungswert", -87)
+    f.hearth = travelCard(f, 454, "Ruhestein", "Heimatort", -87)
+    if app.CreateOverviewPanel then f.overview = app.CreateOverviewPanel(f) end
 
-    label(f, "Taschen-Merkliste", 18, -203, 260, 27, "GameFontNormalLarge", gold)
-    local search = style.EditBox(f, GameFontHighlight)
-    search:SetPoint("TOPLEFT", 362, -204)
-    search:SetSize(300, 27)
-    search:SetTextInsets(8, 8, 0, 0)
-    search:SetMaxLetters(100)
-    local prompt = label(search, "Name oder Markierung suchen", 8, 0, 281, 27, "GameFontHighlightSmall", muted)
-    search:SetScript("OnTextChanged", function(self)
-        query = self:GetText()
-        prompt:SetShown(query == "")
-        paintItems(true)
+    label(f, "Vormerkungen", 18, -556, 350, 27, "GameFontNormalLarge", gold)
+    local openBags = button(f, "Taschen öffnen", 502, -556, 160, 27)
+    openBags:SetScript("OnClick", function()
+        app.CloseDashboard()
+        if app.inventory and app.inventory.Show then app.inventory.Show()
+        elseif ToggleAllBags then ToggleAllBags() end
     end)
-    search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    f.search = search
-    f.tabs = {}
-    for index, tab in ipairs(groupLabels) do
-        local key, caption = unpack(tab)
-        local control = button(f, caption, 18 + (index - 1) * 90, -238, 85, 25)
-        control:SetScript("OnClick", function() chooseGroup(key) end)
-        f.tabs[key] = control
-    end
-    f.merchant = label(f, "Händler geöffnet", 390, -238, 272, 25, "GameFontHighlightSmall", gold, "RIGHT")
-    f.merchant:Hide()
-
-    f.rows = {}
-    for index = 1, rowCount do f.rows[index] = createRow(f, index) end
-    local slider = CreateFrame("Slider", nil, f)
-    slider:SetPoint("TOPLEFT", 648, -278)
-    slider:SetSize(14, rowCount * rowHeight - 1)
-    slider:SetOrientation("VERTICAL")
-    slider:SetValueStep(1)
-    slider:SetObeyStepOnDrag(true)
-    slider:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-    texture(slider, "BACKGROUND", unpack(style.track))
-    slider:SetScript("OnValueChanged", function(_, value)
-        local nextOffset = math.floor(value + 0.5)
-        if nextOffset ~= offset then offset = nextOffset; paintItems() end
-    end)
-    f.slider = slider
-    f:EnableMouseWheel(true)
-    f:SetScript("OnMouseWheel", function(_, delta)
-        offset = math.max(0, offset - 3 * delta)
-        paintItems()
-    end)
-    f.empty = label(f, "", 18, -350, 624, 45, "GameFontHighlight", muted, "CENTER")
-    f.listStatus = label(f, "", 18, -543, 624, 25, "GameFontHighlightSmall", muted)
+    f.openBags = openBags
+    f.keep = travelCard(f, 18, "Behalten", "inkl. Katze und Bär", -591)
+    f.auction = travelCard(f, 236, "Auktionshaus", "Vorgemerkte Gegenstände", -591)
+    f.vendor = travelCard(f, 454, "Händler", "Vorgemerkter Verkaufswert", -591)
+    label(f, "Vormerken: Rechtsklick auf eine Gegenstandszeile in Paulchens Taschen.",
+        18, -669, 644, 22, "GameFontHighlightSmall", muted)
 
     local elapsed = 0
     f:SetScript("OnUpdate", function(_, delta)
@@ -391,17 +269,10 @@ local function createTravelPage(parent)
         local text, color = hearthText(travel)
         f.hearth.value:SetText(text)
         f.hearth.value:SetTextColor(unpack(color))
+        if app.overview then app.overview.Render() end
     end)
     f:SetScript("OnShow", function()
-        f.merchant:SetShown(merchant)
-        if merchant then
-            group, offset = "vendor", 0
-            search:SetText("")
-        end
-        app.SecureCall("Taschen und Reise-Check", refresh)
-    end)
-    f:SetScript("OnHide", function()
-        search:ClearFocus()
+        app.SecureCall("Reiseübersicht", refresh)
     end)
     return f
 end
@@ -424,18 +295,19 @@ local function layoutHeader(f, compact, titleHeight)
     f.close:SetSize(closeSize, closeSize)
 
     for _, definition in ipairs(pageTabs) do
-        local key, _, x, w, compactX, compactWidth = unpack(definition)
+        local key, name, x, w, compactX, compactWidth, compactName = unpack(definition)
         local tab = f.pageTabs[key]
         local tabWidth = compact and compactWidth or w
         tab:ClearAllPoints()
         tab:SetPoint("TOPLEFT", compact and compactX or x, compact and -2 or -7)
         tab:SetWidth(tabWidth)
         tab.text:SetWidth(tabWidth - 8)
+        tab.text:SetText(compact and compactName or name)
     end
 
-    local settingsWidth = compact and 66 or 117
-    f.settings:SetWidth(settingsWidth)
-    f.settings.text:SetWidth(settingsWidth - 8)
+    local optionWidth = compact and 66 or settingsWidth
+    f.settings:SetWidth(optionWidth)
+    f.settings.text:SetWidth(optionWidth - 8)
     f.settings.text:SetText(compact and "Optionen" or "Einstellungen")
 end
 
@@ -460,6 +332,7 @@ local function unavailablePage(parent, message)
 end
 
 local function selectPage(f, key)
+    if not f.pageTabs[key] then key = "travel" end
     if f.page == key then return end
     local page = f.pages[key]
     if not page then
@@ -473,7 +346,7 @@ local function selectPage(f, key)
                 page = app.upgrades.GetPage(f.body)
             else
                 local message = SlashCmdList.PAULCHENUPGRADES and "Öffne das installierte Upgrade-Fenster mit /pu."
-                    or "Aktiviere Polestar für die Ausrüstungsbewertung."
+                    or "Die Ausrüstungsbewertung konnte nicht geladen werden."
                 page = unavailablePage(f.body, message)
             end
         end
@@ -532,7 +405,7 @@ local function createDashboard()
         f.pageTabs[key] = tab
     end
 
-    local settings = button(header, "Einstellungen", 0, -7, 117, 25)
+    local settings = button(header, "Einstellungen", 0, -7, settingsWidth, 25)
     settings:ClearAllPoints()
     settings:SetPoint("RIGHT", header, "RIGHT", -40, 0)
     settings:SetScript("OnClick", app.OpenConfig)
@@ -655,13 +528,6 @@ events:SetScript("OnEvent", function(_, event, id, success)
         return
     elseif event == "MERCHANT_SHOW" or event == "MERCHANT_CLOSED" then
         merchant = event == "MERCHANT_SHOW"
-        if travelPage and travelPage:IsVisible() then
-            travelPage.merchant:SetShown(merchant)
-            if merchant then
-                travelPage.search:SetText("")
-                chooseGroup("vendor")
-            end
-        end
         refresh()
         return
     elseif event == "ITEM_DATA_LOAD_RESULT" and (not success or not pendingItems[id]) then
@@ -671,6 +537,6 @@ events:SetScript("OnEvent", function(_, event, id, success)
     refreshQueued = true
     C_Timer.After(0.1, function()
         refreshQueued = false
-        app.SecureCall("Taschen und Reise-Check", refresh)
+        app.SecureCall("Reiseübersicht", refresh)
     end)
 end)

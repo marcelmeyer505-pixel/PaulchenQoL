@@ -1,8 +1,8 @@
 local _, suite = ...
 local app = suite.upgrades
 if not app then return end
-local pole, gear = Polestar, Polestar.Gear
-local readable = pole.Compat.Readable
+local gear = app.gear
+local readable = suite.Readable
 local recent, pending = {}, {}
 local retryDelays = { 0.2, 0.5, 1, 2 }
 local shown, available = {}, {}
@@ -70,8 +70,8 @@ local function announce(link, id, result, now)
     else card = table.remove(available) or createCard() end
     card.sequence = (card.sequence or 0) + 1
     local sequence = card.sequence
-    local itemName = link:match("|h%[(.-)%]|h") or read(pole.Compat.GetItemName, id) or ("Item " .. id)
-    local icon = read(pole.Compat.ItemIcon, id) or 134400
+    local itemName = link:match("|h%[(.-)%]|h") or read(C_Item and C_Item.GetItemNameByID, id) or ("Item " .. id)
+    local icon = read(C_Item and C_Item.GetItemIconByID, id) or 134400
     card.icon:SetTexture(icon)
     card.nameText:SetText(itemName)
     card.gainText:SetText(detail)

@@ -13,6 +13,29 @@ local wildBuffs = {
     [9884] = true, [9885] = true, [21849] = true, [21850] = true,
 }
 
+local levelUpSound = "Interface\\AddOns\\PaulchenQoL\\Sounds\\level-up.mp3"
+local stockLevelUpSound = 569593 -- sound/spells/levelup.ogg
+local stockSoundMuted = false
+
+function app.ApplyLevelUpSound()
+    if app.Profile().levelUpSound and PlaySoundFile and MuteSoundFile then
+        local ok = pcall(MuteSoundFile, stockLevelUpSound)
+        stockSoundMuted = ok
+    elseif stockSoundMuted and UnmuteSoundFile then
+        if pcall(UnmuteSoundFile, stockLevelUpSound) then stockSoundMuted = false end
+    end
+end
+
+function app.PlayLevelUpSound()
+    if not PlaySoundFile then return false end
+    local ok, playing = pcall(PlaySoundFile, levelUpSound, "SFX")
+    if ok and readable(playing) then return true end
+    if stockSoundMuted and UnmuteSoundFile then
+        if pcall(UnmuteSoundFile, stockLevelUpSound) then stockSoundMuted = false end
+    end
+    return false
+end
+
 local function unitState(api)
     if not api then return end
     local ok, value = pcall(api, "player")
@@ -174,10 +197,16 @@ end
 local handlers = {}
 handlers.PLAYER_LOGIN = function()
     app.Profile()
+    app.ApplyLevelUpSound()
     SLASH_PAULCHENQOLCOMPANION1 = "/paulchen"
     SLASH_PAULCHENQOLCOMPANION2 = "/pq"
     SlashCmdList.PAULCHENQOLCOMPANION = app.CompanionCommand
     app.BootCompanion()
+end
+handlers.PLAYER_LOGOUT = function()
+    if stockSoundMuted and UnmuteSoundFile then
+        if pcall(UnmuteSoundFile, stockLevelUpSound) then stockSoundMuted = false end
+    end
 end
 handlers.PLAYER_ENTERING_WORLD = function(initial, reloaded)
     local first = not states.entered
@@ -203,6 +232,7 @@ handlers.PLAYER_LEVEL_UP = function(level)
     if type(level) ~= "number" or level < 1 or (previousLevel and level <= previousLevel) then return end
     previousLevel = level
     app.RememberLevel(level)
+    if app.Profile().levelUpSound then app.PlayLevelUpSound() end
     app.React("level", { level = level })
 end
 handlers.PLAYER_DEAD = death
