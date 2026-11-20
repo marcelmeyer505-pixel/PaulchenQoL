@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-11-20
+
+- Fixed repeated Auction House row-hover errors in Blizzard's TableBuilder. The Upgrade % and Gold per % cells now implement both mandatory row-hover callbacks, including when the addon loads before the shared TableBuilder mixin.
+- Added regression checks for both value columns, repeated row enter/leave, cell reuse and value/color rendering. Filtering, sorting and comparison calculations are unchanged.
+
 ## 0.8.0 — 2026-11-20
 
 - Added Paulchen's Buff Watcher, integrated into the main window with player, party and scrollable raid views.

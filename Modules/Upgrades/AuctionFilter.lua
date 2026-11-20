@@ -25,6 +25,15 @@ local function decimal(text)
 end
 
 PaulchenQoLAuctionValueCellMixin = {}
+-- TableBuilder forwards row hover events to every cell, unconditionally.
+-- These value-only cells have no hover effect, but must implement both hooks.
+-- Define them here so loading before TableBuilderCellMixin is safe as well.
+function PaulchenQoLAuctionValueCellMixin:OnLineEnter()
+end
+
+function PaulchenQoLAuctionValueCellMixin:OnLineLeave()
+end
+
 function PaulchenQoLAuctionValueCellMixin:Init(_, kind, metrics)
     self.kind, self.metrics = kind, metrics
 end
