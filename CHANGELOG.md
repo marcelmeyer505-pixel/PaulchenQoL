@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 — 2026-11-20
+
+- Refresh Upgrade % and Gold per % sorting when the Auction House updates existing result rows. Handle unavailable row and price data safely.
+- Preserve the last readable Auction House search when a result is temporarily unavailable or protected.
+- Keep readable buffs visible during chat-only restrictions. Reserve the persistent personal Wild reminder for druids and suppress automatic reports when there are no buff requirements.
+- Resolve portrait and live critical-hit font paths with the installed addon folder's spelling.
+
 ## 0.8.1 — 2026-11-20
 
 - Fixed repeated Auction House row-hover errors in Blizzard's TableBuilder. The Upgrade % and Gold per % cells now implement both mandatory row-hover callbacks, including when the addon loads before the shared TableBuilder mixin.

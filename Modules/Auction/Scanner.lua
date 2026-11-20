@@ -175,6 +175,7 @@ function api.Start()
 end
 
 local function captureSearch(key)
+    key = plain(key)
     if not open or type(key) ~= "table" or not (ah.GetNumItemSearchResults and ah.GetItemSearchResultInfo) then return end
     local id = plain(key.itemID)
     if type(id) ~= "number" or id <= 0 then return end
@@ -183,9 +184,16 @@ local function captureSearch(key)
     local items = {}
     for i = 1, total do
         local read, result = pcall(ah.GetItemSearchResultInfo, key, i)
-        if read and type(result) == "table" and plain(result.containsAccountItem) ~= true
-            and plain(result.containsOwnerItem) ~= true then
-            addOffer(items, id, result.itemLink, result.buyoutAmount, result.quantity, result.timeLeftSeconds)
+        result = read and plain(result)
+        if type(result) ~= "table" then return end
+        local accountItem, ownerItem, price = result.containsAccountItem, result.containsOwnerItem, result.buyoutAmount
+        -- An unreadable row cannot prove an item is no longer for sale.
+        -- Keep the previous snapshot until this search can be read completely.
+        if issecretvalue and (issecretvalue(accountItem) or issecretvalue(ownerItem) or issecretvalue(price)) then return end
+        if not accountItem and not ownerItem and type(price) == "number" and price > 0 then
+            local link = plain(result.itemLink)
+            if type(link) ~= "string" or link == "" then return end
+            addOffer(items, id, link, price, result.quantity, result.timeLeftSeconds)
         end
     end
     local data = realmData()

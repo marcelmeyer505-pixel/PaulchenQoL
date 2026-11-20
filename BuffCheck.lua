@@ -133,10 +133,10 @@ local function known(family,variant)
     end
     if not unknown then return false end
 end
-local function restricted()
+local function restricted(lastKind)
     if combat() then return true end
     if C_RestrictedActions then
-        for kind = 0, 5 do
+        for kind = 0, lastKind do
             if C_RestrictedActions.GetAddOnRestrictionState then
                 local state = call(C_RestrictedActions.GetAddOnRestrictionState, kind)
                 if state == nil or state ~= 0 then return true end
@@ -195,7 +195,9 @@ local function providerStates(members)
                     if member.isSelf then
                         local value = known(family,variant and variant.key)
                         available, unknown = available or value == true, unknown or value == nil
-                    elseif type(member.level) ~= "number" or member.level >= (variant and variant.minimum or family.minimum) then
+                    elseif type(member.level) ~= "number" then
+                        unknown = true
+                    elseif member.level >= (variant and variant.minimum or family.minimum) then
                         if family.talent or variant and variant.talent or call(UnitIsConnected,member.unit) ~= true then unknown = true
                         else available = true end
                     end
@@ -209,7 +211,7 @@ local function providerStates(members)
     return result
 end
 local function checkable(member)
-    if restricted() then return false, "Aura-Daten im Kampf oder durch den Client geschützt" end
+    if restricted(4) then return false, "Aura-Daten im Kampf oder durch den Client geschützt" end
     local exists=call(UnitExists,member.unit)
     if exists==false or type(UnitExists)=="function" and exists~=true then return false, "Nicht erreichbar / Existenz unbekannt" end
     if call(UnitIsDeadOrGhost,member.unit) ~= false then return false, "Tot, Geist oder Lebensstatus unbekannt" end
@@ -308,9 +310,11 @@ end
 local function publish(data)
     data.missingCount, data.unknownCount, data.checkedCount, data.unverifiableCount = 0,0,0,0
     data.excluded = data.rosterUnknown == true
+    data.requiredCount = 0
     for _, member in ipairs(data.members) do
         data.missingCount = data.missingCount + #member.missing
         data.unknownCount = data.unknownCount + #member.unknown
+        data.requiredCount = data.requiredCount + #member.present + #member.missing + #member.unknown
         if member.checked then
             if member.verifiable then data.checkedCount=data.checkedCount+1 else data.unverifiableCount=data.unverifiableCount+1 end
         else data.excluded = true end
@@ -319,10 +323,9 @@ local function publish(data)
     snapshot = data
     local own
     for _, member in ipairs(data.members) do if member.isSelf then own=member;break end end
-    local wild = own and own.checked and own.buffs.wild
+    local wild = own and own.class == "DRUID" and own.checked and own.buffs.wild
     app.SetCompanionReminder("mark",wild and wild.required and wild.state==buff.MISSING and "Mal der Wildnis fehlt." or nil)
     if buff.Render then buff.Render() end
-    if app.RefreshOverview then app.RefreshOverview() end
     if data.signature ~= lastComment then
         lastComment = data.signature
         app.CancelReaction("buffMissing"); app.CancelReaction("buffReady")
@@ -332,7 +335,7 @@ local function publish(data)
                 if #member.missing>0 and not (member.isSelf and #member.missing==1 and member.missing[1]=="wild") then first=member;break end
             end
             if first then app.React("buffMissing",{name=first.name,buff=byKey[first.missing[1]].label})
-            elseif data.mode~="SOLO" and data.checkedCount>0 and data.missingCount==0 and data.unknownCount==0 and data.unverifiableCount==0 and not data.excluded then
+            elseif data.mode~="SOLO" and data.requiredCount>0 and data.missingCount==0 and data.unknownCount==0 and data.unverifiableCount==0 and not data.excluded then
                 app.React("buffReady")
             end
         end
@@ -390,6 +393,7 @@ function buff.Report(data)
     if #parts==0 then
         parts[1] = (data.unknownCount>0 or data.unverifiableCount>0) and "Keine sicher fehlenden Buffs; Status teilweise unbekannt."
             or data.excluded and "Geprüfte Buffs vorhanden; Prüfung nicht vollständig."
+            or data.requiredCount==0 and "Keine Buffanforderungen für diese Gruppe."
             or "Alle Gruppenbuffs vorhanden! So gefällt mir das!"
     end
     if data.unknownCount>0 and data.missingCount>0 then parts[#parts+1]=data.unknownCount .. " Buffstatus unbekannt" end
@@ -404,7 +408,7 @@ local function chatChannel(currentMode)
     return currentMode=="RAID" and "RAID" or "PARTY"
 end
 local function chatRestricted()
-    if restricted() then return true end
+    if restricted(5) then return true end
     if C_ChatInfo and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted
         and call(C_ChatInfo.AreOutgoingAddonChatMessagesRestricted)~=false then return true end
     return false
@@ -420,7 +424,8 @@ function buff.Say(automatic)
     local data=buff.Scan()
     local channel=chatChannel(data.mode)
     if not channel then buff.notice="Solospiel: kein Gruppenchatbericht.";return false end
-    if automatic and (not settings.autoChat or not settings.group or data.mode=="RAID" and (not settings.raid or not settings.autoRaid)) then return false end
+    if automatic and (data.requiredCount == 0 or not settings.autoChat or not settings.group
+        or data.mode=="RAID" and (not settings.raid or not settings.autoRaid)) then return false end
     local previous,now=history(),serverTime()
     if automatic and (previous.signature==data.signature or type(previous.at)=="number" and now-previous.at<settings.cooldown) then return false end
     if not automatic and manualAt and clock()-manualAt<5 then buff.notice="Bitte kurz warten.";return false end
@@ -550,7 +555,7 @@ local function tooltip(icon)
     GameTooltip:Show()
 end
 function buff.Render()
-    if not page or not page:IsShown() or not snapshot then return end
+    if not page or not page:IsVisible() or not snapshot then return end
     local data=snapshot
     local maximum=math.max(0,#data.members-12)
     page.offset=math.max(0,math.min(maximum,page.offset or 0))

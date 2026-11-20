@@ -115,6 +115,19 @@ units.party1.error=true;s=b.Scan();assert(#s.members[2].missing==0);units.party1
 restrictedKinds[1]=1;s=b.Scan();assert(s.checkedCount==0 and s.missingCount==0);restrictedKinds[1]=nil
 for token in pairs(units) do aura(token,21849,21562,23028) end
 local settings=b.Settings();assert(not settings.families.spirit and not settings.families.shadow)
+-- A chat-only restriction must not hide readable auras or allow sends.
+restrictedKinds[5]=2
+s=b.Scan();assert(s.checkedCount==5 and s.unknownCount==0 and s.members[1].buffs.wild.state=="PRESENT")
+assert(not b.Say(true) and #sent==0)
+restrictedKinds[5]=nil
+-- A teammate's missing Wild is visible in the table. The persistent
+-- reminder is reserved for the druid's own buff as before.
+units.player.class="WARRIOR";units.party4.class="DRUID";aura("player",21562)
+s=b.Scan();assert(s.members[1].buffs.wild.state=="MISSING" and reminders.mark==nil)
+units.player.class="DRUID";units.party4.class="ROGUE";aura("player",21849,21562,23028)
+for family in pairs(settings.families) do settings.families[family]=false end
+s=b.Scan();assert(b.Report(s):find("Keine Buffanforderungen",1,true))
+for _,family in ipairs(b.families) do settings.families[family.key]=not family.optional end
 settings.families.spirit=true;s=b.Scan();assert(s.members[1].buffs.spirit.state=="UNKNOWN")
 b.SetRequirement("DRUID","spirit","on");s=b.Scan();assert(s.members[1].buffs.spirit.state=="MISSING")
 b.SetRequirement("DRUID","spirit","off");s=b.Scan();assert(not s.members[1].buffs.spirit.required)

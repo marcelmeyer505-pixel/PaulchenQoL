@@ -53,3 +53,47 @@ cells[1]:Populate({price=8.5});assert(cells[1].Text.value=="8,50")
 cells[1]:OnLineEnter();cells[1]:OnLineLeave()
 ''')
 print('Auction cells: mandatory hover callbacks before TableBuilder load, 1000 six-cell enter/leave cycles, both columns, value/color rendering and pooled reuse passed.')
+
+lua.execute(r'''
+local function noop() end
+suite.auction = {}
+SlashCmdList = {}
+local key = {itemID=84, itemLevel=0, itemSuffix=0}
+local good = {itemLink="item:84",buyoutAmount=15000,quantity=1}
+local protected = setmetatable({}, {__index=function() error("Protected row was accessed") end})
+function issecretvalue(value) return value == protected end
+function GetServerTime() return 10 end
+function GetRealmName() return "Test" end
+function UnitFactionGroup() return "Horde" end
+C_Item = {GetItemInfoInstant=function() return nil,nil,nil,"INVTYPE_CHEST" end}
+C_AuctionHouse.GetNumItemSearchResults = function() return #searchRows end
+C_AuctionHouse.GetItemSearchResultInfo = function(_,index)
+    local row = searchRows[index]
+    if row == false then error("Short-lived query failure") end
+    return row
+end
+C_AuctionHouse.HasFullItemSearchResults = function() return true end
+function CreateFrame()
+    return {RegisterEvent=noop,SetScript=function(_,_,handler) scannerEvent=handler end}
+end
+function scanSearch(...)
+    searchRows = {...}
+    scannerEvent(nil, "ITEM_SEARCH_RESULTS_UPDATED", key)
+    local _, searches = suite.auction.GetSnapshot()
+    return searches["84:0:0"]
+end
+auctionGood,auctionProtected=good,protected
+''')
+load((root/'Modules/Auction/Scanner.lua').read_text(encoding='utf-8'))
+lua.execute('''
+scannerEvent(nil,"AUCTION_HOUSE_SHOW")
+local prior=scanSearch(auctionGood)
+assert(prior.complete and prior.offers["item:84"].price==15000)
+assert(scanSearch(false)==prior)
+assert(scanSearch(auctionProtected)==prior)
+assert(scanSearch({buyoutAmount=17000})==prior)
+assert(scanSearch({containsAccountItem=auctionProtected,buyoutAmount=17000,itemLink="item:84"})==prior)
+local cleared=scanSearch({buyoutAmount=0})
+assert(cleared~=prior and cleared.complete and not next(cleared.offers))
+''')
+print('Auction scanner: unreadable, protected and incomplete rows preserve the previous search. A readable empty buyout result still clears old offers.')

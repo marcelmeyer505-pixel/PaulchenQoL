@@ -1,10 +1,10 @@
-local _, app = ...
+local addonName, app = ...
 
 local hearthstone = 6948
 local container = C_Container
 local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local getItemCount = (C_Item and C_Item.GetItemCount) or GetItemCount
-app.artPath = "Interface\\AddOns\\PaulchenQOL\\Textures\\paulchen_"
+app.artPath = "Interface\\AddOns\\" .. addonName .. "\\Textures\\paulchen_"
 app.avatar = app.artPath .. "idle.tga"
 app.markOrder = { "keep", "cat", "bear", "auction", "vendor" }
 app.marks = {

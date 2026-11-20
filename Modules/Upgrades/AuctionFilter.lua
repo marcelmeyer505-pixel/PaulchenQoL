@@ -7,6 +7,7 @@ local gear = app.gear
 local readable = suite.Readable
 local enabled, queued = false, false
 local refresh
+local emptyMetrics = {}
 
 local function compare(row, level)
     local key = readable(row.itemKey)
@@ -73,12 +74,17 @@ local function attach(search, browse)
     local list = browse and browse.ItemList
     if not (list and list.getEntry and list.getNumEntries and list.SetDataProvider) then return end
     local filter = search.FilterButton
+    if not (filter and filter.ClearFiltersButton and type(filter.Reset) == "function"
+        and type(search.UpdateClearFiltersButton) == "function" and type(browse.UpdateBrowseResults) == "function"
+        and type(browse.UpdateHeaders) == "function" and type(browse.SetSortOrder) == "function") then return end
     local started, getEntry, getCount, complete = list.searchStartedFunc, list.getEntry, list.getNumEntries, list.hasFullResultsFunc
     local rows, scores, source, sourceCount = {}, {}, nil, nil
     local sortKey, reverse
     local headers, extendedLayout = {}, nil
 
     local function metrics(row)
+        row = readable(row)
+        if type(row) ~= "table" then return emptyMetrics end
         if scores[row] then return scores[row] end
         local level = gear.PlayerLevel()
         local ok, result = pcall(compare, row, level)
@@ -90,7 +96,8 @@ local function attach(search, browse)
             pct = pct,
             empty = result and result.empty,
         }
-        if values.upgrade and pct and pct > 0 and price and price > 0 and quantity and quantity > 0 then
+        if values.upgrade and pct and pct > 0 and type(price) == "number" and price > 0
+            and type(quantity) == "number" and quantity > 0 then
             values.gold = price / 10000 / pct
         end
         scores[row] = values
@@ -103,10 +110,12 @@ local function attach(search, browse)
             source, sourceCount = browse.browseResults, count
             rows = {}
             for index = 1, count do
-                local row = getEntry(index)
-                local values = metrics(row)
-                if not enabled or values.upgrade then
-                    rows[#rows + 1] = { row = row, index = index, value = values[sortKey] }
+                local row = readable(getEntry(index))
+                if type(row) == "table" then
+                    local values = metrics(row)
+                    if not enabled or values.upgrade then
+                        rows[#rows + 1] = { row = row, index = index, value = values[sortKey] }
+                    end
                 end
             end
             if sortKey then
@@ -149,7 +158,7 @@ local function attach(search, browse)
 
     local function updateHeaders()
         if sortKey then
-            for _, header in ipairs(browse.headers) do
+            for _, header in ipairs(browse.headers or {}) do
                 if header.owner == browse then header:SetArrowState(nil) end
             end
         end
@@ -179,9 +188,11 @@ local function attach(search, browse)
 
     local function extendLayout()
         local nativeLayout = list.tableBuilderLayoutFunction
-        if not nativeLayout or nativeLayout == extendedLayout then return end
+        if type(nativeLayout) ~= "function" or nativeLayout == extendedLayout then return end
         extendedLayout = function(builder)
             nativeLayout(builder)
+            headers = {}
+            if type(builder.AddUnsortableFixedWidthColumn) ~= "function" then return end
             addColumn(builder, "pct", "Upgrade %", 82)
             addColumn(builder, "gold", "Gold pro %", 87)
             updateHeaders()
@@ -190,7 +201,7 @@ local function attach(search, browse)
     end
 
     local function showClearButton()
-        if enabled then filter.ClearFiltersButton:Show() end
+        if enabled and filter.ClearFiltersButton then filter.ClearFiltersButton:Show() end
     end
 
     local function setEnabled(value)
@@ -204,7 +215,9 @@ local function attach(search, browse)
     hooksecurefunc(filter, "Reset", function()
         if enabled then setEnabled(false) end
     end)
-    hooksecurefunc(browse, "UpdateBrowseResults", refreshSoon)
+    -- Browse rows may be reused with new prices and the same total count.
+    -- Invalidate in the native update hook before its next list repaint.
+    hooksecurefunc(browse, "UpdateBrowseResults", refresh)
     hooksecurefunc(browse, "UpdateHeaders", updateHeaders)
     hooksecurefunc(browse, "SetSortOrder", function()
         if not sortKey then return end
@@ -212,8 +225,10 @@ local function attach(search, browse)
         updateProvider()
         browse:UpdateHeaders()
     end)
-    hooksecurefunc(browse, "SetupTableBuilder", extendLayout)
-    extendLayout()
+    if type(browse.SetupTableBuilder) == "function" and type(list.SetTableBuilderLayout) == "function" then
+        hooksecurefunc(browse, "SetupTableBuilder", extendLayout)
+        extendLayout()
+    end
     return function() setEnabled(not enabled) end, function() return sortKey ~= nil end
 end
 
@@ -243,7 +258,7 @@ end)
 
 install()
 app.RegisterEvent("ADDON_LOADED", function(_, name)
-    if name == "Blizzard_AuctionHouseUI" then install() end
+    if readable(name) == "Blizzard_AuctionHouseUI" then install() end
 end)
 app.RegisterEvent("AUCTION_HOUSE_SHOW", install)
 app.On("GEAR_UPDATED", refreshSoon)

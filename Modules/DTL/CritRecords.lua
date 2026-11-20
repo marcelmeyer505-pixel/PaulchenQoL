@@ -1,4 +1,4 @@
-local _, suite = ...
+local addonName, suite = ...
 local addon = suite.timeline
 if not addon then return end
 local style = suite.style
@@ -23,7 +23,7 @@ local function checksum(bytes)
 end
 
 local function readFont(meter, epoch, received)
-    local path = ("Interface\\AddOns\\PaulchenQOL\\Modules\\DTL\\CritFonts\\s%04d.ttf"):format(epoch % slotCount)
+    local path = ("Interface\\AddOns\\%s\\Modules\\DTL\\CritFonts\\s%04d.ttf"):format(addonName, epoch % slotCount)
     local assigned, result = pcall(meter.SetFont, meter, path, 64, "")
     meter:SetText("!~")
     local current = meter:GetFont()
