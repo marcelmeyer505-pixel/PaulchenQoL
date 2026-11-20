@@ -214,6 +214,7 @@ function overview.Render()
         .. (data.subzone ~= "" and data.subzone ~= data.zone and ("\n" .. data.subzone) or ""))
     local upgrade = data.upgrade
     local statuses = { waiting = "Warte auf Ausrüstungsdaten …", scanning = "Suche läuft …", combat = "Im Kampf pausiert",
+        instance = "Aktualisierung nach der Instanz",
         error = "Suchfehler · /pu diagnose", idle = "Noch kein Suchlauf", ready = "Keine bekannten Upgrades" }
     if upgrade and upgrade.best then
         local best = upgrade.best

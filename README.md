@@ -1,4 +1,4 @@
-# Paulchen QoL v0.8.2
+# Paulchen QoL v0.8.3
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -25,6 +25,8 @@ Bei aktiven Kampf-/Client-/Chatrestriktionen wird nichts gesendet. Moderne Chat-
 **Feral Katze** startet mit 1,90 Punkten pro Beweglichkeit, 0,80 pro Stärke, 0,40 pro Angriffskraft und 5,60 pro Nahkampfwaffen-DPS. Dazu kommen 10,20 pro Prozent Krit, 8,77 pro Prozent Trefferchance, 4,78 pro Prozent Angriffstempo, 0,85 pro Waffenkundewertung und 0,13 pro Rüstungsdurchschlag.
 
 Die Upgrade-Suche prüft bei unverändertem Vergleichsstand nur neue oder geänderte Items neu. Vorhandene Wertungen werden übernommen, einschließlich bereits bewerteter Taschenitems und konkreter Zufallsvarianten. Die Statuszeile zeigt **neu bewertet** und **übernommen**. Gleichbleibende Stapelzahlen oder andere Taschenplätze lösen keine neue Suche aus. Neue Ausrüstung in den Taschen bekommt einen gebündelten Nachlauf; eine laufende Suche wird dafür erst beendet.
+
+In Dungeons und Raids sammelt Paulchen automatische Aktualisierungen bis zum Verlassen der Instanz. Die zuletzt berechnete Liste bleibt sichtbar. Mit **Aktualisieren** kannst du vor Ort einen Suchlauf starten. Ein laufender Suchlauf pausiert im Kampf und setzt danach an derselben Stelle fort. Der Loot-Alarm bewertet einzelne Drops direkt.
 
 Sichere Rüstungs- und Schmuckwertungen einschließlich ihrer Varianten werden pro Charakter dauerhaft gespeichert. WoW sichert sie beim Ausloggen oder mit `/reload`. Bei gleicher Ausrüstung, Stufe, Spezialisierung und Gewichtung werden sie auch beim nächsten Login wiederverwendet. Ein passender älterer Punktespeicher wird übernommen. Waffenabhängige Vergleiche bleiben in der Sitzung; neue mögliche Waffen-/Nebenhand-Kombinationen aktualisieren diese Werte gezielt. Normale Waffen-Skillsteigerungen ohne Änderung der Nutzbarkeit verwerfen keine Wertungen.
 

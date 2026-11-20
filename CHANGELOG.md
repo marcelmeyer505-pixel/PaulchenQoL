@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.3 — 2026-11-20
+
+- Resume in-progress upgrade searches after combat from the same position, with their remaining item-data wait budget.
+- Bundle automatic upgrade refreshes until leaving a dungeon or raid. The last results stay available and the Refresh button can start a search inside an instance.
+
 ## 0.8.2 — 2026-11-20
 
 - Refresh Upgrade % and Gold per % sorting when the Auction House updates existing result rows. Handle unavailable row and price data safely.
