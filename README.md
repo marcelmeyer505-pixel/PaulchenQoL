@@ -1,6 +1,22 @@
-# Paulchen QoL v0.7.7
+# Paulchen QoL v0.8.0
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
+
+**Paulchens Buffwächter** prüft eigene, Gruppen- und Raidbuffs im neuen Reiter **Buffs**. Er unterscheidet grün **vorhanden**, rot **fehlt** und grau **unbekannt**. Geschützte, nicht lesbare, tote, ausgeloggte oder entfernte Spieler werden niemals allein deswegen als ungebufft gemeldet. Buffsymbole bieten Tooltips; Raidmitglieder erscheinen in einer scrollbaren Übersicht. Aura-Ereignisse werden 0,2 Sekunden gebündelt und betreffen normalerweise nur den geänderten Spieler. Roster-/Fähigkeitsänderungen und bewusste Checks erneuern die ganze Übersicht. Während der Reiter offen ist, werden unbekannte oder inzwischen entfernte Spieler alle zwei Sekunden gezielt nachgeprüft.
+
+### Buffwächter einrichten
+
+Unter **Einstellungen → Buffwächter einstellen** oder im Buff-Reiter lassen sich eigene Prüfung, Gruppenprüfung, Raidprüfung, Automeldungen, lokale Kommentare und der Reiter separat schalten. Kernfamilien sind Wildnis, Seelenstärke, Intelligenz und Paladinsegen. Göttlicher Wille und Schattenschutz starten als optionale Familien ausgeschaltet. Ohne passenden Buffgeber verlangt „Automatisch“ keinen Buff. Intelligenz und Wille werden automatisch nur für Manaklassen verlangt. **Anforderungen pro Klasse** bietet für jede Familie **Automatisch / Pflicht / Aus** und für Segen die Auswahl einer bestimmten Variante oder eines beliebigen Segens. „Pflicht“ ist eine bewusste Anforderung, auch ohne automatisch erkannten Buffgeber; eine insgesamt ausgeschaltete Familie bleibt ausgeschaltet.
+
+Eigene erlernte Fähigkeiten werden über die verfügbaren Zauberbuch-APIs geprüft. Einzel- und Gruppenvarianten sowie klassische Ränge gehören zur gleichen Familie. Zusätzliche Forever-Ränge können anhand desselben lokalisierten Namens aus dem modernen Zauberbuch erkannt werden. Fremde Zauberbücher und Talente lassen sich damit nicht zuverlässig ermitteln: Nicht bestätigte Talentbuffs wie Göttlicher Wille oder ein gezielt verlangter Segen der Könige bleiben im automatischen Modus unbekannt, statt eine fehlende Fähigkeit zu erfinden. Die Wildnis-Erinnerung verwendet denselben Prüfer und denselben bisherigen Erinnerungsschlüssel; es laufen keine zwei persönlichen Warnsysteme parallel.
+
+### Gruppenchat und Kommentare
+
+Nach einem **erfolgreichen eigenen Wildniszauber** wartet Paulchen ungefähr eine Sekunde nach dem letzten unmittelbar folgenden Zauber und prüft den aktuellen Gruppenstand erneut. Nur Druiden, die in einer Gruppe sind, lösen diesen Automatikbericht aus. Er ist für normale Gruppen anfangs aktiv; **automatische Raidmeldungen sind anfangs aus**. Fehlgeschlagene oder fremde Zauber senden nichts. Änderungen der Gruppe und Einstellungen verwerfen noch ausstehende Meldungen. Der Chat-Abstand ist zwischen 60 und 600 Sekunden einstellbar; identische Zustandsberichte werden zusätzlich unterdrückt. Letzter erfolgreicher Bericht und Cooldown werden pro Charakter gespeichert und überleben `/reload`.
+
+Berichte nennen sicher fehlende Buffs und kennzeichnen unvollständige Prüfungen ausdrücklich. Eine Meldung umfasst höchstens 250 UTF-8-Bytes; bei langen Raidlisten werden Mengen und ein Verweis auf die Detailansicht verwendet. Der Kanal folgt der aktuellen Gruppe (Gruppe, Raid oder Instanzgruppe). Lokale freche Kommentare verwenden Paulchens vorhandene Prioritäten, 15-Sekunden-Sprechblasen und Kategorie-Cooldowns; der Gruppenchat bleibt sachlich. Einzelne unbekannte Auren können alle noch nicht erkannten Familien eines Spielers unbekannt machen. Lesbar vorhandene Buffs dürfen trotzdem als vorhanden angezeigt werden.
+
+Bei aktiven Kampf-/Client-/Chatrestriktionen wird nichts gesendet. Moderne Chat-API und Legacy-Fallback werden nur nach Verfügbarkeitsprüfung verwendet; nach einem abgelehnten Aufruf gibt es keine Wiederholungsversuche über andere APIs. **Bericht übernehmen** öffnet ein lokales Kopierfeld mit dem aktuellen Bericht und passendem Chatpräfix. Du kannst ihn selbst einfügen und senden. Der Buffwächter wirkt keine Zauber und führt keine geschützten Aktionen aus. Die Prüfung im echten Forever-Client bleibt erforderlich; siehe [Buffwächter-Prüfbericht](BUFFWATCHER_TESTS.md).
 
 **Paulchens Logbuch** zeigt die letzten zehn Kämpfe, eigene DPS mit Durchschnitt, Crit-Rekorde, Gegnerprofile sowie EP-Statistiken und Farmrunden. Die Kompaktansicht zeigt zwei wählbare Kennzahlen und die Steuerung für Farmrunden. **Paulchen Upgrades** vergleicht Ausrüstung inklusive manuell geplanter Charakterstufe, Spalten, Filtern und Loot-Alarm. Der Auktionsscan liefert Marktangebote an das Upgrade-Fenster.
 
@@ -105,6 +121,10 @@ Die Begleitoptionen und der Auktionscache sind accountweit. Merkliste, Flugzeite
 | `/pq test` | Einen zufälligen Testkommentar ausgeben |
 | `/pq debug` | Debugmeldungen ein- oder ausschalten |
 | `/pqol` | Paulchen-Hauptfenster öffnen oder schließen |
+| `/pq buffs` | Buffwächter-Reiter öffnen |
+| `/pq buffs check` | Buffcheck erneuern, Ergebnis lokal ausgeben und Reiter öffnen |
+| `/pq buffs say` | Frischen Bericht bewusst im Gruppenchat ausgeben; bei Einschränkungen Kopierfeld öffnen |
+| `/pq buffs debug` | Lokale Buffdiagnose umschalten und Zustände ausgeben |
 | `/logbuch` oder `/dtl` | Logbuch-Reiter öffnen oder das Hauptfenster schließen |
 | `/logbuch mini` | Kompaktansicht ein- oder ausblenden |
 | `/logbuch crits`, `/logbuch xp`, `/logbuch farm` | Crit-Rekorde, EP oder Farmrunden öffnen |

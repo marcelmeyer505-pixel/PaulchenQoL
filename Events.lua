@@ -147,6 +147,9 @@ local function knowsWildBuff()
 end
 
 local function checkWildBuff()
+    -- BuffCheck owns this same reminder key when installed. Keep the old
+    -- implementation only as a compatibility fallback, never a second watcher.
+    if app.buffCheck then return end
     if not states.entered or not UnitClass or (InCombatLockdown and InCombatLockdown()) then return end
     local _, class = UnitClass("player")
     if readable(class) ~= "DRUID" or unitState(UnitIsDeadOrGhost) == true then

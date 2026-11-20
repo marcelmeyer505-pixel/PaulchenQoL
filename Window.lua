@@ -10,6 +10,7 @@ local pageTabs = {
     { "travel", "Übersicht", 137, 94, 7, 47, "Reise" },
     { "logbook", app.logbookLabel, 235, 62, 57, 58 },
     { "upgrades", "Upgrades", 301, 65, 118, 61 },
+    { "buffs", "Buffs", 370, 65, 183, 51 },
 }
 local settingsWidth = 88
 local db, dashboard, travelPage, travel
@@ -303,6 +304,7 @@ local function layoutHeader(f, compact, titleHeight)
         tab:SetWidth(tabWidth)
         tab.text:SetWidth(tabWidth - 8)
         tab.text:SetText(compact and compactName or name)
+        if key=="buffs" then tab:SetShown(not app.buffCheck or app.buffCheck.Settings().showWindow) end
     end
 
     local optionWidth = compact and 66 or settingsWidth
@@ -349,6 +351,9 @@ local function selectPage(f, key)
                     or "Die Ausrüstungsbewertung konnte nicht geladen werden."
                 page = unavailablePage(f.body, message)
             end
+        elseif key == "buffs" then
+            page = app.buffCheck and app.buffCheck.GetPage(f.body)
+                or unavailablePage(f.body,"Buffwächter nicht verfügbar.")
         end
         page:SetPoint("TOP", f.body, "TOP")
         f.pages[key] = page
@@ -446,6 +451,13 @@ end
 
 function app.RefreshDashboardSettings()
     if dashboard then dashboard.companionCheck:SetChecked(app.Profile().show) end
+end
+
+function app.RefreshBuffTab()
+    if not dashboard or not app.buffCheck then return end
+    local shown=app.buffCheck.Settings().showWindow
+    dashboard.pageTabs.buffs:SetShown(shown)
+    if not shown and dashboard.page=="buffs" then selectPage(dashboard,"travel") end
 end
 
 local function createMinimap()

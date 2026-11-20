@@ -12,6 +12,8 @@ local rules = {
     back = { priority = 6, cooldown = 30, lifetime = 75, mood = "happy" },
     bags = { priority = 6, cooldown = 120, lifetime = 100 },
     idle = { priority = 1, cooldown = 95, lifetime = 15 },
+    buffMissing = { priority = 4, cooldown = 120, lifetime = 15, mood = "annoyed" },
+    buffReady = { priority = 4, cooldown = 120, lifetime = 15, mood = "happy" },
 }
 local images = { neutral = "idle", happy = "jubelt", excited = "jubelt", annoyed = "genervt", tired = "schlaeft" }
 local intervals = { 90, 60, 45 }

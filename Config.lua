@@ -162,6 +162,9 @@ local function createWindow()
     button(f, "Level-up-Sound testen", 252, -315, 210):SetScript("OnClick", function()
         if not app.PlayLevelUpSound() then print("Paulchen QoL · Der Level-up-Sound konnte nicht abgespielt werden.") end
     end)
+    button(f, "Buffwächter einstellen", 252, -348, 210):SetScript("OnClick", function()
+        if app.buffCheck then app.buffCheck.OpenConfig() end
+    end)
     button(f, "Position zurücksetzen", 18, -392, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
     button(f, "Testkommentar", 252, -392, 210):SetScript("OnClick", function() app.TestComment() end)
     label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -425)
@@ -177,7 +180,9 @@ end
 
 function app.CompanionCommand(message)
     local cmd = (message or ""):match("^%s*(%S*)"):lower()
-    if cmd == "show" or cmd == "hide" then
+    if cmd == "buffs" and app.buffCheck then
+        app.buffCheck.Command((message or ""):match("^%s*%S+%s*(.-)%s*$"))
+    elseif cmd == "show" or cmd == "hide" then
         write("show", cmd == "show")
     elseif cmd == "reset" then
         app.ResetCompanionPosition()
@@ -189,7 +194,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs]")
     end
     refreshSettings()
 end
