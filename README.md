@@ -1,4 +1,4 @@
-# Paulchen QoL v0.9.1
+# Paulchen QoL v0.9.2
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -92,6 +92,8 @@ Mit **Standardtaschen** schaltest du auf deine bisherige Taschenansicht zurück.
 Ein **Rechtsklick auf den Text einer Gegenstandszeile** öffnet die Vormerkungen. Standardmäßig gibt es **Behalten**, **DPS-Ausrüstung**, **Tank-Ausrüstung**, **AH** und **Händler** sowie **Ohne Markierung**. Bestehende Vormerkungen bleiben erhalten. Die Markierung steht neben dem Gegenstandsnamen und lässt sich über ihren Namen suchen. Am Item-Symbol bleiben die üblichen Gegenstandsaktionen aktiv. Die Übersicht und die Markierung des günstigsten entfernbaren Stapels werden nach einer Änderung aktualisiert.
 
 Über **Kategorien** legst du eigene Vormerkungen an und bearbeitest die Namen und Farben vorhandener Kategorien. Wähle eine Farbe im Farbwähler oder gib einen Hex-Code wie `#4DA6FF` ein. Die Kategorien werden pro Charakter gespeichert. Beim Umbenennen oder Umfärben bleiben zugewiesene Gegenstände in ihrer Kategorie. Eigene Kategorien kannst du dort auch löschen. Ihre Gegenstände werden wieder automatisch einsortiert.
+
+Ziehe eine eigene Kategorie im Kategorienfenster am Griff rechts neben ihrem Namen vor oder hinter eine andere eigene Kategorie. Beim Ziehen kannst du mit dem Mausrad zwischen den Seiten blättern. Die Reihenfolge gilt für die Taschenliste und das Rechtsklickmenü und wird pro Charakter gespeichert.
 
 Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe. Der Zeilenhintergrund ist dezent getönt. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
 

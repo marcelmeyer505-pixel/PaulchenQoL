@@ -5,6 +5,7 @@ app.inventory = inventory
 local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor
 local layout
 local rowHeight, rowCount = 32, 14
+local builtinMarkCount = #app.markOrder
 local clearMarkLabel = "Ohne Markierung"
 local itemCategories = {
     { "equipment", "Ausrüstung" }, { "consumables", "Verbrauchbares" },
@@ -39,24 +40,58 @@ local function updateCategories()
 end
 local function loadMarkCategories()
     local saved = settings.markCategories
-    for _, key in ipairs(app.markOrder) do app.marks[key] = saved[key] or app.marks[key] end
+    for index = 1, builtinMarkCount do
+        local key = app.markOrder[index]
+        app.marks[key] = saved[key] or app.marks[key]
+    end
+    for index = #app.markOrder, builtinMarkCount + 1, -1 do
+        app.marks[app.markOrder[index]] = nil
+        app.markOrder[index] = nil
+    end
     local indices = {}
     for index in pairs(saved) do
         if type(index) == "number" then indices[#indices + 1] = index end
     end
     table.sort(indices)
     settings.nextMarkCategoryId = math.max(tonumber(settings.nextMarkCategoryId) or 1, (indices[#indices] or 0) + 1)
-    for _, index in ipairs(indices) do
+    local loaded = {}
+    local function loadCategory(index)
+        if type(index) ~= "number" or not saved[index] or loaded[index] then return end
         local key = "custom_" .. index
-        if not app.marks[key] then app.markOrder[#app.markOrder + 1] = key end
+        app.markOrder[#app.markOrder + 1] = key
         app.marks[key] = saved[index]
+        loaded[index] = true
     end
+    if type(settings.customCategoryOrder) == "table" then
+        for _, index in ipairs(settings.customCategoryOrder) do loadCategory(index) end
+    end
+    for _, index in ipairs(indices) do loadCategory(index) end
     updateCategories()
 end
 local function refreshMarkCategories()
+    local order = {}
+    for index = builtinMarkCount + 1, #app.markOrder do
+        order[#order + 1] = customCategoryIndex(app.markOrder[index])
+    end
+    settings.customCategoryOrder = order
     updateCategories()
     inventory.Refresh()
     if app.RefreshOverview then app.RefreshOverview() end
+end
+local function moveMarkCategory(source, target, after)
+    local from, to
+    for index = builtinMarkCount + 1, #app.markOrder do
+        local key = app.markOrder[index]
+        if key == source then from = index end
+        if key == target then to = index end
+    end
+    if not from or not to or from == to then return false end
+    local insertion = to + (after and 1 or 0) - (from < to and 1 or 0)
+    if insertion == from then return false end
+    table.remove(app.markOrder, from)
+    table.insert(app.markOrder, insertion, source)
+    refreshMarkCategories()
+    return true
 end
 local function saveMarkCategory(key, name, color)
     local saved = settings.markCategories
@@ -154,7 +189,76 @@ local function categoryButton(parent, text, x, y, width, onClick)
     button:SetScript("OnClick", onClick)
     return button
 end
-local function createMarkList(parent, width, visibleRows, choose, allowClear)
+local function enableCategoryDrag(list)
+    local draggedKey, markedRow, markedAfter
+    local line = list:CreateTexture(nil, "OVERLAY")
+    line:SetHeight(2)
+    line:SetColorTexture(unpack(style.gold))
+    line:Hide()
+
+    local function dropTarget()
+        local _, cursorY = GetCursorPosition()
+        for _, option in ipairs(list.options) do
+            local row = option.button
+            if option.key ~= draggedKey and option.handle:IsVisible() and row:IsMouseOver() then
+                local _, middle = row:GetCenter()
+                if middle then return option, cursorY < middle * row:GetEffectiveScale() end
+            end
+        end
+    end
+    local function cancel()
+        draggedKey, markedRow, markedAfter = nil, nil, nil
+        list:SetScript("OnUpdate", nil)
+        line:Hide()
+    end
+    local function finish()
+        if not draggedKey then return end
+        local target, after = dropTarget()
+        local source = draggedKey
+        cancel()
+        if target and moveMarkCategory(source, target.key, after) then list.Select(list.selected, false) end
+    end
+    local function update()
+        if not IsMouseButtonDown("LeftButton") then finish(); return end
+        local target, after = dropTarget()
+        if markedRow == target and markedAfter == after then return end
+        markedRow, markedAfter = target, after
+        line:SetShown(target ~= nil)
+        if target then
+            local edge = after and "BOTTOM" or "TOP"
+            line:ClearAllPoints()
+            line:SetPoint("LEFT", target.button, edge .. "LEFT", 0, after and -1 or 1)
+            line:SetPoint("RIGHT", target.button, edge .. "RIGHT", 0, after and -1 or 1)
+        end
+    end
+    for _, option in ipairs(list.options) do
+        local grip = CreateFrame("Button", nil, option.button)
+        option.handle = grip
+        grip:SetPoint("RIGHT", -1, 0)
+        grip:SetSize(24, 24)
+        grip:EnableMouse(true)
+        grip:RegisterForDrag("LeftButton")
+        for row = 0, 2 do
+            for column = 0, 1 do
+                local dot = grip:CreateTexture(nil, "ARTWORK")
+                dot:SetSize(2, 2)
+                dot:SetPoint("CENTER", -3 + column * 6, 5 - row * 5)
+                dot:SetColorTexture(unpack(style.gold))
+            end
+        end
+        grip:SetScript("OnDragStart", function(self)
+            if not self:IsVisible() then return end
+            draggedKey = option.key
+            list:SetScript("OnUpdate", update)
+            update()
+        end)
+        grip:SetScript("OnDragStop", function()
+            if not IsMouseButtonDown("LeftButton") then finish() end
+        end)
+    end
+    list:SetScript("OnHide", cancel)
+end
+local function createMarkList(parent, width, visibleRows, choose, allowClear, reorder)
     local list = CreateFrame("Frame", nil, parent)
     list.options, list.page, list.selected = {}, 1, false
     local markRows = visibleRows - (allowClear and 1 or 0)
@@ -168,6 +272,7 @@ local function createMarkList(parent, width, visibleRows, choose, allowClear)
             local shown = definition ~= nil or allowClear == true and index == shownMarks + 1
             option.key = key
             option.button:SetShown(shown)
+            if option.handle then option.handle:SetShown(customCategoryIndex(key) ~= nil) end
             option.title:SetText(definition and definition[1] or clearMarkLabel)
             option.title:SetTextColor(unpack(definition and definition[2] or style.cream))
             local active = shown and (key or false) == list.selected
@@ -187,7 +292,8 @@ local function createMarkList(parent, width, visibleRows, choose, allowClear)
         local button = style.Button(list)
         button:SetSize(width, 24)
         button:SetPoint("TOPLEFT", 0, -(index - 1) * 26)
-        local title = style.Label(button, "", 28, 0, width - 34, 24, "GameFontHighlightSmall", style.cream)
+        local title = style.Label(button, "", 28, 0, width - (reorder and 56 or 34), 24,
+            "GameFontHighlightSmall", style.cream)
         local check = button:CreateTexture(nil, "OVERLAY")
         check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
         check:SetSize(18, 18)
@@ -218,6 +324,7 @@ local function createMarkList(parent, width, visibleRows, choose, allowClear)
         end
         paint()
     end
+    if reorder then enableCategoryDrag(list) end
     return list
 end
 local function createMarkMenu()
@@ -305,8 +412,9 @@ local function createCategoryEditor()
         editor.saveCategory:SetWidth(removable and 170 or 270)
         editor.list.Select(key or false, jumpToSelection)
     end
-    editor.list = createMarkList(editor, 210, 8, function(key) edit(key) end)
+    editor.list = createMarkList(editor, 210, 8, function(key) edit(key) end, false, true)
     editor.list:SetPoint("TOPLEFT", 14, -76)
+    style.Label(editor, "Eigene Kategorien am Griff ziehen", 14, -310, 210, 15, "GameFontHighlightSmall", style.muted)
     editor.newCategory = categoryButton(editor, "+ Neue Kategorie", 14, -42, 210, function()
         edit(nil, true)
         editor.nameBox:SetFocus()

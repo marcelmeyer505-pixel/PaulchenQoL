@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2 — 2026-11-21
+
+- Drag custom categories into a new order in the bag category editor. The bag list and right-click menu follow the saved order.
+
 ## 0.9.1 — 2026-11-21
 
 - Delete custom bag categories from the category editor. Items assigned to a deleted category return to their automatic bag categories.
