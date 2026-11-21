@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.6 — 2026-11-21
+
+- Fix the Forever ScrollBox error when assigning or clearing a mark from a bag row. The bag's own menu closes before the item moves to its new category.
+
 ## 0.8.5 — 2026-11-21
 
 - Use addon-owned controls for optional upgrade columns and long filter lists to avoid the Forever ScrollBox error when a scrollable menu closes.

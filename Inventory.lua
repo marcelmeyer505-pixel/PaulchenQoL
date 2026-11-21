@@ -2,7 +2,7 @@ local _, app = ...
 local C, style, readable = C_Container, app.style, app.Readable
 local inventory = { slots = {}, offset = 0, query = "", searchCollapsed = {} }
 app.inventory = inventory
-local window, settings, refreshQueued, suppress, pendingAction
+local window, settings, refreshQueued, suppress, pendingAction, markMenu
 local layout
 local rowHeight, rowCount = 32, 14
 local categories = {
@@ -75,6 +75,67 @@ function inventory.Mark(item, mark)
     end
     if app.RefreshOverview then app.RefreshOverview() end
 end
+local function createMarkMenu()
+    local menu = CreateFrame("Frame", "PaulchenInventoryMarkMenu", window, "BackdropTemplate")
+    menu:Hide()
+    menu:EnableMouse(true)
+    menu:SetClampedToScreen(true)
+    menu:SetFrameLevel(window:GetFrameLevel() + 20)
+    menu:SetSize(238, 38 + (#app.markOrder + 1) * 26)
+    style.Panel(menu, style.background, style.accent)
+    menu.title = style.Label(menu, "", 10, -3, 192, 28, "GameFontNormal", style.gold)
+    local close = CreateFrame("Button", nil, menu, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -1, -1)
+    close:SetScript("OnClick", function() menu:Hide() end)
+
+    menu.options = {}
+    local function addOption(key)
+        local mark = app.marks[key]
+        local option = style.Button(menu)
+        option:SetSize(222, 24)
+        option:SetPoint("TOPLEFT", 8, -32 - #menu.options * 26)
+        style.Label(option, mark and mark[1] or "Ohne Markierung", 29, 0, 184, 24,
+            "GameFontHighlightSmall", mark and mark[2] or style.cream)
+        local check = option:CreateTexture(nil, "OVERLAY")
+        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        check:SetSize(20, 20)
+        check:SetPoint("LEFT", 4, 0)
+        menu.options[#menu.options + 1] = { key = key, button = option, check = check }
+        option:SetScript("OnClick", function()
+            if not menu:IsVisible() then return end
+            local item = menu.item
+            menu:Hide()
+            inventory.Mark(item, key)
+        end)
+    end
+    for _, key in ipairs(app.markOrder) do addOption(key) end
+    addOption(nil)
+
+    menu:SetScript("OnShow", function(self) app.RegisterSupported(self, "GLOBAL_MOUSE_DOWN") end)
+    menu:SetScript("OnHide", function(self)
+        self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+        self.ownerRow, self.item = nil, nil
+    end)
+    menu:SetScript("OnEvent", function(self)
+        if not self:IsMouseOver() then self:Hide() end
+    end)
+    return menu
+end
+local function showMarkMenu(row)
+    markMenu = markMenu or createMarkMenu()
+    markMenu.ownerRow, markMenu.item = row, row.item
+    markMenu.title:SetText(row.item.name)
+    local current = app.Settings().marks[row.item.markKey]
+    for _, option in ipairs(markMenu.options) do
+        local selected = option.key == current
+        option.check:SetShown(selected)
+        style.SetButtonState(option.button, selected)
+    end
+    markMenu:ClearAllPoints()
+    markMenu:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 36, -2)
+    GameTooltip:Hide()
+    markMenu:Show()
+end
 local function updateMoney()
     if window and window.money then
         window.money:SetText(money(GetMoney and readable(GetMoney())))
@@ -129,19 +190,7 @@ local function createSlot(bag, slot)
     row:SetScript("OnEnter", function() row.button:OnEnter(); groupTooltip(row) end)
     row:SetScript("OnLeave", function() row.button:OnLeave() end)
     row:SetScript("OnMouseUp", function(self, mouseButton)
-        if mouseButton ~= "RightButton" or not self.item or not self.item.id
-            or not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-        local item = self.item
-        GameTooltip:Hide()
-        MenuUtil.CreateContextMenu(self, function(_, menu)
-            menu:CreateTitle(item.name)
-            for _, key in ipairs(app.markOrder) do
-                menu:CreateRadio(app.marks[key][1], function() return app.Settings().marks[item.markKey] == key end,
-                    function() inventory.Mark(item, key) end)
-            end
-            menu:CreateRadio("Ohne Markierung", function() return not app.Settings().marks[item.markKey] end,
-                function() inventory.Mark(item, nil) end)
-        end)
+        if mouseButton == "RightButton" and self.item and self.item.markKey then showMarkMenu(self) end
     end)
     row:Hide()
     inventory.slots[bag .. ":" .. slot] = row
@@ -247,6 +296,10 @@ layout = function()
     for index = 1, rowCount do
         local row = rows[index + inventory.offset]
         if row then displayed[row] = true end
+    end
+    if markMenu and markMenu:IsShown() then
+        local owner = markMenu.ownerRow
+        if not displayed[owner] or owner.item.markKey ~= markMenu.item.markKey then markMenu:Hide() end
     end
     for _, row in pairs(inventory.slots) do if not displayed[row] then row:Hide() end end
     for _, header in pairs(categoryHeaders) do if not displayed[header] then header:Hide() end end
@@ -458,6 +511,7 @@ local function createWindow()
     style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
     f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
     f:SetScript("OnShow", inventory.Refresh)
+    f:SetScript("OnHide", function() if markMenu then markMenu:Hide() end end)
     f:Hide()
     UISpecialFrames[#UISpecialFrames + 1] = "PaulchenQoLInventory"
     -- Pre-create slot identities before combat; displaying the window is safe later.
