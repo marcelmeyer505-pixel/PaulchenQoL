@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 — 2026-11-21
+
+- Delete custom bag categories from the category editor. Items assigned to a deleted category return to their automatic bag categories.
+
 ## 0.9.0 — 2026-11-21
 
 - Create custom bag categories and edit the names and colors of existing marks. The editor supports the color picker and hex values, and the right-click list pages through larger sets of categories.

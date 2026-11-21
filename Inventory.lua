@@ -24,8 +24,11 @@ local function combat() return InCombatLockdown and InCombatLockdown() end
 local function lower(text)
     return text:gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("Ü", "ü"):lower()
 end
+local function customCategoryIndex(key)
+    if key then return tonumber(key:match("^custom_(%d+)$")) end
+end
 local function updateCategories()
-    categories = {}
+    categories, categoryNames = {}, {}
     -- Explicit marks come before the automatic item-class categories.
     for _, key in ipairs(app.markOrder) do
         local mark = app.marks[key]
@@ -37,27 +40,56 @@ end
 local function loadMarkCategories()
     local saved = settings.markCategories
     for _, key in ipairs(app.markOrder) do app.marks[key] = saved[key] or app.marks[key] end
-    for index, definition in ipairs(saved) do
+    local indices = {}
+    for index in pairs(saved) do
+        if type(index) == "number" then indices[#indices + 1] = index end
+    end
+    table.sort(indices)
+    settings.nextMarkCategoryId = math.max(tonumber(settings.nextMarkCategoryId) or 1, (indices[#indices] or 0) + 1)
+    for _, index in ipairs(indices) do
         local key = "custom_" .. index
         if not app.marks[key] then app.markOrder[#app.markOrder + 1] = key end
-        app.marks[key] = definition
+        app.marks[key] = saved[index]
     end
     updateCategories()
 end
+local function refreshMarkCategories()
+    updateCategories()
+    inventory.Refresh()
+    if app.RefreshOverview then app.RefreshOverview() end
+end
 local function saveMarkCategory(key, name, color)
     local saved = settings.markCategories
-    local storageKey = key and (tonumber(key:match("^custom_(%d+)$")) or key)
+    local storageKey = customCategoryIndex(key) or key
     if not key then
-        storageKey = #saved + 1
+        storageKey = settings.nextMarkCategoryId
+        settings.nextMarkCategoryId = storageKey + 1
         key = "custom_" .. storageKey
         app.markOrder[#app.markOrder + 1] = key
     end
     local definition = { name, color }
     saved[storageKey], app.marks[key] = definition, definition
-    updateCategories()
-    inventory.Refresh()
-    if app.RefreshOverview then app.RefreshOverview() end
+    refreshMarkCategories()
     return key
+end
+local function deleteMarkCategory(key)
+    local index = customCategoryIndex(key)
+    if not index or not settings.markCategories[index] then return end
+    settings.markCategories[index], app.marks[key] = nil, nil
+    for position, mark in ipairs(app.markOrder) do
+        if mark == key then table.remove(app.markOrder, position); break end
+    end
+
+    local category = "mark_" .. key
+    settings.collapsed[category], inventory.searchCollapsed[category] = nil, nil
+    local header = categoryHeaders[category]
+    if header then header:Hide() end
+    categoryHeaders[category] = nil
+    local marks = app.Settings().marks
+    for itemKey, mark in pairs(marks) do
+        if mark == key then marks[itemKey] = nil end
+    end
+    refreshMarkCategories()
 end
 local function colorHex(r, g, b)
     return ("#%02X%02X%02X"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
@@ -263,10 +295,14 @@ local function createCategoryEditor()
     local function edit(key, jumpToSelection)
         editor.key, editor.colorSession = key or false, false
         local definition = app.marks[key]
+        local removable = customCategoryIndex(key) ~= nil
         editor.heading:SetText(definition and "Kategorie bearbeiten" or "Neue Kategorie")
         editor.nameBox:SetText(definition and definition[1] or "")
         editor.hexBox:SetText(colorHex(unpack(definition and definition[2] or style.gold)))
         editor.status:SetText("")
+        editor.deletePrompt:Hide()
+        editor.deleteCategory:SetShown(removable)
+        editor.saveCategory:SetWidth(removable and 170 or 270)
         editor.list.Select(key or false, jumpToSelection)
     end
     editor.list = createMarkList(editor, 210, 8, function(key) edit(key) end)
@@ -333,6 +369,25 @@ local function createCategoryEditor()
         editor.status:SetText("Gespeichert")
         editor.nameBox:ClearFocus()
         editor.hexBox:ClearFocus()
+    end)
+    local deletePrompt = CreateFrame("Frame", nil, editor)
+    deletePrompt:SetPoint("TOPLEFT", 246, -234)
+    deletePrompt:SetSize(270, 78)
+    deletePrompt:Hide()
+    editor.deletePrompt = deletePrompt
+    local deleteText = style.Label(deletePrompt, "", 0, 0, 270, 38, "GameFontHighlightSmall", style.cream)
+    deleteText:SetWordWrap(true)
+    editor.confirmDelete = categoryButton(deletePrompt, "Löschen bestätigen", 0, -43, 170, function()
+        if not deletePrompt:IsVisible() then return end
+        deleteMarkCategory(editor.key)
+        edit(nil, true)
+        editor.status:SetText("Kategorie gelöscht")
+    end)
+    editor.cancelDelete = categoryButton(deletePrompt, "Abbrechen", 178, -43, 92, function() deletePrompt:Hide() end)
+    editor.deleteCategory = categoryButton(editor, "Löschen", 426, -198, 90, function()
+        editor.status:SetText("")
+        deleteText:SetText(("„%s“ löschen? Die Gegenstände werden automatisch einsortiert."):format(app.marks[editor.key][1]))
+        deletePrompt:Show()
     end)
     editor:SetScript("OnShow", function() edit(nil, true) end)
     editor:SetScript("OnHide", function()
