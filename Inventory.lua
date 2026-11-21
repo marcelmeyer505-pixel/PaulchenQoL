@@ -5,7 +5,7 @@ local bank = { slots = {}, offset = 0, query = "", searchCollapsed = {}, categor
 app.inventory = inventory
 inventory.bank = bank
 local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor
-local layout, refreshView, openBank, depositCategory, transfer
+local layout, refreshView, openBank, transferCategory, transfer
 local rowHeight, rowCount = 32, 14
 local builtinMarkCount = #app.markOrder
 local clearMarkLabel = "Ohne Markierung"
@@ -32,8 +32,8 @@ local function canBank()
     end
     return BANK_CONTAINER ~= nil
 end
-local function canDeposit()
-    return canBank() and C.PickupContainerItem and GetCursorInfo and ClearCursor
+local function canTransfer()
+    return canBank() and C.PickupContainerItem ~= nil and GetCursorInfo ~= nil and ClearCursor ~= nil
 end
 local function bankContainers()
     local bags, names = {}, {}
@@ -55,6 +55,12 @@ local function bankContainers()
         end
     end
     return bags, names
+end
+local function containersFor(view)
+    if view.isBank then return bankContainers() end
+    local bags = {}
+    for bag = 0, lastBag() do bags[#bags + 1] = bag end
+    return bags
 end
 local function lower(text)
     return text:gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("Ü", "ü"):lower()
@@ -754,6 +760,8 @@ end
 local function categorize(view, rows)
     local buckets, display = {}, {}
     local window, settings, categoryHeaders = view.window, view.settings, view.categoryHeaders
+    local transferAvailable = canTransfer()
+    local transferEnabled = transferAvailable and not transfer and not combat()
     -- Search starts expanded and has its own temporary folds, preserving the
     -- character's normal category layout when the query is cleared.
     local collapsed = view.query:find("%S") and view.searchCollapsed or settings.collapsed
@@ -778,15 +786,12 @@ local function categorize(view, rows)
                     categorize(view, view.filtered)
                     layout(view)
                 end)
-                if not view.isBank then
-                    header.deposit = categoryButton(header, "Einlagern", 552, -4, 110, function() depositCategory(key) end)
-                end
+                header.transferButton = categoryButton(header, view.isBank and "Auslagern" or "Einlagern", 552, -4, 110,
+                    function() transferCategory(view, key) end)
                 categoryHeaders[key] = header
             end
-            if not view.isBank then
-                header.deposit:SetShown(not not canDeposit())
-                header.deposit:SetEnabled(not transfer and not combat())
-            end
+            header.transferButton:SetShown(transferAvailable)
+            header.transferButton:SetEnabled(transferEnabled)
             if color then
                 header.caption:SetTextColor(unpack(color))
                 header:SetBackdropColor(color[1] * 0.22, color[2] * 0.22, color[3] * 0.22, 1)
@@ -807,9 +812,8 @@ refreshView = function(view)
     local marks = app.Settings().marks
     local filtered, free, capacity = {}, 0, 0
     local groups, bySlot = {}, {}
-    local bags = {}
-    if view.isBank then bags, view.containerNames = bankContainers()
-    else for bag = 0, lastBag() do bags[#bags + 1] = bag end end
+    local bags, names = containersFor(view)
+    view.containerNames = names
     for _, bag in ipairs(bags) do
         for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do
             capacity = capacity + 1
@@ -862,7 +866,7 @@ function inventory.Refresh()
     refreshView(inventory)
     refreshView(bank)
 end
--- Use fixed, verified slots so this action can only move items to the personal bank.
+-- Only transfer between verified slots in the player's bags and personal bank.
 local function physicalStack(bag, slot)
     local raw = C.GetContainerItemInfo(bag, slot)
     local info = readable(raw)
@@ -886,7 +890,7 @@ local function permittedInBank(bag, slot)
     local location = ItemLocation:CreateFromBagAndSlot(bag, slot)
     return location:IsValid() and readable(C_Bank.IsItemAllowedInBankType(bankType, location)) == true
 end
-local function bankDestination(bags, source)
+local function findDestination(bags, source)
     local itemAPI = C_Item and C_Item.GetItemInfo or GetItemInfo
     local maxStack = readable(select(8, itemAPI(source.link))) or 1
     local getFamily = C_Item and C_Item.GetItemFamily or GetItemFamily
@@ -914,12 +918,17 @@ local function transferMessage(text)
         if view.window then view.window.transferStatus:SetText(text or view.window.defaultActions) end
     end
 end
+local function showTransferProgress(state)
+    transferMessage(("%s … %d / %d Stück"):format(state.action, state.moved, state.total))
+end
 local function finishTransfer(state, reason)
     if transfer ~= state then return end
     transfer = nil
     local remaining = state.total - state.moved
-    local text = ("%d Stück eingelagert"):format(state.moved)
-    if remaining > 0 then text = text .. (" · %d übrig"):format(remaining) end
+    local text = ("%d Stück %s"):format(state.moved, state.fromBank and "ausgelagert" or "eingelagert")
+    if remaining > 0 then
+        text = text .. (" · %d übrig %s"):format(remaining, state.fromBank and "in der Bank" or "in den Taschen")
+    end
     if reason then text = text .. " · " .. reason end
     bank.transferMessage = text
     transferMessage(text)
@@ -940,7 +949,7 @@ local function confirmMove(state, entry, target, tries)
         state.moved = state.moved + moved
         entry.count = entry.count - moved
         if entry.count == 0 then state.index = state.index + 1 end
-        transferMessage(("Einlagern … %d / %d Stück"):format(state.moved, state.total))
+        showTransferProgress(state)
         C_Timer.After(0.12, function() stepTransfer(state) end)
     elseif tries >= 8 then
         state.index = state.index + 1
@@ -952,15 +961,15 @@ end
 stepTransfer = function(state)
     if transfer ~= state then return end
     if not canBank() then finishTransfer(state, "Bank geschlossen"); return end
-    if combat() or GetCursorInfo() then finishTransfer(state, "Einlagern unterbrochen"); return end
+    if combat() or GetCursorInfo() then finishTransfer(state, state.action .. " unterbrochen"); return end
     local last = math.min(#state.entries, state.index + 7)
     while state.index <= last do
         local entry = state.entries[state.index]
         local current = physicalStack(entry.bag, entry.slot)
         if current and not current.locked and current.key == entry.key and current.count == entry.count
             and (not entry.guid or stackGUID(entry.bag, entry.slot) == entry.guid)
-            and permittedInBank(entry.bag, entry.slot) then
-            local target = bankDestination(state.bags, current)
+            and (state.fromBank or permittedInBank(entry.bag, entry.slot)) then
+            local target = findDestination(state.destinationBags, current)
             if target then
                 local picked = pcall(C.PickupContainerItem, entry.bag, entry.slot)
                 if GetCursorInfo() == "item" then
@@ -982,17 +991,21 @@ stepTransfer = function(state)
     if state.entries[state.index] then
         C_Timer.After(0, function() stepTransfer(state) end)
     else
-        finishTransfer(state, state.moved < state.total and "Rest blieb in den Taschen" or nil)
+        finishTransfer(state)
     end
 end
-depositCategory = function(key)
-    if transfer or not canDeposit() or not window:IsShown() or combat() then return end
+transferCategory = function(view, key)
+    if transfer or not canTransfer() or not view.window:IsShown() or combat() then return end
     if GetCursorInfo() then transferMessage("Leere zuerst den Mauszeiger."); return end
-    refreshView(inventory)
-    local state = { entries = {}, index = 1, total = 0, moved = 0, bags = bankContainers() }
-    for bag = 0, lastBag() do
+    refreshView(view)
+    local state = {
+        entries = {}, index = 1, total = 0, moved = 0, fromBank = view.isBank,
+        action = view.isBank and "Auslagern" or "Einlagern",
+        destinationBags = containersFor(view.isBank and inventory or bank),
+    }
+    for _, bag in ipairs(containersFor(view)) do
         for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do
-            local group = inventory.groupsBySlot[bag .. ":" .. slot]
+            local group = view.groupsBySlot[bag .. ":" .. slot]
             if group and inventory.Category(group.item) == key then
                 local item = physicalStack(bag, slot)
                 if item then
@@ -1005,9 +1018,9 @@ depositCategory = function(key)
     end
     if state.total == 0 then return end
     transfer = state
-    transferMessage(("Einlagern … 0 / %d Stück"):format(state.total))
-    categorize(inventory, inventory.filtered)
-    layout(inventory)
+    showTransferProgress(state)
+    categorize(view, view.filtered)
+    layout(view)
     stepTransfer(state)
 end
 local function createWindow(view)

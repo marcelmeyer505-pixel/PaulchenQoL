@@ -1,4 +1,4 @@
-# Paulchen QoL v0.10.0
+# Paulchen QoL v0.10.1
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -98,6 +98,8 @@ Ziehe eine eigene Kategorie im Kategorienfenster am Griff rechts neben ihrem Nam
 Beim Bankier öffnet sich **Paulchens Bank** für das persönliche Bankfach. Die Bank übernimmt deine Kategorien, Farben und Reihenfolge. Über **Taschen** und **Bank** wechselst du die Liste. Suche, Spaltensortierung und eingeklappte Kategorien werden getrennt geführt. **Standardbank** gibt die normale Bankoberfläche frei, etwa zum Verwalten der Fächer.
 
 Mit geöffneter Bank nimmst du in der Taschenliste **Einlagern** neben einem Kategorienamen. Das verschiebt alle Stapel dieser Kategorie, auch wenn ein Suchfilter nur einen Teil davon anzeigt. Paulchen füllt passende Bankstapel auf und nutzt anschließend freie Plätze. Das Ergebnis steht unten im Fenster.
+
+In **Paulchens Bank** holst du über **Auslagern** alle Stapel einer Kategorie aus deinen persönlichen Bankfächern zurück. Paulchen füllt passende Taschenstapel auf und nutzt freie Plätze, die den Gegenstand aufnehmen können. Passt nur ein Teil in deine Taschen, bleibt der Rest in der Bank.
 
 Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe. Der Zeilenhintergrund ist dezent getönt. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
 

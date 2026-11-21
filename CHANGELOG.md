@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 — 2026-11-22
+
+- Withdraw an entire category from the personal bank into your bags. Fill compatible stacks first and report how many items moved or stayed in the bank.
+
 ## 0.10.0 — 2026-11-22
 
 - Add a personal bank list with the same category names, colors, ordering, grouped stacks, search and sorting as the bag list.
