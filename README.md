@@ -1,4 +1,4 @@
-# Paulchen QoL v0.8.6
+# Paulchen QoL v0.8.7
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -75,7 +75,7 @@ Der erste Reiter zeigt den Reise-Check mit freien Taschenplätzen, niedrigster H
 
 Der Upgrade-Check startet nach jedem Login und `/reload` automatisch im Hintergrund. Er wartet auf bekannte Ausrüstungsdaten, nutzt die vorhandenen Quellen und den Punktecache und läuft in kleinen Schritten. Im Kampf pausiert er; danach wird die Suche neu gestartet. Ausrüstungs-, Stufen- und Profilwechsel aktualisieren den Vergleich auch bei geschlossenem Fenster. Der Check öffnet kein Fenster und löst keinen Vollscan des Auktionshauses aus. Eine manuell höher eingestellte Suchstufe bleibt im Upgradefenster nutzbar; die Übersicht zeigt nur auf der aktuellen Charakterstufe verwendbare Treffer.
 
-Unten stehen die Vormerkungen für **Behalten** (einschließlich Katze und Bär), **Auktionshaus** und **Händler** als Zusammenfassung. Der Händlerwert umfasst verkaufbare vorgemerkte Gegenstände. **Taschen öffnen** wechselt direkt vom Hauptfenster in die neue Taschenliste. Die Gegenstandsliste bleibt ausschließlich in den Taschen. Die Übersicht passt ihren Maßstab an die verfügbare Bildschirmhöhe an; das kompakte Logbuch behält seine eigene Größe.
+Unten stehen die Vormerkungen für **Behalten** (einschließlich Tank- und DPS-Ausrüstung), **Auktionshaus** und **Händler** als Zusammenfassung. Der Händlerwert umfasst verkaufbare vorgemerkte Gegenstände. **Taschen öffnen** wechselt direkt vom Hauptfenster in die neue Taschenliste. Die Gegenstandsliste bleibt ausschließlich in den Taschen. Die Übersicht passt ihren Maßstab an die verfügbare Bildschirmhöhe an; das kompakte Logbuch behält seine eigene Größe.
 
 ## Taschen als Liste
 
@@ -89,9 +89,9 @@ Am Gegenstandssymbol funktionieren die normalen Taschenaktionen: Rechtsklick zum
 
 Mit **Standardtaschen** schaltest du auf deine bisherige Taschenansicht zurück. `/ptaschen` aktiviert die Liste wieder. Bank, Schlüsselbund und Gildenbank behalten ihre eigene Ansicht. Es werden keine Gegenstände automatisch verkauft, gelöscht oder umsortiert.
 
-Ein **Rechtsklick auf den Text einer Gegenstandszeile** öffnet die Vormerkungen **Behalten**, **Katze**, **Bär**, **AH** und **Händler** sowie **Ohne Markierung**. Bestehende Vormerkungen bleiben erhalten. Die Markierung steht neben dem Gegenstandsnamen und lässt sich über ihren Namen suchen. Am Item-Symbol bleiben die üblichen Gegenstandsaktionen aktiv. Die Übersicht und die Markierung des günstigsten entfernbaren Stapels werden nach einer Änderung aktualisiert.
+Ein **Rechtsklick auf den Text einer Gegenstandszeile** öffnet die Vormerkungen **Behalten**, **DPS-Ausrüstung**, **Tank-Ausrüstung**, **AH** und **Händler** sowie **Ohne Markierung**. Bestehende Vormerkungen bleiben erhalten. Die Markierung steht neben dem Gegenstandsnamen und lässt sich über ihren Namen suchen. Am Item-Symbol bleiben die üblichen Gegenstandsaktionen aktiv. Die Übersicht und die Markierung des günstigsten entfernbaren Stapels werden nach einer Änderung aktualisiert.
 
-Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe; der Zeilenhintergrund ist dezent getönt. **Behalten** ist grün, **Katze/Bär** goldfarben, **AH** hellblau und **Händler** lachsfarben. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
+Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe; der Zeilenhintergrund ist dezent getönt. **Behalten** ist grün, **DPS- und Tank-Ausrüstung** sind goldfarben, **AH** ist hellblau und **Händler** lachsfarben. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
 
 ## Installation
 

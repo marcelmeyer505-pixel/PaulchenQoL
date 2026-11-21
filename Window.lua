@@ -256,7 +256,7 @@ local function createTravelPage(parent)
         elseif ToggleAllBags then ToggleAllBags() end
     end)
     f.openBags = openBags
-    f.keep = travelCard(f, 18, "Behalten", "inkl. Katze und Bär", -591)
+    f.keep = travelCard(f, 18, "Behalten", "inkl. Tank- und DPS-Ausrüstung", -591)
     f.auction = travelCard(f, 236, "Auktionshaus", "Vorgemerkte Gegenstände", -591)
     f.vendor = travelCard(f, 454, "Händler", "Vorgemerkter Verkaufswert", -591)
     label(f, "Vormerken: Rechtsklick auf eine Gegenstandszeile in Paulchens Taschen.",

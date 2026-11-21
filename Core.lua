@@ -9,8 +9,8 @@ app.avatar = app.artPath .. "idle.tga"
 app.markOrder = { "keep", "cat", "bear", "auction", "vendor" }
 app.marks = {
     keep = { "Behalten", { 0.61, 0.85, 0.63 } },
-    cat = { "Katze", { 0.95, 0.72, 0.37 } },
-    bear = { "Bär", { 0.95, 0.72, 0.37 } },
+    cat = { "DPS-Ausrüstung", { 0.95, 0.72, 0.37 } },
+    bear = { "Tank-Ausrüstung", { 0.95, 0.72, 0.37 } },
     auction = { "AH", { 0.65, 0.79, 1 } },
     vendor = { "Händler", { 1, 0.57, 0.43 } },
 }

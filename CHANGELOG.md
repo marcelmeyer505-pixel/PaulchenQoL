@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.7 — 2026-11-21
+
+- Rename the Cat and Bear bag marks to DPS Gear and Tank Gear. Existing marks and collapsed categories carry over.
+
 ## 0.8.6 — 2026-11-21
 
 - Fix the Forever ScrollBox error when assigning or clearing a mark from a bag row. The bag's own menu closes before the item moves to its new category.
