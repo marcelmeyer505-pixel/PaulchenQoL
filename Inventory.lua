@@ -1,9 +1,11 @@
 local _, app = ...
 local C, style, readable = C_Container, app.style, app.Readable
-local inventory = { slots = {}, offset = 0, query = "", searchCollapsed = {} }
+local inventory = { slots = {}, offset = 0, query = "", searchCollapsed = {}, categoryHeaders = {} }
+local bank = { slots = {}, offset = 0, query = "", searchCollapsed = {}, categoryHeaders = {}, isBank = true }
 app.inventory = inventory
+inventory.bank = bank
 local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor
-local layout
+local layout, refreshView, openBank, depositCategory, transfer
 local rowHeight, rowCount = 32, 14
 local builtinMarkCount = #app.markOrder
 local clearMarkLabel = "Ohne Markierung"
@@ -14,7 +16,6 @@ local itemCategories = {
     { "quests", "Questgegenstände" }, { "junk", "Plunder" }, { "other", "Sonstiges" },
 }
 local categories, categoryNames = {}, {}
-local categoryHeaders = {}
 local columns = {
     { "name", "Gegenstand", 52, 268 }, { "count", "Anzahl", 324, 54 },
     { "quality", "Qualität", 382, 92 }, { "value", "Händler / Gesamt", 478, 128 },
@@ -22,6 +23,39 @@ local columns = {
 }
 local function lastBag() return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4 end
 local function combat() return InCombatLockdown and InCombatLockdown() end
+local function characterBankType() return Enum and Enum.BankType and Enum.BankType.Character end
+local function canBank()
+    if not bank.atBank then return false end
+    local bankType = characterBankType()
+    if bankType ~= nil and C_Bank and C_Bank.CanUseBank then
+        return readable(C_Bank.CanUseBank(bankType)) == true
+    end
+    return BANK_CONTAINER ~= nil
+end
+local function canDeposit()
+    return canBank() and C.PickupContainerItem and GetCursorInfo and ClearCursor
+end
+local function bankContainers()
+    local bags, names = {}, {}
+    local legacy = BANK_CONTAINER
+    local bankType = characterBankType()
+    if bankType ~= nil and C_Bank and C_Bank.FetchPurchasedBankTabData then
+        local tabs = readable(C_Bank.FetchPurchasedBankTabData(bankType)) or {}
+        for _, tab in ipairs(tabs) do
+            local bag = readable(tab.ID)
+            if type(bag) == "number" and bag > lastBag() and not names[bag] then
+                bags[#bags + 1], names[bag] = bag, readable(tab.name) or "Bankfach " .. (#bags + 1)
+            end
+        end
+    end
+    if #bags == 0 and legacy and (readable(C.GetContainerNumSlots(legacy)) or 0) > 0 then
+        bags[1], names[legacy] = legacy, "Bank"
+        for bag = lastBag() + 1, lastBag() + (NUM_BANKBAGSLOTS or 0) do
+            bags[#bags + 1], names[bag] = bag, "Banktasche " .. (bag - lastBag())
+        end
+    end
+    return bags, names
+end
 local function lower(text)
     return text:gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("Ü", "ü"):lower()
 end
@@ -116,10 +150,12 @@ local function deleteMarkCategory(key)
     end
 
     local category = "mark_" .. key
-    settings.collapsed[category], inventory.searchCollapsed[category] = nil, nil
-    local header = categoryHeaders[category]
-    if header then header:Hide() end
-    categoryHeaders[category] = nil
+    for _, view in ipairs({ inventory, bank }) do
+        view.settings.collapsed[category], view.searchCollapsed[category] = nil, nil
+        local header = view.categoryHeaders[category]
+        if header then header:Hide() end
+        view.categoryHeaders[category] = nil
+    end
     local marks = app.Settings().marks
     for itemKey, mark in pairs(marks) do
         if mark == key then marks[itemKey] = nil end
@@ -152,30 +188,35 @@ local function groupKey(id, link)
     if #fields >= 9 then fields[8], fields[9] = "0", "0" end
     return table.concat(fields, ":")
 end
+local function slotText(row)
+    local names = row.view.containerNames
+    return ((names and names[row.bag]) or (row.bag == 0 and "Rucksack" or tostring(row.bag))) .. ":" .. row.slot
+end
 local function groupTooltip(row)
     local mark = row.item and app.marks[row.item.mark]
     if mark then GameTooltip:AddLine("Vormerkung: " .. mark[1], unpack(mark[2])) end
     local group = row.group
     if not group or #group.members < 2 then return end
     GameTooltip:AddLine(("Gesamt: %d · %d Stapel"):format(row.item.count, #group.members), 1, 0.82, 0.45)
-    GameTooltip:AddLine(("Aktionen betreffen diesen Stapel: %d Stück (%s:%d)")
-        :format(group.stackCount, row.bag == 0 and "Rucksack" or row.bag, row.slot), 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(("Aktionen betreffen diesen Stapel: %d Stück (%s)")
+        :format(group.stackCount, slotText(row)), 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
-function inventory.Mark(item, mark)
+function inventory.Mark(item, mark, view)
     if not item or not item.markKey or mark and not app.marks[mark] then return end
     app.Settings().marks[item.markKey] = mark
-    if mark and settings then
-        settings.collapsed["mark_" .. mark] = nil
-        inventory.searchCollapsed["mark_" .. mark] = nil
+    view = view or inventory
+    if mark and view.settings then
+        view.settings.collapsed["mark_" .. mark] = nil
+        view.searchCollapsed["mark_" .. mark] = nil
     end
     inventory.Refresh()
     -- Keep the moved item visible after its category changes. Slot identities
     -- remain fixed; only the row's visual position and viewport move.
-    for index, row in ipairs(inventory.displayRows or {}) do
+    for index, row in ipairs(view.displayRows or {}) do
         if row.categoryHeader ~= true and row.item.markKey == item.markKey then
-            inventory.offset = math.max(0, index - 2)
-            layout()
+            view.offset = math.max(0, index - 2)
+            layout(view)
             break
         end
     end
@@ -328,11 +369,11 @@ local function createMarkList(parent, width, visibleRows, choose, allowClear, re
     return list
 end
 local function createMarkMenu()
-    local menu = CreateFrame("Frame", "PaulchenInventoryMarkMenu", window, "BackdropTemplate")
+    local menu = CreateFrame("Frame", "PaulchenInventoryMarkMenu", UIParent, "BackdropTemplate")
     menu:Hide()
     menu:EnableMouse(true)
     menu:SetClampedToScreen(true)
-    menu:SetFrameLevel(window:GetFrameLevel() + 20)
+    menu:SetFrameStrata("DIALOG")
     style.Panel(menu, style.background, style.accent)
     menu.title = style.Label(menu, "", 10, -3, 192, 28, "GameFontNormal", style.gold)
     local close = CreateFrame("Button", nil, menu, "UIPanelCloseButton")
@@ -340,9 +381,9 @@ local function createMarkMenu()
     close:SetScript("OnClick", function() menu:Hide() end)
 
     menu.list = createMarkList(menu, 222, 8, function(key)
-        local item = menu.item
+        local item, view = menu.item, menu.ownerRow.view
         menu:Hide()
-        inventory.Mark(item, key)
+        inventory.Mark(item, key, view)
     end, true)
     menu.list:SetPoint("TOPLEFT", 8, -32)
 
@@ -361,6 +402,7 @@ local function showMarkMenu(row)
     markMenu = markMenu or createMarkMenu()
     markMenu.ownerRow, markMenu.item = row, row.item
     markMenu.title:SetText(row.item.name)
+    markMenu:SetFrameLevel(row.view.window:GetFrameLevel() + 20)
     markMenu.list.Select(app.Settings().marks[row.item.markKey], true)
     markMenu:SetSize(238, 38 + markMenu.list:GetHeight())
     markMenu:ClearAllPoints()
@@ -505,9 +547,10 @@ local function createCategoryEditor()
     end)
     return editor
 end
-local function updateMoney()
-    if window and window.money then
-        window.money:SetText(money(GetMoney and readable(GetMoney())))
+local function updateMoney(view)
+    local frame = view.window
+    if frame and frame.money then
+        frame.money:SetText(money(GetMoney and readable(GetMoney())))
     end
 end
 local function hideOtherBags()
@@ -536,12 +579,21 @@ local function makeButton(parent, bag, slot)
     button:Show()
     return button
 end
-local function createSlot(bag, slot)
-    local row = CreateFrame("Frame", nil, window)
+local function createSlot(view, bag, slot)
+    local row = CreateFrame("Frame", nil, view.window)
     row:SetSize(672, rowHeight - 1)
     row:EnableMouse(true)
     row.button = makeButton(row, bag, slot)
-    row.bag, row.slot = bag, slot
+    row.view, row.bag, row.slot = view, bag, slot
+    if view.isBank and C.UseContainerItem then
+        local onClick = row.button:GetScript("OnClick")
+        row.button:SetScript("OnClick", function(self, mouseButton)
+            if not canBank() or combat() then return end
+            if mouseButton == "RightButton" and not (IsModifiedClick and IsModifiedClick()) then
+                if not GetCursorInfo or not GetCursorInfo() then C.UseContainerItem(bag, slot) end
+            elseif onClick then onClick(self, mouseButton) end
+        end)
+    end
     row.group = false
     row.fill = style.Fill(row, "BACKGROUND", unpack(style.rowColors[1]))
     row.markAccent = row:CreateTexture(nil, "ARTWORK")
@@ -562,7 +614,7 @@ local function createSlot(bag, slot)
         if mouseButton == "RightButton" and self.item and self.item.markKey then showMarkMenu(self) end
     end)
     row:Hide()
-    inventory.slots[bag .. ":" .. slot] = row
+    view.slots[bag .. ":" .. slot] = row
     return row
 end
 local function readSlot(row, marks)
@@ -600,7 +652,7 @@ local function readSlot(row, marks)
     SetItemButtonCount(b, count > 1 and count or 0)
     SetItemButtonDesaturated(b, info and readable(info.isLocked) or false)
     SetItemButtonQuality(b, id and row.item.quality or nil, link, false, info and readable(info.isBound))
-    if b.UpdateCooldown then b:UpdateCooldown(id ~= nil) end
+    if not row.view.isBank and b.UpdateCooldown then b:UpdateCooldown(id ~= nil) end
     if b.UpdateQuestItem then
         b:UpdateQuestItem(isQuestItem, questID, quest and readable(quest.isActive))
     end
@@ -614,19 +666,20 @@ local function readSlot(row, marks)
     row.labels.count:SetText(id and count or "–")
     row.labels.quality:SetText(id and (_G["ITEM_QUALITY" .. row.item.quality .. "_DESC"] or row.item.quality) or "–")
     row.labels.value:SetText(id and money(row.item.value) or "–")
-    row.labels.bag:SetText((row.bag == 0 and "Rucksack" or tostring(row.bag)) .. ":" .. row.slot)
+    row.labels.bag:SetText(slotText(row))
 end
-function inventory.Compare(a, b)
+function inventory.Compare(a, b, viewSettings)
+    viewSettings = viewSettings or settings
     local x, y = a.item, b.item
     if not x.id ~= not y.id then return x.id ~= nil end
-    local key = settings.sort
+    local key = viewSettings.sort
     local av, bv = x[key], y[key]
     if key == "name" then av, bv = lower(av), lower(bv) end
     -- Uncached merchant values always come last, including descending order.
     if av == nil or bv == nil then
         if av ~= bv then return av ~= nil end
     elseif av ~= bv then
-        if settings.ascending then return av < bv else return av > bv end
+        if viewSettings.ascending then return av < bv else return av > bv end
     end
     if x.bag ~= y.bag then return x.bag < y.bag end
     return x.slot < y.slot
@@ -644,31 +697,33 @@ function inventory.Category(item)
     if class == 13 then return "keys" end
     return "other"
 end
-function inventory.Matches(item)
+function inventory.Matches(item, view)
+    view = view or inventory
     if not item.id then return false end
-    if settings.hideQuestItems and item.isQuest then return false end
-    local query = lower(inventory.query:match("^%s*(.-)%s*$"))
+    if view.settings.hideQuestItems and item.isQuest then return false end
+    local query = lower(view.query:match("^%s*(.-)%s*$"))
     if query == "" or query == tostring(item.id) then return true end
     local categoryName = categoryNames[inventory.Category(item)] or ""
     return lower(item.name .. " " .. item.category .. " " .. item.subcategory .. " " .. categoryName):find(query, 1, true) ~= nil
 end
-layout = function()
-    local rows = inventory.displayRows or {}
+layout = function(view)
+    local window, settings = view.window, view.settings
+    local rows = view.displayRows or {}
     local maxOffset = math.max(0, #rows - rowCount)
-    inventory.offset = math.max(0, math.min(maxOffset, inventory.offset))
+    view.offset = math.max(0, math.min(maxOffset, view.offset))
     local displayed = {}
     for index = 1, rowCount do
-        local row = rows[index + inventory.offset]
+        local row = rows[index + view.offset]
         if row then displayed[row] = true end
     end
-    if markMenu and markMenu:IsShown() then
+    if markMenu and markMenu:IsShown() and markMenu.ownerRow.view == view then
         local owner = markMenu.ownerRow
         if not displayed[owner] or owner.item.markKey ~= markMenu.item.markKey then markMenu:Hide() end
     end
-    for _, row in pairs(inventory.slots) do if not displayed[row] then row:Hide() end end
-    for _, header in pairs(categoryHeaders) do if not displayed[header] then header:Hide() end end
+    for _, row in pairs(view.slots) do if not displayed[row] then row:Hide() end end
+    for _, header in pairs(view.categoryHeaders) do if not displayed[header] then header:Hide() end end
     for index = 1, rowCount do
-        local row = rows[index + inventory.offset]
+        local row = rows[index + view.offset]
         if row then
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 14, -152 - (index - 1) * rowHeight)
@@ -687,20 +742,21 @@ layout = function()
         end
     end
     window.slider:SetMinMaxValues(0, maxOffset)
-    window.slider:SetValue(inventory.offset)
+    window.slider:SetValue(view.offset)
     window.slider:SetShown(maxOffset > 0)
-    window.noItems:SetShown(#(inventory.filtered or {}) == 0)
-    window.status:SetText(("%d Treffer · %d / %d Plätze frei"):format(#(inventory.filtered or {}), inventory.free, inventory.capacity))
+    window.noItems:SetShown(#(view.filtered or {}) == 0)
+    window.status:SetText(("%d Treffer · %d / %d Plätze frei"):format(#(view.filtered or {}), view.free, view.capacity))
     for _, col in ipairs(columns) do
         local arrow = settings.sort == col[1] and (settings.ascending and " ^" or " v") or ""
         window.headers[col[1]]:SetText(col[2] .. arrow)
     end
 end
-local function categorize(rows)
+local function categorize(view, rows)
     local buckets, display = {}, {}
+    local window, settings, categoryHeaders = view.window, view.settings, view.categoryHeaders
     -- Search starts expanded and has its own temporary folds, preserving the
     -- character's normal category layout when the query is cleared.
-    local collapsed = inventory.query:find("%S") and inventory.searchCollapsed or settings.collapsed
+    local collapsed = view.query:find("%S") and view.searchCollapsed or settings.collapsed
     for _, row in ipairs(rows) do
         local key = inventory.Category(row.item)
         buckets[key] = buckets[key] or {}
@@ -717,11 +773,19 @@ local function categorize(rows)
                 header.categoryHeader = true
                 header.caption = style.Label(header, "", 8, 0, 650, rowHeight - 1, "GameFontNormal", style.gold)
                 header:SetScript("OnClick", function()
-                    local folds = inventory.query:find("%S") and inventory.searchCollapsed or settings.collapsed
+                    local folds = view.query:find("%S") and view.searchCollapsed or settings.collapsed
                     folds[key] = not folds[key]
-                    inventory.Refresh()
+                    categorize(view, view.filtered)
+                    layout(view)
                 end)
+                if not view.isBank then
+                    header.deposit = categoryButton(header, "Einlagern", 552, -4, 110, function() depositCategory(key) end)
+                end
                 categoryHeaders[key] = header
+            end
+            if not view.isBank then
+                header.deposit:SetShown(not not canDeposit())
+                header.deposit:SetEnabled(not transfer and not combat())
             end
             if color then
                 header.caption:SetTextColor(unpack(color))
@@ -735,20 +799,23 @@ local function categorize(rows)
             end
         end
     end
-    inventory.displayRows, inventory.categoryHeaders = display, categoryHeaders
+    view.displayRows = display
 end
-function inventory.Refresh()
-    if not window or not window:IsShown() then return end
-    updateMoney()
+refreshView = function(view)
+    if not view.window or not view.window:IsShown() or (view.isBank and not canBank()) then return end
+    updateMoney(view)
     local marks = app.Settings().marks
     local filtered, free, capacity = {}, 0, 0
     local groups, bySlot = {}, {}
-    for bag = 0, lastBag() do
+    local bags = {}
+    if view.isBank then bags, view.containerNames = bankContainers()
+    else for bag = 0, lastBag() do bags[#bags + 1] = bag end end
+    for _, bag in ipairs(bags) do
         for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do
             capacity = capacity + 1
-            local row = inventory.slots[bag .. ":" .. slot]
+            local row = view.slots[bag .. ":" .. slot]
             -- ItemButton bag attributes are initialized out of combat only.
-            if not row and not combat() then row = createSlot(bag, slot) end
+            if not row and not combat() then row = createSlot(view, bag, slot) end
             if row then
                 readSlot(row, marks)
                 if not row.item.id then free = free + 1 end
@@ -781,53 +848,228 @@ function inventory.Refresh()
         row.labels.count:SetText(row.item.count)
         row.labels.value:SetText(money(row.item.value))
         row.labels.bag:SetText(#group.members > 1 and (#group.members .. " Stapel")
-            or ((row.bag == 0 and "Rucksack" or tostring(row.bag)) .. ":" .. row.slot))
+            or slotText(row))
         SetItemButtonCount(row.button, row.item.count > 1 and row.item.count or 0)
-        if inventory.Matches(row.item) then filtered[#filtered + 1] = row end
+        if inventory.Matches(row.item, view) then filtered[#filtered + 1] = row end
     end
-    inventory.groupsBySlot = bySlot
-    table.sort(filtered, inventory.Compare)
-    inventory.filtered, inventory.free, inventory.capacity = filtered, free, capacity
-    categorize(filtered)
-    layout()
+    view.groupsBySlot = bySlot
+    table.sort(filtered, function(a, b) return inventory.Compare(a, b, view.settings) end)
+    view.filtered, view.free, view.capacity = filtered, free, capacity
+    categorize(view, filtered)
+    layout(view)
 end
-local function createWindow()
-    local f = CreateFrame("Frame", "PaulchenQoLInventory", UIParent, "BackdropTemplate")
-    window, inventory.window = f, f
+function inventory.Refresh()
+    refreshView(inventory)
+    refreshView(bank)
+end
+-- Use fixed, verified slots so this action can only move items to the personal bank.
+local function physicalStack(bag, slot)
+    local raw = C.GetContainerItemInfo(bag, slot)
+    local info = readable(raw)
+    if info == nil then
+        if issecretvalue and issecretvalue(raw) then return false end
+        return nil
+    end
+    local id, link, count = readable(info.itemID), readable(info.hyperlink), readable(info.stackCount)
+    if not id or not link or not count then return false end
+    return { key = groupKey(id, link), link = link, count = count, locked = readable(info.isLocked) ~= false }
+end
+local function stackGUID(bag, slot)
+    if C_Item and C_Item.GetItemGUID and ItemLocation then
+        local location = ItemLocation:CreateFromBagAndSlot(bag, slot)
+        if location:IsValid() then return readable(C_Item.GetItemGUID(location)) end
+    end
+end
+local function permittedInBank(bag, slot)
+    local bankType = characterBankType()
+    if bankType == nil or not (C_Bank and C_Bank.IsItemAllowedInBankType and ItemLocation) then return true end
+    local location = ItemLocation:CreateFromBagAndSlot(bag, slot)
+    return location:IsValid() and readable(C_Bank.IsItemAllowedInBankType(bankType, location)) == true
+end
+local function bankDestination(bags, source)
+    local itemAPI = C_Item and C_Item.GetItemInfo or GetItemInfo
+    local maxStack = readable(select(8, itemAPI(source.link))) or 1
+    local getFamily = C_Item and C_Item.GetItemFamily or GetItemFamily
+    local itemFamily = getFamily and readable(getFamily(source.link)) or 0
+    local empty
+    for _, bag in ipairs(bags) do
+        local _, family
+        if C.GetContainerNumFreeSlots then _, family = C.GetContainerNumFreeSlots(bag) end
+        family = readable(family) or 0
+        if family == 0 or (bit and bit.band(itemFamily, family) ~= 0) then
+            for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do
+                local target = physicalStack(bag, slot)
+                if target == nil and not empty then
+                    empty = { bag = bag, slot = slot, count = 0 }
+                elseif target and not target.locked and target.key == source.key and target.count < maxStack then
+                    return { bag = bag, slot = slot, count = target.count }
+                end
+            end
+        end
+    end
+    return empty
+end
+local function transferMessage(text)
+    for _, view in ipairs({ inventory, bank }) do
+        if view.window then view.window.transferStatus:SetText(text or view.window.defaultActions) end
+    end
+end
+local function finishTransfer(state, reason)
+    if transfer ~= state then return end
+    transfer = nil
+    local remaining = state.total - state.moved
+    local text = ("%d Stück eingelagert"):format(state.moved)
+    if remaining > 0 then text = text .. (" · %d übrig"):format(remaining) end
+    if reason then text = text .. " · " .. reason end
+    bank.transferMessage = text
+    transferMessage(text)
+    inventory.Refresh()
+end
+local stepTransfer
+local function confirmMove(state, entry, target, tries)
+    if transfer ~= state then return end
+    if not canBank() then finishTransfer(state, "Bank geschlossen"); return end
+    local sourceNow = physicalStack(entry.bag, entry.slot)
+    local targetNow = physicalStack(target.bag, target.slot)
+    local remainder = sourceNow and sourceNow.key == entry.key and sourceNow.count or 0
+    local moved = 0
+    if sourceNow ~= false and targetNow and targetNow.key == entry.key then
+        moved = math.min(entry.count - remainder, targetNow.count - target.count)
+    end
+    if moved > 0 then
+        state.moved = state.moved + moved
+        entry.count = entry.count - moved
+        if entry.count == 0 then state.index = state.index + 1 end
+        transferMessage(("Einlagern … %d / %d Stück"):format(state.moved, state.total))
+        C_Timer.After(0.12, function() stepTransfer(state) end)
+    elseif tries >= 8 then
+        state.index = state.index + 1
+        stepTransfer(state)
+    else
+        C_Timer.After(0.12, function() confirmMove(state, entry, target, tries + 1) end)
+    end
+end
+stepTransfer = function(state)
+    if transfer ~= state then return end
+    if not canBank() then finishTransfer(state, "Bank geschlossen"); return end
+    if combat() or GetCursorInfo() then finishTransfer(state, "Einlagern unterbrochen"); return end
+    local last = math.min(#state.entries, state.index + 7)
+    while state.index <= last do
+        local entry = state.entries[state.index]
+        local current = physicalStack(entry.bag, entry.slot)
+        if current and not current.locked and current.key == entry.key and current.count == entry.count
+            and (not entry.guid or stackGUID(entry.bag, entry.slot) == entry.guid)
+            and permittedInBank(entry.bag, entry.slot) then
+            local target = bankDestination(state.bags, current)
+            if target then
+                local picked = pcall(C.PickupContainerItem, entry.bag, entry.slot)
+                if GetCursorInfo() == "item" then
+                    local contents = physicalStack(target.bag, target.slot)
+                    local unchanged = (target.count == 0 and contents == nil)
+                        or (contents and not contents.locked and contents.key == entry.key and contents.count == target.count)
+                    local placed = picked and unchanged and canBank() and pcall(C.PickupContainerItem, target.bag, target.slot)
+                    -- A merge may leave a remainder on the cursor. Return it to the source slot.
+                    if GetCursorInfo() == "item" then ClearCursor() end
+                    if placed then
+                        C_Timer.After(0.12, function() confirmMove(state, entry, target, 1) end)
+                        return
+                    end
+                end
+            end
+        end
+        state.index = state.index + 1
+    end
+    if state.entries[state.index] then
+        C_Timer.After(0, function() stepTransfer(state) end)
+    else
+        finishTransfer(state, state.moved < state.total and "Rest blieb in den Taschen" or nil)
+    end
+end
+depositCategory = function(key)
+    if transfer or not canDeposit() or not window:IsShown() or combat() then return end
+    if GetCursorInfo() then transferMessage("Leere zuerst den Mauszeiger."); return end
+    refreshView(inventory)
+    local state = { entries = {}, index = 1, total = 0, moved = 0, bags = bankContainers() }
+    for bag = 0, lastBag() do
+        for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do
+            local group = inventory.groupsBySlot[bag .. ":" .. slot]
+            if group and inventory.Category(group.item) == key then
+                local item = physicalStack(bag, slot)
+                if item then
+                    item.bag, item.slot, item.guid = bag, slot, stackGUID(bag, slot)
+                    state.entries[#state.entries + 1] = item
+                    state.total = state.total + item.count
+                end
+            end
+        end
+    end
+    if state.total == 0 then return end
+    transfer = state
+    transferMessage(("Einlagern … 0 / %d Stück"):format(state.total))
+    categorize(inventory, inventory.filtered)
+    layout(inventory)
+    stepTransfer(state)
+end
+local function createWindow(view)
+    local isBank, settings = view.isBank, view.settings
+    local f = CreateFrame("Frame", isBank and "PaulchenQoLBank" or "PaulchenQoLInventory", UIParent, "BackdropTemplate")
+    view.window = f
+    if not isBank then window = f end
     f:SetSize(718, 678)
-    f:SetFrameStrata("HIGH")
+    f:SetFrameStrata(isBank and "DIALOG" or "HIGH")
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     style.Panel(f, style.background)
     if type(settings.x) == "number" and type(settings.y) == "number" then
         f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", settings.x, settings.y)
-    else f:SetPoint("CENTER") end
+    else
+        local native = isBank and BankFrame
+        local frames = isBank and Bagnon and Bagnon.Frames
+        local bagnonBank = frames and frames.Get and frames:Get("bank")
+        if bagnonBank and bagnonBank:IsVisible() then native = bagnonBank end
+        if native and native:IsVisible() then f:SetPoint("TOPLEFT", native, "TOPLEFT")
+        else f:SetPoint("CENTER") end
+    end
     local title = CreateFrame("Frame", nil, f)
-    title:SetPoint("TOPLEFT"); title:SetSize(520, 42)
+    title:SetPoint("TOPLEFT"); title:SetSize(420, 42)
     title:EnableMouse(true); title:RegisterForDrag("LeftButton")
     title:SetScript("OnDragStart", function() f:StartMoving() end)
     title:SetScript("OnDragStop", function()
         f:StopMovingOrSizing(); settings.x, settings.y = f:GetCenter()
     end)
-    style.Label(title, "Paulchens Taschen", 18, -9, 390, 28, "GameFontNormalLarge", style.gold)
+    style.Label(title, isBank and "Paulchens Bank" or "Paulchens Taschen", 18, -9, 390, 28, "GameFontNormalLarge", style.gold)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
-    close:SetScript("OnClick", function() f:Hide() end)
+    close:SetScript("OnClick", function()
+        f:Hide()
+        if isBank and canBank() then
+            local closeBank = C_Bank and C_Bank.CloseBankFrame or CloseBankFrame
+            if closeBank then closeBank() end
+        end
+    end)
     local original = style.TextButton(f)
-    original:SetSize(130, 25); original:SetPoint("TOPRIGHT", -42, -9); original:SetText("Standardtaschen")
+    original:SetSize(130, 25); original:SetPoint("TOPRIGHT", -42, -9)
+    original:SetText(isBank and "Standardbank" or "Standardtaschen")
     original:SetScript("OnClick", function()
+        if isBank then f:Hide(); return end
         settings.enabled = false; pendingAction = nil; f:Hide()
         if OpenAllBags then OpenAllBags() end
         print("Paulchen: Standardtaschen aktiv. /ptaschen aktiviert die Liste wieder.")
     end)
+    if isBank then
+        f.bagTab = categoryButton(f, "Taschen", 430, -9, 108, function() inventory.Show() end)
+    else
+        f.bankTab = categoryButton(f, "Bank", 430, -9, 108, function() openBank() end)
+        f.bankTab:Hide()
+    end
     local search = style.EditBox(f)
     search:SetPoint("TOPLEFT", 18, -48); search:SetSize(420, 28)
     local prompt = style.Label(search, "Name, Gegenstandsart oder ID suchen", 8, 0, 400, 28, "GameFontHighlightSmall", style.muted)
     search:SetScript("OnTextChanged", function(self)
-        inventory.query, inventory.offset = self:GetText(), 0
-        inventory.searchCollapsed = {}
-        prompt:SetShown(inventory.query == ""); inventory.Refresh()
+        view.query, view.offset = self:GetText(), 0
+        view.searchCollapsed = {}
+        prompt:SetShown(view.query == ""); refreshView(view)
     end)
     search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
@@ -842,15 +1084,17 @@ local function createWindow()
     hideQuest:SetChecked(settings.hideQuestItems)
     style.Label(hideQuest, "Questitems ausblenden", 28, 0, 250, 24, "GameFontHighlightSmall", style.cream)
     hideQuest:SetScript("OnClick", function(self)
-        settings.hideQuestItems, inventory.offset = not not self:GetChecked(), 0
-        inventory.Refresh()
+        settings.hideQuestItems, view.offset = not not self:GetChecked(), 0
+        refreshView(view)
     end)
     f.hideQuestItems = hideQuest
-    f.categories = categoryButton(f, "Kategorien", 550, -82, 136, function()
-        if markMenu then markMenu:Hide() end
-        categoryEditor = categoryEditor or createCategoryEditor()
-        categoryEditor:SetShown(not categoryEditor:IsShown())
-    end)
+    if not isBank then
+        f.categories = categoryButton(f, "Kategorien", 550, -82, 136, function()
+            if markMenu then markMenu:Hide() end
+            categoryEditor = categoryEditor or createCategoryEditor()
+            categoryEditor:SetShown(not categoryEditor:IsShown())
+        end)
+    end
     f.headers = {}
     for _, col in ipairs(columns) do
         local key = col[1]
@@ -859,8 +1103,8 @@ local function createWindow()
         b:SetScript("OnClick", function()
             if settings.sort == key then settings.ascending = not settings.ascending
             else settings.ascending = key == "name" or key == "bag" end
-            settings.sort, inventory.offset = key, 0
-            inventory.Refresh()
+            settings.sort, view.offset = key, 0
+            refreshView(view)
         end)
         f.headers[key] = b
     end
@@ -870,30 +1114,45 @@ local function createWindow()
     slider:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
     slider:SetScript("OnValueChanged", function(_, value)
         value = math.floor(value + 0.5)
-        if value ~= inventory.offset then inventory.offset = value; layout() end
+        if value ~= view.offset then view.offset = value; layout(view) end
     end)
     f.slider = slider
     f:EnableMouseWheel(true)
-    f:SetScript("OnMouseWheel", function(_, delta) inventory.offset = inventory.offset - delta * 3; layout() end)
+    f:SetScript("OnMouseWheel", function(_, delta) view.offset = view.offset - delta * 3; layout(view) end)
     f.status = style.Label(f, "", 18, -608, 650, 20, "GameFontHighlightSmall", style.gold)
-    style.Label(f, "Aktionen am Symbol betreffen einen Stapel: benutzen / verkaufen / verschieben", 18, -632, 680, 18, "GameFontHighlightSmall", style.muted)
+    local actions = isBank and "Rechtsklick aufs Symbol: Stapel auslagern · Ziehen: Stapel verschieben"
+        or "Aktionen am Symbol betreffen einen Stapel: benutzen / verkaufen / verschieben"
+    f.transferStatus = style.Label(f, actions, 18, -632, 680, 18, "GameFontHighlightSmall", style.muted)
+    f.defaultActions = actions
+    if bank.transferMessage then f.transferStatus:SetText(bank.transferMessage) end
     style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
     f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
-    f:SetScript("OnShow", inventory.Refresh)
+    f:SetScript("OnShow", function() refreshView(view) end)
     f:SetScript("OnHide", function()
-        if markMenu then markMenu:Hide() end
-        if categoryEditor then categoryEditor:Hide() end
+        if markMenu and markMenu:IsShown() and markMenu.ownerRow.view == view then markMenu:Hide() end
+        if not isBank and categoryEditor then categoryEditor:Hide() end
     end)
     f:Hide()
-    UISpecialFrames[#UISpecialFrames + 1] = "PaulchenQoLInventory"
+    UISpecialFrames[#UISpecialFrames + 1] = f:GetName()
     -- Pre-create slot identities before combat; displaying the window is safe later.
-    for bag = 0, lastBag() do
-        for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do createSlot(bag, slot) end
+    if not isBank then
+        for bag = 0, lastBag() do
+            for slot = 1, readable(C.GetContainerNumSlots(bag)) or 0 do createSlot(view, bag, slot) end
+        end
     end
+end
+openBank = function()
+    if not canBank() then return end
+    pendingAction = nil
+    if not bank.window then createWindow(bank) end
+    window:Hide()
+    if bank.window:IsShown() then refreshView(bank) else bank.window:Show() end
 end
 function inventory.Open()
     if not window then return end
-    hideOtherBags(); window:Show(); inventory.Refresh()
+    if bank.window then bank.window:Hide() end
+    hideOtherBags()
+    if window:IsShown() then refreshView(inventory) else window:Show() end
 end
 function inventory.Show()
     if settings then settings.enabled = true; inventory.Open() end
@@ -918,31 +1177,38 @@ local function request(action)
         if not settings.enabled or not nextAction then return end
         if nextAction == "close" then if window then window:Hide() end
         elseif nextAction == "toggle" then hideOtherBags(); inventory.Toggle()
-        else inventory.Open() end
+        elseif not (bank.window and bank.window:IsShown()) then inventory.Open() end
     end)
+end
+local function initializeViewSettings(view, config)
+    view.settings = config
+    if type(config.hideQuestItems) ~= "boolean" then config.hideQuestItems = true end
+    if type(config.collapsed) ~= "table" then config.collapsed = {} end
+    local valid = false
+    for _, col in ipairs(columns) do if config.sort == col[1] then valid = true end end
+    if not valid then config.sort, config.ascending = "name", true end
+    if type(config.ascending) ~= "boolean" then config.ascending = true end
 end
 local events = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_LOGIN", "BAG_UPDATE_DELAYED", "BAG_UPDATE_COOLDOWN", "ITEM_LOCK_CHANGED",
-    "GET_ITEM_INFO_RECEIVED", "QUEST_LOG_UPDATE", "PLAYER_MONEY", "PLAYER_REGEN_ENABLED", "MERCHANT_SHOW", "MERCHANT_CLOSED" }) do
+    "GET_ITEM_INFO_RECEIVED", "QUEST_LOG_UPDATE", "PLAYER_MONEY", "PLAYER_REGEN_ENABLED", "MERCHANT_SHOW", "MERCHANT_CLOSED",
+    "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BANK_TABS_CHANGED", "PLAYERBANKSLOTS_CHANGED" }) do
     app.RegisterSupported(events, event)
 end
 events:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_MONEY" then updateMoney(); return end
+    if event == "PLAYER_MONEY" then updateMoney(inventory); updateMoney(bank); return end
     if event == "PLAYER_LOGIN" then
         if not C or not ContainerFrameItemButtonMixin then return end
         local db = app.Settings()
         if type(db.inventory) ~= "table" then db.inventory = {} end
         settings = db.inventory
         if settings.enabled == nil then settings.enabled = true end
-        if type(settings.hideQuestItems) ~= "boolean" then settings.hideQuestItems = true end
-        if type(settings.collapsed) ~= "table" then settings.collapsed = {} end
         if type(settings.markCategories) ~= "table" then settings.markCategories = {} end
+        if type(settings.bank) ~= "table" then settings.bank = {} end
+        initializeViewSettings(inventory, settings)
+        initializeViewSettings(bank, settings.bank)
         loadMarkCategories()
-        local valid = false
-        for _, col in ipairs(columns) do if settings.sort == col[1] then valid = true end end
-        if not valid then settings.sort, settings.ascending = "name", true end
-        if type(settings.ascending) ~= "boolean" then settings.ascending = true end
-        createWindow()
+        createWindow(inventory)
         SLASH_PAULCHENINVENTORY1 = "/ptaschen"
         SlashCmdList.PAULCHENINVENTORY = function()
             settings.enabled = true; inventory.Toggle()
@@ -963,7 +1229,24 @@ events:SetScript("OnEvent", function(_, event)
         end) end
         return
     end
-    if not window or not window:IsShown() or refreshQueued then return end
+    if not window then return end
+    if event == "BANKFRAME_OPENED" then
+        if bank.atBank then return end
+        bank.atBank = true
+        bank.transferMessage = nil
+        transferMessage()
+        C_Timer.After(0, function()
+            window.bankTab:SetShown(canBank())
+            openBank()
+        end)
+        return
+    elseif event == "BANKFRAME_CLOSED" then
+        bank.atBank = false
+        if transfer then finishTransfer(transfer, "Bank geschlossen") end
+        window.bankTab:Hide()
+        if bank.window then bank.window:Hide() end
+    end
+    if (not window:IsShown() and not (bank.window and bank.window:IsShown())) or refreshQueued then return end
     refreshQueued = true
     C_Timer.After(0.1, function() refreshQueued = false; inventory.Refresh() end)
 end)

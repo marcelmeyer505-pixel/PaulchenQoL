@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 — 2026-11-22
+
+- Add a personal bank list with the same category names, colors, ordering, grouped stacks, search and sorting as the bag list.
+- Deposit a whole bag category into the personal bank while it is open. Merge compatible stacks first and report how many items moved or stayed in the bags.
+
 ## 0.9.2 — 2026-11-21
 
 - Drag custom categories into a new order in the bag category editor. The bag list and right-click menu follow the saved order.
