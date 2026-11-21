@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.5 — 2026-11-21
+
+- Use addon-owned controls for optional upgrade columns and long filter lists to avoid the Forever ScrollBox error when a scrollable menu closes.
+
 ## 0.8.4 — 2026-11-21
 
 - Run upgrade searches on login, UI reload, or a click on Refresh. Loot, equipment changes, profile changes and instance transitions no longer launch background searches.

@@ -54,6 +54,7 @@ for _, slot in ipairs(app.slots) do slots[#slots + 1] = slot end
 local automatic = "auto"
 
 local window, db, scan, finished, exportDialog, profileEditor
+local choicePanel
 local generation = 0
 local resultsStale, pausedAt, resumeScan
 local plannedLevel
@@ -613,6 +614,112 @@ local function button(parent, caption, x, y, w, h)
     return b
 end
 
+-- Long menus use addon-owned buttons. Blizzard's scrollable menu closes by
+-- updating its ScrollBox, which can reject protected dimensions in Forever.
+local choicesPerColumn, choiceRowHeight = 12, 25
+local function layoutChoices(panel)
+    local perPage = choicesPerColumn * (panel.multiple and 2 or 1)
+    local last = math.min(#panel.choices, panel.page * perPage)
+    local first = (panel.page - 1) * perPage + 1
+    local rows = math.min(choicesPerColumn, last - first + 1)
+    for index, control in ipairs(panel.buttons) do
+        local choice = index <= perPage and first + index - 1 <= last and panel.choices[first + index - 1]
+        control:SetShown(not not choice)
+        if choice then
+            local selected = panel.isSelected(choice[1])
+            control.value = choice[1]
+            control.tick:SetShown(selected)
+            control.text:SetText(choice[2])
+            control:ClearAllPoints()
+            control:SetPoint("TOPLEFT", 8 + math.floor((index - 1) / choicesPerColumn) * 258,
+                -34 - ((index - 1) % choicesPerColumn) * choiceRowHeight)
+            style.SetButtonState(control, selected)
+        end
+    end
+    local pages = math.ceil(#panel.choices / perPage)
+    local footer = rows * choiceRowHeight + 39
+    panel.previous:ClearAllPoints()
+    panel.next:ClearAllPoints()
+    panel.pageText:ClearAllPoints()
+    panel.previous:SetPoint("TOPLEFT", 8, -footer)
+    panel.next:SetPoint("TOPLEFT", 197, -footer)
+    panel.pageText:SetPoint("TOPLEFT", 90, -footer)
+    panel.previous:SetEnabled(panel.page > 1)
+    panel.next:SetEnabled(panel.page < pages)
+    panel.previous:SetShown(pages > 1)
+    panel.next:SetShown(pages > 1)
+    panel.pageText:SetShown(pages > 1)
+    panel.pageText:SetText(("%d / %d"):format(panel.page, pages))
+    panel:SetSize(panel.multiple and 532 or 274, footer + (pages > 1 and 28 or 0))
+end
+
+local function createChoicePanel()
+    local panel = CreateFrame("Frame", "PaulchenUpgradeOptions", window, "BackdropTemplate")
+    panel:Hide()
+    panel:EnableMouse(true)
+    panel:SetClampedToScreen(true)
+    panel:SetFrameLevel(window:GetFrameLevel() + 30)
+    style.Panel(panel, style.background, style.accent)
+    panel.title = label(panel, "GameFontNormal", GOLD, 12, -4, 220, 25)
+    local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -2, -1)
+    close:SetScript("OnClick", function() panel:Hide() end)
+    panel.buttons = {}
+    for index = 1, choicesPerColumn * 2 do
+        local control = style.Button(panel)
+        control:SetSize(248, 23)
+        control.text = style.Label(control, "", 28, 0, 213, 23, "GameFontHighlightSmall", TEXT)
+        control.tick = control:CreateTexture(nil, "OVERLAY")
+        control.tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        control.tick:SetSize(20, 20)
+        control.tick:SetPoint("LEFT", 4, 0)
+        control:SetScript("OnClick", function(self)
+            if not panel.multiple then panel:Hide() end
+            panel.choose(self.value)
+            if panel:IsShown() then layoutChoices(panel) end
+        end)
+        panel.buttons[index] = control
+    end
+    panel.previous = button(panel, "Zurück", 8, 0, 68, 22)
+    panel.next = button(panel, "Weiter", 197, 0, 68, 22)
+    panel.pageText = label(panel, "GameFontHighlightSmall", MUTED, 90, 0, 93, 22, "CENTER")
+    local function turnPage(delta)
+        local perPage = choicesPerColumn * (panel.multiple and 2 or 1)
+        local page = math.max(1, math.min(math.ceil(#panel.choices / perPage), panel.page + delta))
+        if page == panel.page then return end
+        panel.page = page
+        layoutChoices(panel)
+    end
+    panel.previous:SetScript("OnClick", function() turnPage(-1) end)
+    panel.next:SetScript("OnClick", function() turnPage(1) end)
+    panel:EnableMouseWheel(true)
+    panel:SetScript("OnMouseWheel", function(_, delta) turnPage(delta > 0 and -1 or 1) end)
+    return panel
+end
+
+local function showChoices(owner, heading, choices, isSelected, choose, multiple)
+    choicePanel = choicePanel or createChoicePanel()
+    local panel = choicePanel
+    if panel:IsShown() and panel.ownerButton == owner then panel:Hide(); return end
+    panel.ownerButton, panel.choices, panel.isSelected, panel.choose = owner, choices, isSelected, choose
+    panel.multiple, panel.page = multiple == true, 1
+    if not multiple then
+        for index, choice in ipairs(choices) do
+            if isSelected(choice[1]) then panel.page = math.ceil(index / choicesPerColumn); break end
+        end
+    end
+    panel.title:SetText(heading)
+    panel:ClearAllPoints()
+    if multiple then panel:SetPoint("TOPRIGHT", owner, "BOTTOMRIGHT", 0, -3)
+    else panel:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -3) end
+    layoutChoices(panel)
+    panel:Show()
+end
+
+local function hideChoices()
+    if choicePanel then choicePanel:Hide() end
+end
+
 local function createProfileEditor(parent)
     local f = CreateFrame("Frame", "PaulchenStatProfilesFrame", parent, "BackdropTemplate")
     f:SetSize(700, 414)
@@ -755,17 +862,23 @@ local function dropdown(parent, options, key, x, w, currentLabel, y)
         end
     end
     local b = button(parent, caption(), x, y or -69, w, 27)
+    local function selected(value) return db[key] == value end
+    local function choose(value)
+        db[key] = value
+        b.text:SetText(caption())
+        draw(true)
+    end
     b:SetScript("OnClick", function(self)
+        local choices = type(options) == "function" and options() or options
+        if #choices > 14 then
+            showChoices(self, "Auswahl", choices, selected, choose)
+            return
+        end
+        hideChoices()
         MenuUtil.CreateContextMenu(self, function(_, menu)
-            local choices = type(options) == "function" and options() or options
-            if #choices > 14 and menu.SetScrollMode then menu:SetScrollMode(390) end
             for _, option in ipairs(choices) do
                 local value, text = option[1], option[2]
-                menu:CreateRadio(text, function() return db[key] == value end, function()
-                    db[key] = value
-                    b.text:SetText(caption())
-                    draw(true)
-                end)
+                menu:CreateRadio(text, function() return selected(value) end, function() choose(value) end)
             end
         end)
     end)
@@ -946,8 +1059,8 @@ local function createPage(parent)
     f.autoLevel:Hide()
     f.overviewTab = button(titlebar, "Übersicht", 463, -12, 106, 27)
     f.instancesTab = button(titlebar, "Instanzen", 575, -12, 106, 27)
-    f.overviewTab:SetScript("OnClick", function() db.tab = "overview"; draw(true) end)
-    f.instancesTab:SetScript("OnClick", function() db.tab = "instances"; draw(true) end)
+    f.overviewTab:SetScript("OnClick", function() hideChoices(); db.tab = "overview"; draw(true) end)
+    f.instancesTab:SetScript("OnClick", function() hideChoices(); db.tab = "instances"; draw(true) end)
     f.lootToggle = button(titlebar, "", 699, -12, 146, 27)
     f.lootToggle:SetScript("OnClick", function()
         db.lootAlerts = not app.LootAlertsEnabled()
@@ -967,6 +1080,7 @@ local function createPage(parent)
     f.auctionScan:SetScript("OnClick", function() PaulchenAuktionsscan.Start() end)
     f.contentButton = button(f, "Spielinhalte" .. downArrow, 17, -103, 210, 27)
     f.contentButton:SetScript("OnClick", function(self)
+        hideChoices()
         MenuUtil.CreateContextMenu(self, function(_, menu)
             if menu.CreateTitle then menu:CreateTitle("Auf deinem Server freigeschaltet") end
             for _, choice in ipairs(app.content.choices) do
@@ -1018,22 +1132,18 @@ local function createPage(parent)
         exportDialog.ShowResults()
     end)
     f.columnsMenu = button(f, "Spalten" .. downArrow, 764, -103, 128, 27)
+    local columnChoices = {}
+    for _, col in ipairs(columns) do
+        if col.option then columnChoices[#columnChoices + 1] = {col.key, col.option} end
+    end
     f.columnsMenu:SetScript("OnClick", function(self)
-        MenuUtil.CreateContextMenu(self, function(_, menu)
-            if menu.SetScrollMode then menu:SetScrollMode(390) end
-            for _, col in ipairs(columns) do
-                local key = col.key
-                if col.option then
-                    menu:CreateCheckbox(col.option, function() return db.columns[key] == true end, function()
-                        db.columns[key] = not db.columns[key] or nil
-                        if db.sortKey == key and not db.columns[key] then db.sortKey, db.ascending = "pct", false end
-                        layoutColumns(f, db.columns[key] and key or nil)
-                        draw(true)
-                        return MenuResponse and MenuResponse.Refresh
-                    end)
-                end
-            end
-        end)
+        showChoices(self, "Sichtbare Spalten", columnChoices, function(key) return db.columns[key] == true end,
+            function(key)
+                db.columns[key] = not db.columns[key] or nil
+                if db.sortKey == key and not db.columns[key] then db.sortKey, db.ascending = "pct", false end
+                layoutColumns(f, db.columns[key] and key or nil)
+                draw(true)
+            end, true)
     end)
 
     f.viewport = CreateFrame("ScrollFrame", nil, f)
@@ -1116,6 +1226,7 @@ local function createPage(parent)
         draw()
     end)
     f:SetScript("OnHide", function()
+        hideChoices()
         if hoveredRow then
             if GameTooltip:IsOwned(hoveredRow) then GameTooltip:Hide() end
             hoveredRow = nil
