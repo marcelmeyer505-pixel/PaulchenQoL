@@ -1,4 +1,4 @@
-# Paulchen QoL v0.8.3
+# Paulchen QoL v0.8.4
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -24,9 +24,9 @@ Bei aktiven Kampf-/Client-/Chatrestriktionen wird nichts gesendet. Moderne Chat-
 
 **Feral Katze** startet mit 1,90 Punkten pro Beweglichkeit, 0,80 pro Stärke, 0,40 pro Angriffskraft und 5,60 pro Nahkampfwaffen-DPS. Dazu kommen 10,20 pro Prozent Krit, 8,77 pro Prozent Trefferchance, 4,78 pro Prozent Angriffstempo, 0,85 pro Waffenkundewertung und 0,13 pro Rüstungsdurchschlag.
 
-Die Upgrade-Suche prüft bei unverändertem Vergleichsstand nur neue oder geänderte Items neu. Vorhandene Wertungen werden übernommen, einschließlich bereits bewerteter Taschenitems und konkreter Zufallsvarianten. Die Statuszeile zeigt **neu bewertet** und **übernommen**. Gleichbleibende Stapelzahlen oder andere Taschenplätze lösen keine neue Suche aus. Neue Ausrüstung in den Taschen bekommt einen gebündelten Nachlauf; eine laufende Suche wird dafür erst beendet.
+Ein Upgrade-Suchlauf startet beim Login, nach `/reload` oder mit **Aktualisieren**. Änderungen an Ausrüstung, Taschen, Statprofil, Suchstufe oder Inhaltsfreigaben markieren die letzte Liste als veraltet. Beim nächsten Suchlauf übernimmt Paulchen unveränderte Wertungen für bekannte Items und Varianten. Die Statuszeile zeigt **neu bewertet** und **übernommen**.
 
-In Dungeons und Raids sammelt Paulchen automatische Aktualisierungen bis zum Verlassen der Instanz. Die zuletzt berechnete Liste bleibt sichtbar. Mit **Aktualisieren** kannst du vor Ort einen Suchlauf starten. Ein laufender Suchlauf pausiert im Kampf und setzt danach an derselben Stelle fort. Der Loot-Alarm bewertet einzelne Drops direkt.
+Diese Regeln gelten auch in Dungeons und Raids. Ein laufender Suchlauf pausiert im Kampf und setzt danach an derselben Stelle fort. Der Loot-Alarm bewertet einzelne Drops direkt.
 
 Sichere Rüstungs- und Schmuckwertungen einschließlich ihrer Varianten werden pro Charakter dauerhaft gespeichert. WoW sichert sie beim Ausloggen oder mit `/reload`. Bei gleicher Ausrüstung, Stufe, Spezialisierung und Gewichtung werden sie auch beim nächsten Login wiederverwendet. Ein passender älterer Punktespeicher wird übernommen. Waffenabhängige Vergleiche bleiben in der Sitzung; neue mögliche Waffen-/Nebenhand-Kombinationen aktualisieren diese Werte gezielt. Normale Waffen-Skillsteigerungen ohne Änderung der Nutzbarkeit verwerfen keine Wertungen.
 
@@ -149,7 +149,7 @@ Die Unterbefehle von `/pq` funktionieren auch mit `/paulchen`. Falls Paulchen ge
 - **Questabgaben auf der Weltkarte** schaltet die zusätzlichen Fragezeichen ein oder aus. Die Einstellung ist standardmäßig aktiv.
 - **Reithandschuhe automatisch wechseln** legt beim Aufmounten die Handschuhe der Vorhut aus den Taschen an und stellt beim Abmounten die zuvor getragenen Handschuhe wieder her. Der Wechsel erfolgt außerhalb des Kampfes und deine vorherigen Handschuhe werden pro Charakter gespeichert. Wechselst du sie während des Reitens von Hand, übernimmt Paulchen erst beim nächsten Aufmounten wieder.
 
-Der automatische Wechsel der Reithandschuhe und das Zurückwechseln starten keinen neuen Upgrade-Suchlauf und unterbrechen keinen laufenden. Für Itempunkte, Tooltip-Vergleich und die Upgrade-Suche gelten währenddessen weiterhin die gemerkten normalen Handschuhe. Das gilt auch für den regulären Login-/Reload-Check im Sattel. Manuelle Ausrüstungswechsel werden weiterhin neu verglichen.
+Der automatische Wechsel der Reithandschuhe und das Zurückwechseln unterbrechen die Upgrade-Suche nicht. Für Itempunkte, Tooltip-Vergleich und die Upgrade-Suche gelten währenddessen die gemerkten normalen Handschuhe. Das gilt auch für den Login oder Reload im Sattel. Manuelle Ausrüstungswechsel fließen beim nächsten Suchlauf in die Liste ein.
 
 ## Ereignisse
 

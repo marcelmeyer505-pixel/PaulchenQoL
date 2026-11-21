@@ -169,7 +169,7 @@ function app.CreateOverviewPanel(parent)
         if app.upgrades and app.upgrades.OpenOverviewUpgrade then app.upgrades.OpenOverviewUpgrade()
         else app.OpenModule("upgrades") end
     end)
-    control(f.upgrade, "Neu prüfen", 162, -64, 144, function()
+    control(f.upgrade, "Aktualisieren", 162, -64, 144, function()
         if app.upgrades and app.upgrades.CheckUpgrades then app.upgrades.CheckUpgrades() end
     end)
     f:SetScript("OnShow", function() overview.Render() end)
@@ -214,7 +214,7 @@ function overview.Render()
         .. (data.subzone ~= "" and data.subzone ~= data.zone and ("\n" .. data.subzone) or ""))
     local upgrade = data.upgrade
     local statuses = { waiting = "Warte auf Ausrüstungsdaten …", scanning = "Suche läuft …", combat = "Im Kampf pausiert",
-        instance = "Aktualisierung nach der Instanz",
+        stale = "Liste veraltet · Aktualisieren",
         error = "Suchfehler · /pu diagnose", idle = "Noch kein Suchlauf", ready = "Keine bekannten Upgrades" }
     if upgrade and upgrade.best then
         local best = upgrade.best

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.4 — 2026-11-21
+
+- Run upgrade searches on login, UI reload, or a click on Refresh. Loot, equipment changes, profile changes and instance transitions no longer launch background searches.
+- Keep the last completed results visible and mark them as out of date when search inputs change. An already requested search can resume after combat.
+
 ## 0.8.3 — 2026-11-20
 
 - Resume in-progress upgrade searches after combat from the same position, with their remaining item-data wait budget.

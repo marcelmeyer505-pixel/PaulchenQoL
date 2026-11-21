@@ -54,12 +54,12 @@ for _, slot in ipairs(app.slots) do slots[#slots + 1] = slot end
 local automatic = "auto"
 
 local window, db, scan, finished, exportDialog, profileEditor
-local generation, refreshPending = 0, false
-local instancePending, pausedAt, resumeScan
+local generation = 0
+local resultsStale, pausedAt, resumeScan
 local plannedLevel
-local autoReady, autoWaiting, autoToken = false, false, 0
-local autoManual
-local queueAutomatic, deltaPending
+local enteredWorld, waitingForGear, startAfterCombat
+local requestToken = 0
+local wakeRequestedScan, waitingItemID
 local scanFailure, displayFailure
 local display, offset = {}, 0
 local hoveredRow, renderingRows
@@ -72,20 +72,6 @@ end
 
 local function matchesSearchLevel(current)
     return current.level == searchLevel() and current.playerLevel == gear.PlayerLevel()
-end
-
-local function inDungeon()
-    if IsInInstance then
-        local _, kind = IsInInstance()
-        kind = suite.Readable(kind)
-        if kind ~= nil then return kind == "party" or kind == "raid" end
-    end
-    if GetInstanceInfo then
-        local _, kind = GetInstanceInfo()
-        kind = suite.Readable(kind)
-        return kind == "party" or kind == "raid"
-    end
-    return false
 end
 
 local function instanceSelection()
@@ -159,7 +145,7 @@ local function exportResults()
 end
 
 local function exportReady()
-    return #display > 0 and not scan and not refreshPending and not scanFailure and not displayFailure
+    return #display > 0 and not scan and not waitingForGear and not resultsStale and not scanFailure and not displayFailure
 end
 
 local function auctionPrice(source)
@@ -385,14 +371,16 @@ local function render(reset)
     local status
     if pausedAt then
         status = "Suche pausiert im Kampf."
+    elseif startAfterCombat then
+        status = "Angeforderte Suche startet nach dem Kampf."
+    elseif waitingForGear then
+        status = "Warte auf Ausrüstungsdaten."
     elseif scan then
         status = scanStatus(scan)
     elseif scanFailure then
         status = "Suche abgebrochen · Details mit /pu diagnose"
-    elseif refreshPending then
-        status = "Suche wird nach dem Kampf aktualisiert."
-    elseif instancePending then
-        status = "Automatische Aktualisierung nach der Instanz."
+    elseif resultsStale then
+        status = "Liste veraltet · Für aktuelle Ergebnisse auf Aktualisieren klicken."
     elseif finished then
         status = instances and ("%d Instanz-Upgrades"):format(#display) or ("%d / %d Upgrades"):format(#display, #finished.rows)
         if instances and not finished.atlas.loaded and not finished.journal.loaded then
@@ -406,7 +394,7 @@ local function render(reset)
             status = status .. (" · %d gesperrt übersprungen"):format(finished.skippedContent)
         end
     else
-        status = "Daten werden vorbereitet."
+        status = "Auf Aktualisieren klicken, um Upgrades zu suchen."
     end
     if auctions and current and current.auctionAt then
         status = status .. " · AH-Stand " .. date("%d.%m. %H:%M", current.auctionAt)
@@ -415,11 +403,12 @@ local function render(reset)
     local canExport = exportReady()
     window.exportButton:SetEnabled(canExport)
     window.exportButton.text:SetTextColor(unpack(canExport and TEXT or MUTED))
-    window.profile:SetText("Profil · " .. app.ProfileName() .. "   |")
+    window.profile:SetText("Profil · " .. (current and current.profile or app.ProfileName()) .. "   |")
     window.profile:SetWidth(math.min(260, window.profile:GetStringWidth() + 2))
     if not window.levelInput:HasFocus() then window.levelInput:SetText(tostring(searchLevel())) end
     window.autoLevel:SetShown(searchLevel() > gear.PlayerLevel())
-    window.empty:SetShown(#display == 0 and not scan and not refreshPending and not scanFailure)
+    window.empty:SetShown(#display == 0 and finished ~= nil and not scan and not waitingForGear
+        and not resultsStale and not scanFailure)
     local empty = finished and #finished.rows > 0 and "Keine Treffer für diese Filter." or "Keine erreichbaren Upgrades in den geladenen Daten."
     if finished and #finished.rows == 0 and finished.unavailable > 0 then
         empty = "Noch keine Upgrades gefunden. Itemdaten fehlen; mit Aktualisieren weiterladen."
@@ -462,19 +451,10 @@ local function draw(reset)
     end
 end
 
-local function refresh(keepResults)
-    keepResults = keepResults == true
-    deltaPending = false
-    autoToken, autoWaiting = autoToken + 1, false
-    if InCombatLockdown() then
-        refreshPending = true
-        draw()
-        return
-    end
+local function startScan()
     pausedAt, resumeScan = nil, nil
     generation = generation + 1
     local token = generation
-    refreshPending = false
     scanFailure, displayFailure = nil, nil
     local ok, result = pcall(app.NewScan, searchLevel())
     if not ok then
@@ -482,7 +462,7 @@ local function refresh(keepResults)
         draw()
         return
     end
-    instancePending = nil
+    resultsStale = false
     scan = result
     local lastDraw, lastRows, stepQueued
     local queueStep
@@ -501,7 +481,6 @@ local function refresh(keepResults)
             finished, scan = scan, nil
             resumeScan = nil
             draw()
-            if deltaPending then deltaPending = false; queueAutomatic(0.3) end
             return
         end
         queueStep(0.05)
@@ -522,7 +501,7 @@ local function refresh(keepResults)
     end
     resumeScan = queueStep
     queueStep()
-    draw(not keepResults)
+    draw()
 end
 
 local function equipmentReady()
@@ -533,64 +512,70 @@ local function equipmentReady()
             local id = GetInventoryItemID and suite.Readable(GetInventoryItemID("player", slot))
             local link = gear.Client.InventoryLink(slot)
             if (id and id > 0 and not link) or (link and not gear.GetItemInfo(link)) then
-                if id and C_Item and C_Item.RequestLoadItemDataByID then
-                    C_Item.RequestLoadItemDataByID(gear.ItemID(link) or id)
+                local itemID = gear.ItemID(link) or id
+                if itemID and C_Item and C_Item.RequestLoadItemDataByID then
+                    C_Item.RequestLoadItemDataByID(itemID)
                 end
-                return false
+                return false, itemID
             end
         end
     end
     return true
 end
 
-local function deferUntilExit()
-    if autoWaiting and not autoManual then
-        autoToken, autoWaiting, refreshPending = autoToken + 1, false, false
-    end
-    if instancePending then return end
-    instancePending = true
-    if not scan then draw() end
-end
-
-queueAutomatic = function(delay, manual)
-    if not autoReady then return end
-    if not manual and autoWaiting and autoManual then return end
-    if not manual and inDungeon() then deferUntilExit(); return end
-    if not manual and scan then deltaPending = true; return end
-    autoToken = autoToken + 1
-    local token, attempts = autoToken, 0
-    autoWaiting, autoManual = true, manual
+function app.CheckUpgrades()
+    requestToken = requestToken + 1
+    local token, attempts = requestToken, 0
+    local checkQueued
+    waitingForGear, startAfterCombat, waitingItemID = true, false, nil
+    local queueCheck
     local function check()
-        if token ~= autoToken then return end
-        if not manual and inDungeon() then
-            autoWaiting, refreshPending = false, false
-            deferUntilExit()
+        if InCombatLockdown() then
+            startAfterCombat = true
+            draw()
             return
         end
-        if InCombatLockdown() then refreshPending = true; return end
-        local ok, ready = pcall(equipmentReady)
+        local ok, ready, itemID = pcall(equipmentReady)
         if not ok then
-            autoWaiting, scanFailure = false, "Ausrüstungsdaten: " .. tostring(ready)
+            waitingForGear, scanFailure = false, "Ausrüstungsdaten: " .. tostring(ready)
+            wakeRequestedScan, waitingItemID = nil, nil
+            draw()
             return
         end
         if not ready then
+            waitingItemID = itemID
             attempts = attempts + 1
-            -- Item arrival events re-arm the check after this bounded retry.
-            if attempts < 20 then C_Timer.After(0.5, check) end
+            if attempts == 1 then draw() end
+            if attempts < 20 then queueCheck(0.5) end
             return
         end
-        refresh(true)
+        waitingForGear = false
+        wakeRequestedScan, waitingItemID = nil, nil
+        startScan()
     end
-    C_Timer.After(delay or 0.1, check)
+    queueCheck = function(delay)
+        if checkQueued then return end
+        checkQueued = true
+        C_Timer.After(delay, function()
+            if token ~= requestToken then return end
+            checkQueued = false
+            check()
+        end)
+    end
+    wakeRequestedScan = queueCheck
+    queueCheck(0.1)
 end
 
-local function queueDelta()
-    queueAutomatic(0.3)
-end
-
-function app.CheckUpgrades()
-    autoReady = true
-    queueAutomatic(nil, true)
+local function invalidateResults(cancelScan)
+    if not scan and not finished then return end
+    local cancelled = cancelScan and scan ~= nil
+    if cancelled then
+        generation = generation + 1
+        scan, pausedAt, resumeScan = nil, nil, nil
+    end
+    if resultsStale and not cancelled then return end
+    resultsStale = true
+    draw()
 end
 
 function app.OverviewUpgrade()
@@ -604,16 +589,16 @@ function app.OverviewUpgrade()
         end
     end
     return { best = best, profile = current and current.profile or app.ProfileName(),
-        state = (refreshPending or pausedAt) and "combat" or scan and "scanning" or autoWaiting and "waiting"
-            or scanFailure and "error" or instancePending and "instance" or finished and "ready" or "idle",
+        state = (startAfterCombat or pausedAt) and "combat" or waitingForGear and "waiting" or scan and "scanning"
+            or scanFailure and "error" or resultsStale and "stale" or finished and "ready" or "idle",
         error = scanFailure, partial = current and ((current.errors or 0) > 0 or (current.unavailable or 0) > 0) }
 end
 
 local function setSearchLevel(level)
     plannedLevel = level and level > gear.PlayerLevel() and level or nil
     local current = scan or finished
-    if not current or not matchesSearchLevel(current) then
-        refresh()
+    if current and not matchesSearchLevel(current) then
+        invalidateResults(true)
     else
         draw()
     end
@@ -989,7 +974,7 @@ local function createPage(parent)
                 menu:CreateCheckbox(caption, function() return app.content.Snapshot()[key] end, function()
                     app.content.SetEnabled(key, not app.content.Snapshot()[key])
                     -- Source eligibility changes; cached stat comparisons stay reusable.
-                    refresh()
+                    invalidateResults(true)
                 end)
             end
         end)
@@ -1024,7 +1009,7 @@ local function createPage(parent)
     end)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     local reload = button(f, "Aktualisieren", 764, -69, 128, 27)
-    reload:SetScript("OnClick", refresh)
+    reload:SetScript("OnClick", app.CheckUpgrades)
     f.exportButton = button(f, "Exportieren", 350, -103, 118, 27)
     f.exportButton:SetEnabled(false)
     f.exportButton:SetScript("OnClick", function()
@@ -1127,15 +1112,8 @@ local function createPage(parent)
     layoutColumns(f)
 
     f:SetScript("OnShow", function()
-        autoReady = true
         layoutColumns(f)
-        local current = scan or finished
-        if not refreshPending and not instancePending
-            and ((not current and not scanFailure) or (current and not matchesSearchLevel(current))) then
-            refresh()
-        else
-            draw()
-        end
+        draw()
     end)
     f:SetScript("OnHide", function()
         if hoveredRow then
@@ -1217,15 +1195,13 @@ function app.UpdateMinimap(shown)
 end
 
 app.On("GEAR_UPDATED", function(reason)
-    if reason == "bags" or reason == "bagItems" then queueDelta(); return end
-    if reason ~= "profile" and reason ~= "equipment" and reason ~= "level" and reason ~= "skills" then return end
-    generation = generation + 1
-    local hadScan = scan ~= nil
-    scan, deltaPending, pausedAt, resumeScan = nil, false, nil, nil
-    queueAutomatic()
-    if hadScan and instancePending then draw() end
+    if reason == "bags" or reason == "bagItems" then
+        invalidateResults(false)
+    elseif reason == "profile" or reason == "equipment" or reason == "level" or reason == "skills" then
+        invalidateResults(true)
+    end
 end)
-app.On("PAULCHEN_VARIANT_ADDED", queueDelta)
+app.On("PAULCHEN_VARIANT_ADDED", function() invalidateResults(false) end)
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
@@ -1253,26 +1229,23 @@ events:SetScript("OnEvent", function(_, event, id, success)
     elseif event == "AUCTION_HOUSE_SHOW" or event == "AUCTION_HOUSE_CLOSED" then
         if window and window:IsVisible() then C_Timer.After(0, updateAuctionScanButton) end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
-        if event == "PLAYER_ENTERING_WORLD" and (id or success or not autoReady) then
-            autoReady = true
-            queueAutomatic()
+        if event == "PLAYER_ENTERING_WORLD" and (not enteredWorld or suite.Readable(id) or suite.Readable(success)) then
+            enteredWorld = true
+            app.CheckUpgrades()
         end
-        if instancePending and not inDungeon() then queueAutomatic(0.3) end
         if window and window:IsVisible() and db.tab == "instances" and db.instanceSelection == automatic then
             draw(true)
         end
     elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
         id, success = suite.Readable(id), suite.Readable(success)
         if scan and id then app.ItemDataReady(scan, id, success) end
-        if autoWaiting and success ~= false then queueAutomatic(nil, autoManual) end
+        if wakeRequestedScan and not startAfterCombat and id and id == waitingItemID and success ~= false then
+            wakeRequestedScan(0)
+        end
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if refreshPending then
-            if autoWaiting then
-                refreshPending = false
-                queueAutomatic(nil, autoManual)
-            else
-                refresh()
-            end
+        if startAfterCombat then
+            startAfterCombat = false
+            wakeRequestedScan(0)
         elseif scan and pausedAt then
             local elapsed = math.max(0, GetTime() - pausedAt)
             -- The scan's timeout budget excludes time spent in combat.

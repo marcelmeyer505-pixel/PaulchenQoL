@@ -521,7 +521,7 @@ local function bagState()
 end
 
 for event, reason in pairs({
-    PLAYER_ENTERING_WORLD = "equipment", PLAYER_EQUIPMENT_CHANGED = "equipment", PLAYER_LEVEL_UP = "level",
+    PLAYER_ENTERING_WORLD = "world", PLAYER_EQUIPMENT_CHANGED = "equipment", PLAYER_LEVEL_UP = "level",
     BAG_UPDATE_DELAYED = "bags", SKILL_LINES_CHANGED = "skills", SPELLS_CHANGED = "skills",
 }) do
     local change = reason
