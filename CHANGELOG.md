@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — 2026-11-21
+
+- Create custom bag categories and edit the names and colors of existing marks. The editor supports the color picker and hex values, and the right-click list pages through larger sets of categories.
+
 ## 0.8.7 — 2026-11-21
 
 - Rename the Cat and Bear bag marks to DPS Gear and Tank Gear. Existing marks and collapsed categories carry over.

@@ -1,4 +1,4 @@
-# Paulchen QoL v0.8.7
+# Paulchen QoL v0.9.0
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -89,9 +89,11 @@ Am Gegenstandssymbol funktionieren die normalen Taschenaktionen: Rechtsklick zum
 
 Mit **Standardtaschen** schaltest du auf deine bisherige Taschenansicht zurück. `/ptaschen` aktiviert die Liste wieder. Bank, Schlüsselbund und Gildenbank behalten ihre eigene Ansicht. Es werden keine Gegenstände automatisch verkauft, gelöscht oder umsortiert.
 
-Ein **Rechtsklick auf den Text einer Gegenstandszeile** öffnet die Vormerkungen **Behalten**, **DPS-Ausrüstung**, **Tank-Ausrüstung**, **AH** und **Händler** sowie **Ohne Markierung**. Bestehende Vormerkungen bleiben erhalten. Die Markierung steht neben dem Gegenstandsnamen und lässt sich über ihren Namen suchen. Am Item-Symbol bleiben die üblichen Gegenstandsaktionen aktiv. Die Übersicht und die Markierung des günstigsten entfernbaren Stapels werden nach einer Änderung aktualisiert.
+Ein **Rechtsklick auf den Text einer Gegenstandszeile** öffnet die Vormerkungen. Standardmäßig gibt es **Behalten**, **DPS-Ausrüstung**, **Tank-Ausrüstung**, **AH** und **Händler** sowie **Ohne Markierung**. Bestehende Vormerkungen bleiben erhalten. Die Markierung steht neben dem Gegenstandsnamen und lässt sich über ihren Namen suchen. Am Item-Symbol bleiben die üblichen Gegenstandsaktionen aktiv. Die Übersicht und die Markierung des günstigsten entfernbaren Stapels werden nach einer Änderung aktualisiert.
 
-Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe; der Zeilenhintergrund ist dezent getönt. **Behalten** ist grün, **DPS- und Tank-Ausrüstung** sind goldfarben, **AH** ist hellblau und **Händler** lachsfarben. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
+Über **Kategorien** legst du eigene Vormerkungen an und bearbeitest die Namen und Farben vorhandener Kategorien. Wähle eine Farbe im Farbwähler oder gib einen Hex-Code wie `#4DA6FF` ein. Die Kategorien werden pro Charakter gespeichert. Beim Umbenennen oder Umfärben bleiben zugewiesene Gegenstände in ihrer Kategorie.
+
+Markierte Gegenstände erscheinen oben in einer eigenen aufklappbaren Kategorie mit dem Namen ihrer Vormerkung. Kategorienkopf, Farbstreifen und farbiger Namenszusatz verwenden die Markierungsfarbe. Der Zeilenhintergrund ist dezent getönt. Die Seltenheitsfarbe des eigentlichen Itemnamens und der Quest-Rahmen bleiben erhalten. Gleiche Stapel bleiben zusammengefasst und werden innerhalb ihrer Gruppe nach der gewählten Spalte sortiert. Beim Markieren wird die Zielkategorie aufgeklappt und der Gegenstand in den sichtbaren Bereich geholt. **Ohne Markierung** stellt die normale Gegenstandskategorie und Zeilenfarbe wieder her. Der Filter „Questitems ausblenden“ gilt auch für markierte Gegenstände.
 
 ## Installation
 

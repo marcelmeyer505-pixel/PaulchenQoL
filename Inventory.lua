@@ -2,20 +2,17 @@ local _, app = ...
 local C, style, readable = C_Container, app.style, app.Readable
 local inventory = { slots = {}, offset = 0, query = "", searchCollapsed = {} }
 app.inventory = inventory
-local window, settings, refreshQueued, suppress, pendingAction, markMenu
+local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor
 local layout
 local rowHeight, rowCount = 32, 14
-local categories = {
+local clearMarkLabel = "Ohne Markierung"
+local itemCategories = {
     { "equipment", "Ausrüstung" }, { "consumables", "Verbrauchbares" },
     { "materials", "Handwerksmaterial" }, { "recipes", "Rezepte" },
     { "bags", "Taschen" }, { "keys", "Schlüssel" },
     { "quests", "Questgegenstände" }, { "junk", "Plunder" }, { "other", "Sonstiges" },
 }
--- Explicit player marks take precedence over the normal item-class buckets.
-for index, key in ipairs(app.markOrder) do
-    local mark = app.marks[key]
-    table.insert(categories, index, { "mark_" .. key, mark[1], mark[2] })
-end
+local categories, categoryNames = {}, {}
 local categoryHeaders = {}
 local columns = {
     { "name", "Gegenstand", 52, 268 }, { "count", "Anzahl", 324, 54 },
@@ -26,6 +23,48 @@ local function lastBag() return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or
 local function combat() return InCombatLockdown and InCombatLockdown() end
 local function lower(text)
     return text:gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("Ü", "ü"):lower()
+end
+local function updateCategories()
+    categories = {}
+    -- Explicit marks come before the automatic item-class categories.
+    for _, key in ipairs(app.markOrder) do
+        local mark = app.marks[key]
+        categories[#categories + 1] = { "mark_" .. key, mark[1], mark[2] }
+    end
+    for _, category in ipairs(itemCategories) do categories[#categories + 1] = category end
+    for _, category in ipairs(categories) do categoryNames[category[1]] = category[2] end
+end
+local function loadMarkCategories()
+    local saved = settings.markCategories
+    for _, key in ipairs(app.markOrder) do app.marks[key] = saved[key] or app.marks[key] end
+    for index, definition in ipairs(saved) do
+        local key = "custom_" .. index
+        if not app.marks[key] then app.markOrder[#app.markOrder + 1] = key end
+        app.marks[key] = definition
+    end
+    updateCategories()
+end
+local function saveMarkCategory(key, name, color)
+    local saved = settings.markCategories
+    local storageKey = key and (tonumber(key:match("^custom_(%d+)$")) or key)
+    if not key then
+        storageKey = #saved + 1
+        key = "custom_" .. storageKey
+        app.markOrder[#app.markOrder + 1] = key
+    end
+    local definition = { name, color }
+    saved[storageKey], app.marks[key] = definition, definition
+    updateCategories()
+    inventory.Refresh()
+    if app.RefreshOverview then app.RefreshOverview() end
+    return key
+end
+local function colorHex(r, g, b)
+    return ("#%02X%02X%02X"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+local function readColor(text)
+    local r, g, b = text:match("^%s*#?(%x%x)(%x%x)(%x%x)%s*$")
+    if r then return { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } end
 end
 local function money(value)
     if value == nil then return "…" end
@@ -75,41 +114,98 @@ function inventory.Mark(item, mark)
     end
     if app.RefreshOverview then app.RefreshOverview() end
 end
+local function categoryButton(parent, text, x, y, width, onClick)
+    local button = style.TextButton(parent)
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    button:SetSize(width, 24)
+    button:SetText(text)
+    button:SetScript("OnClick", onClick)
+    return button
+end
+local function createMarkList(parent, width, visibleRows, choose, allowClear)
+    local list = CreateFrame("Frame", nil, parent)
+    list.options, list.page, list.selected = {}, 1, false
+    local markRows = visibleRows - (allowClear and 1 or 0)
+    local function paint()
+        local pages = math.ceil(#app.markOrder / markRows)
+        local first = (list.page - 1) * markRows
+        local shownMarks = math.min(markRows, #app.markOrder - first)
+        for index, option in ipairs(list.options) do
+            local key = index <= shownMarks and app.markOrder[first + index] or nil
+            local definition = app.marks[key]
+            local shown = definition ~= nil or allowClear == true and index == shownMarks + 1
+            option.key = key
+            option.button:SetShown(shown)
+            option.title:SetText(definition and definition[1] or clearMarkLabel)
+            option.title:SetTextColor(unpack(definition and definition[2] or style.cream))
+            local active = shown and (key or false) == list.selected
+            option.check:SetShown(active)
+            style.SetButtonState(option.button, active)
+        end
+        list.previous:SetEnabled(list.page > 1)
+        list.next:SetEnabled(list.page < pages)
+        list.previous:SetShown(pages > 1)
+        list.next:SetShown(pages > 1)
+        list.pageText:SetShown(pages > 1)
+        list.pageText:SetText(("%d / %d"):format(list.page, pages))
+        local height = pages > 1 and visibleRows * 26 + 28 or (shownMarks + (allowClear and 1 or 0)) * 26
+        list:SetSize(width, height)
+    end
+    for index = 1, visibleRows do
+        local button = style.Button(list)
+        button:SetSize(width, 24)
+        button:SetPoint("TOPLEFT", 0, -(index - 1) * 26)
+        local title = style.Label(button, "", 28, 0, width - 34, 24, "GameFontHighlightSmall", style.cream)
+        local check = button:CreateTexture(nil, "OVERLAY")
+        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        check:SetSize(18, 18)
+        check:SetPoint("LEFT", 4, 0)
+        local option = { button = button, title = title, check = check }
+        list.options[index] = option
+        button:SetScript("OnClick", function()
+            if button:IsVisible() then choose(option.key) end
+        end)
+    end
+    local function turnPage(delta)
+        list.page = math.max(1, math.min(list.page + delta, math.ceil(#app.markOrder / markRows)))
+        paint()
+    end
+    local footer = -visibleRows * 26 - 2
+    list.previous = categoryButton(list, "<", 0, footer, 38, function() turnPage(-1) end)
+    list.next = categoryButton(list, ">", width - 38, footer, 38, function() turnPage(1) end)
+    list.pageText = style.Label(list, "", 40, footer, width - 80, 24, "GameFontHighlightSmall", style.muted, "CENTER")
+    list:EnableMouseWheel(true)
+    list:SetScript("OnMouseWheel", function(_, delta) turnPage(delta > 0 and -1 or 1) end)
+    function list.Select(key, jumpToSelection)
+        list.selected = key or false
+        if jumpToSelection then
+            list.page = 1
+            for index, mark in ipairs(app.markOrder) do
+                if mark == key then list.page = math.ceil(index / markRows); break end
+            end
+        end
+        paint()
+    end
+    return list
+end
 local function createMarkMenu()
     local menu = CreateFrame("Frame", "PaulchenInventoryMarkMenu", window, "BackdropTemplate")
     menu:Hide()
     menu:EnableMouse(true)
     menu:SetClampedToScreen(true)
     menu:SetFrameLevel(window:GetFrameLevel() + 20)
-    menu:SetSize(238, 38 + (#app.markOrder + 1) * 26)
     style.Panel(menu, style.background, style.accent)
     menu.title = style.Label(menu, "", 10, -3, 192, 28, "GameFontNormal", style.gold)
     local close = CreateFrame("Button", nil, menu, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -1, -1)
     close:SetScript("OnClick", function() menu:Hide() end)
 
-    menu.options = {}
-    local function addOption(key)
-        local mark = app.marks[key]
-        local option = style.Button(menu)
-        option:SetSize(222, 24)
-        option:SetPoint("TOPLEFT", 8, -32 - #menu.options * 26)
-        style.Label(option, mark and mark[1] or "Ohne Markierung", 29, 0, 184, 24,
-            "GameFontHighlightSmall", mark and mark[2] or style.cream)
-        local check = option:CreateTexture(nil, "OVERLAY")
-        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-        check:SetSize(20, 20)
-        check:SetPoint("LEFT", 4, 0)
-        menu.options[#menu.options + 1] = { key = key, button = option, check = check }
-        option:SetScript("OnClick", function()
-            if not menu:IsVisible() then return end
-            local item = menu.item
-            menu:Hide()
-            inventory.Mark(item, key)
-        end)
-    end
-    for _, key in ipairs(app.markOrder) do addOption(key) end
-    addOption(nil)
+    menu.list = createMarkList(menu, 222, 8, function(key)
+        local item = menu.item
+        menu:Hide()
+        inventory.Mark(item, key)
+    end, true)
+    menu.list:SetPoint("TOPLEFT", 8, -32)
 
     menu:SetScript("OnShow", function(self) app.RegisterSupported(self, "GLOBAL_MOUSE_DOWN") end)
     menu:SetScript("OnHide", function(self)
@@ -122,19 +218,129 @@ local function createMarkMenu()
     return menu
 end
 local function showMarkMenu(row)
+    if categoryEditor and categoryEditor:IsShown() then return end
     markMenu = markMenu or createMarkMenu()
     markMenu.ownerRow, markMenu.item = row, row.item
     markMenu.title:SetText(row.item.name)
-    local current = app.Settings().marks[row.item.markKey]
-    for _, option in ipairs(markMenu.options) do
-        local selected = option.key == current
-        option.check:SetShown(selected)
-        style.SetButtonState(option.button, selected)
-    end
+    markMenu.list.Select(app.Settings().marks[row.item.markKey], true)
+    markMenu:SetSize(238, 38 + markMenu.list:GetHeight())
     markMenu:ClearAllPoints()
     markMenu:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 36, -2)
     GameTooltip:Hide()
     markMenu:Show()
+end
+local function createCategoryEditor()
+    local editor = CreateFrame("Frame", "PaulchenBagCategoryEditor", window, "BackdropTemplate")
+    editor:Hide()
+    editor:EnableMouse(true)
+    editor:SetFrameLevel(window:GetFrameLevel() + 25)
+    editor:SetPoint("CENTER")
+    editor:SetSize(534, 328)
+    style.Panel(editor, style.background, style.accent)
+    style.Label(editor, "Taschenkategorien", 14, -5, 430, 28, "GameFontNormalLarge", style.gold)
+    local close = CreateFrame("Button", nil, editor, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -2, -2)
+    close:SetScript("OnClick", function() editor:Hide() end)
+
+    editor.heading = style.Label(editor, "", 246, -42, 270, 24, "GameFontNormal", style.gold)
+    style.Label(editor, "Name", 246, -74, 270, 18, "GameFontHighlightSmall", style.muted)
+    editor.nameBox = style.EditBox(editor)
+    editor.nameBox:SetPoint("TOPLEFT", 246, -96)
+    editor.nameBox:SetSize(270, 26)
+    editor.nameBox:SetMaxLetters(32)
+    style.Label(editor, "Farbe", 246, -134, 270, 18, "GameFontHighlightSmall", style.muted)
+    editor.hexBox = style.EditBox(editor)
+    editor.hexBox:SetPoint("TOPLEFT", 422, -155)
+    editor.hexBox:SetSize(94, 24)
+    editor.hexBox:SetMaxLetters(7)
+    editor.status = style.Label(editor, "", 246, -238, 270, 48, "GameFontHighlightSmall", style.muted)
+    editor.status:SetWordWrap(true)
+    for _, input in ipairs({ editor.nameBox, editor.hexBox }) do
+        input:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+        input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    end
+
+    local function edit(key, jumpToSelection)
+        editor.key, editor.colorSession = key or false, false
+        local definition = app.marks[key]
+        editor.heading:SetText(definition and "Kategorie bearbeiten" or "Neue Kategorie")
+        editor.nameBox:SetText(definition and definition[1] or "")
+        editor.hexBox:SetText(colorHex(unpack(definition and definition[2] or style.gold)))
+        editor.status:SetText("")
+        editor.list.Select(key or false, jumpToSelection)
+    end
+    editor.list = createMarkList(editor, 210, 8, function(key) edit(key) end)
+    editor.list:SetPoint("TOPLEFT", 14, -76)
+    editor.newCategory = categoryButton(editor, "+ Neue Kategorie", 14, -42, 210, function()
+        edit(nil, true)
+        editor.nameBox:SetFocus()
+    end)
+
+    editor.colorButton = categoryButton(editor, "Farbe wählen", 246, -155, 163, function()
+        local picker = ColorPickerFrame
+        if not (picker and picker.SetupColorPickerAndShow and picker.GetColorRGB) then
+            editor.hexBox:SetFocus()
+            return
+        end
+        local previous = editor.hexBox:GetText()
+        local color = readColor(previous) or style.gold
+        local session = {}
+        editor.colorSession = session
+        picker:SetupColorPickerAndShow({
+            r = color[1], g = color[2], b = color[3],
+            swatchFunc = function()
+                if editor:IsVisible() and editor.colorSession == session then
+                    editor.hexBox:SetText(colorHex(picker:GetColorRGB()))
+                end
+            end,
+            cancelFunc = function()
+                if editor:IsVisible() and editor.colorSession == session then editor.hexBox:SetText(previous) end
+            end,
+        })
+    end)
+    local swatch = editor.colorButton:CreateTexture(nil, "OVERLAY")
+    swatch:SetSize(16, 16)
+    swatch:SetPoint("LEFT", 8, 0)
+    editor.hexBox:SetScript("OnTextChanged", function(self)
+        local color = readColor(self:GetText())
+        swatch:SetShown(color ~= nil)
+        if color then swatch:SetColorTexture(unpack(color)) end
+    end)
+
+    editor.saveCategory = categoryButton(editor, "Speichern", 246, -198, 270, function()
+        local name = editor.nameBox:GetText():match("^%s*(.-)%s*$")
+        if name == "" or name:find("[|%c]") then
+            editor.status:SetText("Gib einen gültigen Kategorienamen ein.")
+            return
+        end
+        local color = readColor(editor.hexBox:GetText())
+        if not color then
+            editor.status:SetText("Wähle eine Farbe oder gib einen Hex-Code ein, z. B. #4DA6FF.")
+            return
+        end
+        local normalized = lower(name)
+        if normalized == lower(clearMarkLabel) then
+            editor.status:SetText("Dieser Name ist bereits vergeben.")
+            return
+        end
+        for _, key in ipairs(app.markOrder) do
+            if key ~= editor.key and lower(app.marks[key][1]) == normalized then
+                editor.status:SetText("Dieser Name ist bereits vergeben.")
+                return
+            end
+        end
+        edit(saveMarkCategory(editor.key, name, color), true)
+        editor.status:SetText("Gespeichert")
+        editor.nameBox:ClearFocus()
+        editor.hexBox:ClearFocus()
+    end)
+    editor:SetScript("OnShow", function() edit(nil, true) end)
+    editor:SetScript("OnHide", function()
+        editor.colorSession = false
+        editor.nameBox:ClearFocus()
+        editor.hexBox:ClearFocus()
+    end)
+    return editor
 end
 local function updateMoney()
     if window and window.money then
@@ -279,14 +485,9 @@ function inventory.Matches(item)
     if not item.id then return false end
     if settings.hideQuestItems and item.isQuest then return false end
     local query = lower(inventory.query:match("^%s*(.-)%s*$"))
-    local categoryName = ""
-    for _, category in ipairs(categories) do
-        if category[1] == inventory.Category(item) then categoryName = category[2]; break end
-    end
-    local mark = app.marks[item.mark]
-    return query == "" or query == tostring(item.id)
-        or lower(item.name .. " " .. item.category .. " " .. item.subcategory .. " " .. categoryName
-            .. " " .. (mark and mark[1] or "")):find(query, 1, true) ~= nil
+    if query == "" or query == tostring(item.id) then return true end
+    local categoryName = categoryNames[inventory.Category(item)] or ""
+    return lower(item.name .. " " .. item.category .. " " .. item.subcategory .. " " .. categoryName):find(query, 1, true) ~= nil
 end
 layout = function()
     local rows = inventory.displayRows or {}
@@ -352,17 +553,17 @@ local function categorize(rows)
                 header:SetSize(672, rowHeight - 1)
                 header.categoryHeader = true
                 header.caption = style.Label(header, "", 8, 0, 650, rowHeight - 1, "GameFontNormal", style.gold)
-                if color then
-                    header.caption:SetTextColor(unpack(color))
-                    header:SetBackdropColor(color[1] * 0.22, color[2] * 0.22, color[3] * 0.22, 1)
-                    header:SetBackdropBorderColor(color[1] * 0.65, color[2] * 0.65, color[3] * 0.65, 1)
-                end
                 header:SetScript("OnClick", function()
                     local folds = inventory.query:find("%S") and inventory.searchCollapsed or settings.collapsed
                     folds[key] = not folds[key]
                     inventory.Refresh()
                 end)
                 categoryHeaders[key] = header
+            end
+            if color then
+                header.caption:SetTextColor(unpack(color))
+                header:SetBackdropColor(color[1] * 0.22, color[2] * 0.22, color[3] * 0.22, 1)
+                header:SetBackdropBorderColor(color[1] * 0.65, color[2] * 0.65, color[3] * 0.65, 1)
             end
             header.caption:SetText((collapsed[key] and "[+] " or "[-] ") .. caption .. " (" .. #items .. ")")
             display[#display + 1] = header
@@ -482,6 +683,11 @@ local function createWindow()
         inventory.Refresh()
     end)
     f.hideQuestItems = hideQuest
+    f.categories = categoryButton(f, "Kategorien", 550, -82, 136, function()
+        if markMenu then markMenu:Hide() end
+        categoryEditor = categoryEditor or createCategoryEditor()
+        categoryEditor:SetShown(not categoryEditor:IsShown())
+    end)
     f.headers = {}
     for _, col in ipairs(columns) do
         local key = col[1]
@@ -511,7 +717,10 @@ local function createWindow()
     style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
     f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
     f:SetScript("OnShow", inventory.Refresh)
-    f:SetScript("OnHide", function() if markMenu then markMenu:Hide() end end)
+    f:SetScript("OnHide", function()
+        if markMenu then markMenu:Hide() end
+        if categoryEditor then categoryEditor:Hide() end
+    end)
     f:Hide()
     UISpecialFrames[#UISpecialFrames + 1] = "PaulchenQoLInventory"
     -- Pre-create slot identities before combat; displaying the window is safe later.
@@ -564,6 +773,8 @@ events:SetScript("OnEvent", function(_, event)
         if settings.enabled == nil then settings.enabled = true end
         if type(settings.hideQuestItems) ~= "boolean" then settings.hideQuestItems = true end
         if type(settings.collapsed) ~= "table" then settings.collapsed = {} end
+        if type(settings.markCategories) ~= "table" then settings.markCategories = {} end
+        loadMarkCategories()
         local valid = false
         for _, col in ipairs(columns) do if settings.sort == col[1] then valid = true end end
         if not valid then settings.sort, settings.ascending = "name", true end
