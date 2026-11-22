@@ -45,6 +45,7 @@ local columns = {
 local sources = {
     { "all", "Alle Quellen" }, { "bag", "Eigene Taschen" }, { "quest", "Quests" }, { "boe", "BoE / Handel" },
     { "dungeon", "Instanzen" }, { "raid", "Raids" }, { "drop", "Sonstige Drops" }, { "vendor", "Händler" },
+    { "undermine", app.sourceNames.undermine },
     { "craft", "Herstellung" },
     { "auction", "Auktionshaus" },
 }

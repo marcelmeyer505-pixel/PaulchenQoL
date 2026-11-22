@@ -4,9 +4,10 @@ if not app then return end
 local pole = Polestar
 local availability = app.content
 local moduleName = "AtlasLootClassic_DungeonsAndRaids"
+local pixXizzix = 227853
 local sourceNames = {
     quest = "Quest", boe = "BoE", dungeon = "Instanz", raid = "Raid", drop = "Drop", vendor = "Händler",
-    craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen",
+    craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen", undermine = "Undermine Real",
 }
 app.sourceNames = sourceNames
 
@@ -552,13 +553,14 @@ local function addCodexSources(scan, id, list, quests, drops, crafts, restricted
                     addDrop(scan, list, drops, location, title, route.chance, route.zone)
                 end
             elseif not restricted and (route.type == "vendor" or route.type == "gift") then
-                local key = raw.npc or route.label
+                local undermine = route.type == "vendor" and raw.npc == pixXizzix
+                local key = undermine and "undermine" or raw.npc or route.label
                 if not vendors[key] then
                     vendors[key] = true
                     local price = type(route.price) == "number" and route.price or nil
                     local effort = raw.limited and 4 or price and price >= 100000 and 3 or 2
                     list[#list + 1] = {
-                        kind = "vendor", title = route.label, zone = route.zone, effort = effort,
+                        kind = undermine and "undermine" or "vendor", title = route.label, zone = route.zone, effort = effort,
                         detail = price and price > 0 and GetCoinTextureString and GetCoinTextureString(price)
                             or (raw.limited and "Begrenzter Vorrat") or nil,
                     }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.2 — 2026-11-22
+
+- Add an Undermine Real source filter for upgrade items sold by Pix Xizzix.
+
 ## 0.11.1 — 2026-11-22
 
 - Show TSM DBMinBuyout in the upgrade window as a `[PREIS]` estimate. Saved buyout offers and live auction results remain available. The tooltip can show both the actual offer and the TSM estimate.
