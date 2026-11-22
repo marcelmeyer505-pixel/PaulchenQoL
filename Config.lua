@@ -2,7 +2,8 @@ local _, app = ...
 
 local defaults = {
     show = true, size = 128, opacity = 1, bubbles = true, comments = true,
-    frequency = 2, sarcasm = 2, hideCombat = true, memory = true, debug = false, moduleIcons = false,
+    frequency = 2, hideCombat = true, memory = true, debug = false, moduleIcons = false,
+    ambientComments = true, repairHints = true, pauseHints = false, situationalComments = true,
     questTurnIns = true, mountGloves = true, levelUpSound = true,
 }
 local profile, window
@@ -30,13 +31,18 @@ function app.Profile()
     profile.size = math.floor(clamp(profile.size, 64, 256, 128) + 0.5)
     profile.opacity = clamp(profile.opacity, 0.2, 1, 1)
     profile.frequency = math.floor(clamp(profile.frequency, 1, 3, 2))
-    profile.sarcasm = math.floor(clamp(profile.sarcasm, 1, 3, 2))
+    profile.sarcasm = nil
     return profile
 end
 
 function app.Debug(text)
     if profile and profile.debug then print("Paulchen QoL · " .. text) end
 end
+
+local dialogueSettings = {
+    frequency = true, show = true, comments = true, bubbles = true, ambientComments = true,
+    repairHints = true, pauseHints = true, situationalComments = true, memory = true,
+}
 
 local function write(key, value)
     app.Profile()[key] = value
@@ -46,8 +52,8 @@ local function write(key, value)
     if key == "questTurnIns" then app.RefreshQuestMap() end
     if key == "mountGloves" then app.RefreshMountGloves() end
     if key == "levelUpSound" then app.ApplyLevelUpSound() end
-    if app.RestartIdle and (key == "frequency" or key == "comments" or key == "show" or key == "bubbles") then
-        app.RestartIdle()
+    if app.companionLife and dialogueSettings[key] then
+        app.companionLife.Update(key == "frequency" or key == "ambientComments")
     end
 end
 app.SetProfile = write
@@ -67,10 +73,10 @@ local function button(parent, text, x, y, width)
     return b
 end
 
-local function checkbox(parent, key, text, y)
+local function checkbox(parent, key, text, y, x)
     local b = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     b:SetSize(24, 24)
-    b:SetPoint("TOPLEFT", 17, y)
+    b:SetPoint("TOPLEFT", x or 17, y)
     label(b, text, nil, 29, -6)
     b:SetScript("OnClick", function(self) write(key, not not self:GetChecked()) end)
     return function() b:SetChecked(app.Profile()[key]) end
@@ -129,8 +135,8 @@ app.RefreshSettings = refreshSettings
 local function createWindow()
     local f = CreateFrame("Frame", "PaulchenQoLConfig", UIParent, "BackdropTemplate")
     f:Hide()
-    f:SetSize(485, 452)
-    f:SetScale(math.min(1, (UIParent:GetWidth() - 20) / 485, (UIParent:GetHeight() - 20) / 452))
+    f:SetSize(506, 505)
+    f:SetScale(math.min(1, (UIParent:GetWidth() - 20) / 506, (UIParent:GetHeight() - 20) / 505))
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
@@ -139,7 +145,7 @@ local function createWindow()
     f:SetBackdropBorderColor(0.64, 0.40, 0.23, 1)
     label(f, "Paulchen · Einstellungen", "GameFontNormalLarge", 18, -15)
     label(f, "Begleiter", "GameFontNormal", 19, -60)
-    label(f, "Aussehen und Persönlichkeit", "GameFontNormal", 252, -60)
+    label(f, "Aussehen und Gespräche", "GameFontNormal", 252, -60)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
     close:SetScript("OnClick", function() f:Hide() end)
@@ -157,20 +163,23 @@ local function createWindow()
         slider(f, "size", "Größe", -90, 64, 256, 1, 1, "px"),
         slider(f, "opacity", "Deckkraft", -137, 20, 100, 1, 100, "%"),
         choices(f, "frequency", "Häufigkeit", { "Selten", "Normal", "Gesprächig" }, -184),
-        choices(f, "sarcasm", "Sarkasmus", { "Lieb", "Frech", "Gnadenlos" }, -238),
+        checkbox(f, "ambientComments", "Spontanes Geplapper", -229, 249),
+        checkbox(f, "situationalComments", "Situationskommentare", -258, 249),
+        checkbox(f, "repairHints", "Reparaturhinweise", -287, 249),
+        checkbox(f, "pauseHints", "Pausenerinnerungen", -316, 249),
     }
-    button(f, "Level-up-Sound testen", 252, -315, 210):SetScript("OnClick", function()
+    button(f, "Level-up-Sound testen", 252, -355, 224):SetScript("OnClick", function()
         if not app.PlayLevelUpSound() then print("Paulchen QoL · Der Level-up-Sound konnte nicht abgespielt werden.") end
     end)
-    button(f, "Buffwächter einstellen", 252, -348, 210):SetScript("OnClick", function()
+    button(f, "Buffwächter einstellen", 252, -391, 224):SetScript("OnClick", function()
         if app.buffCheck then app.buffCheck.OpenConfig() end
     end)
     button(f, "Taschen / Preise", 18, -368, 180):SetScript("OnClick", function()
         if app.inventory then app.inventory.OpenPriceSettings() end
     end)
-    button(f, "Position zurücksetzen", 18, -392, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
-    button(f, "Testkommentar", 252, -392, 210):SetScript("OnClick", function() app.TestComment() end)
-    label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -425)
+    button(f, "Position zurücksetzen", 18, -427, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
+    button(f, "Testkommentar", 252, -427, 224):SetScript("OnClick", function() app.TestComment() end)
+    label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -471)
     table.insert(UISpecialFrames, f:GetName())
     f:SetScript("OnShow", refreshSettings)
     return f

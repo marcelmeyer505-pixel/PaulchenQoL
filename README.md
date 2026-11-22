@@ -1,4 +1,4 @@
-# Paulchen QoL v0.11.3
+# Paulchen QoL v0.12.0
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -162,10 +162,12 @@ Die Unterbefehle von `/pq` funktionieren auch mit `/paulchen`. Falls Paulchen ge
 - **Eigener Level-up-Sound** spielt beim Stufenaufstieg die mitgelieferte Datei `Sounds/level-up.mp3` ab und schaltet den Blizzard-Levelaufstiegsklang während der Sitzung stumm. In den Einstellungen lässt sich die Datei testen und auf den WoW-Klang zurückschalten. Die Lautstärke folgt den Soundeffekten. Die Audiodatei stammt vom Benutzer.
 - **Paulchen anzeigen**, **Textblasen** und **Kommentare** lassen sich separat schalten. Mit ausgeschalteten Kommentaren bleiben Flugzeit und Händlerwert bei eingeschalteten Textblasen verfügbar.
 - **Größe** reicht von 64 bis 256 Pixel und startet bei 128. **Deckkraft** reicht von 20 bis 100 Prozent. Die Blase passt sich dem Text an und wechselt je nach Position die Seite.
-- **Häufigkeit** legt für normale Kommentare eine Mindestpause von 90, 60 oder 45 Sekunden fest. Wichtige Ereignisse können früher zu Wort kommen. Pro Ereignis gilt zusätzlich eine eigene Abklingzeit.
-- **Sarkasmus** bietet **Lieb**, **Frech** und **Gnadenlos**. Stimmungen steuern die Illustration und können die Wortwahl abmildern.
-- **Im Kampf ausblenden** ist anfangs aktiv. Dialoge pausieren im Kampf. Nach dem Kampf verarbeitet Paulchen relevante, noch aktuelle Meldungen aus einer Warteschlange mit höchstens fünf Einträgen.
-- **Erinnerungen speichern** erfasst Tode insgesamt und pro Sitzung, erreichte Stufen, Gebietsbesuche, zuletzt gesprochene Zeilen und erkannte Questabgaben pro Charakter. Das Abschalten pausiert die Erfassung. Vorhandene Daten stehen beim Wiedereinschalten wieder zur Verfügung.
+- **Spontanes Geplapper** startet eingeschaltet. Die **Häufigkeit** legt zufällige Abstände von 5–8 Minuten, 3–6 Minuten oder rund 1½–3½ Minuten fest. Ereignisse und praktische Hinweise können zusätzlich zu Wort kommen. Wichtige Hinweise verschieben Geplapper, wenn sie gerade angezeigt wurden.
+- **Situationskommentare** schaltet Reaktionen auf bestätigte Spielereignisse ein oder aus. Paulchen wählt aus einem gemeinsamen Pool in seinem Ton und bezieht die letzten 40 Zeilen in die Auswahl ein. Die Illustrationen reagieren auch bei ausgeblendeten Textblasen.
+- **Reparaturhinweise** sind anfangs aktiv. Unter 40 % Haltbarkeit eines ausgerüsteten Teils erinnert Paulchen ans Reparieren. Unter 20 % kann er früher erneut warnen. Für Reparaturhinweise gilt ansonsten eine Pause von 25 Minuten. Beim Händler prüft Paulchen dessen Reparaturfunktion.
+- **Pausenerinnerungen** sind anfangs aus. Nach dem Einschalten können Hinweise um Stunde 1, 2, 3 und 4 sowie danach alle zwei Stunden erscheinen, jeweils einmal pro Spielsitzung. Überholte Hinweise fallen weg.
+- **Im Kampf ausblenden** ist anfangs aktiv. Kommentare pausieren bei Kämpfen, laufenden Bossbegegnungen, Ladebildschirmen und geschützten Zuständen. Nach dem Kampf kann höchstens ein wichtiger, noch aktueller Ereigniskommentar nachkommen. Eine AFK-Phase erhält höchstens eine Ansprache und keinen Rückstau.
+- **Erinnerungen speichern** erfasst Tode, Stufen, Gebietsbesuche, zuletzt gesprochene Zeilen und erkannte Questabgaben pro Charakter. Das Abschalten pausiert persönliche Aufzeichnungen. Spielzeit, bereits ausgegebene Pausenhinweise und der Reparaturabstand bleiben als Sitzungsdaten für ein `/reload` erhalten.
 - **Debugmodus** zeigt verarbeitete Dialogkategorien und erkannte Modulfehler im eigenen Chatfenster.
 - **Separate Modul-Minimapknöpfe** blendet bei verfügbaren Minimap-Bibliotheken die zusätzlichen Knöpfe für Logbuch und Upgrades ein. Deren gespeicherte Positionen und Sichtbarkeit werden übernommen.
 - **Questabgaben auf der Weltkarte** schaltet die zusätzlichen Fragezeichen ein oder aus. Die Einstellung ist standardmäßig aktiv.
@@ -175,13 +177,15 @@ Der automatische Wechsel der Reithandschuhe und das Zurückwechseln unterbrechen
 
 ## Ereignisse
 
-Paulchen reagiert beim Einloggen, bei einem Levelaufstieg, beim Tod, nach der Wiederbelebung, beim Gebietswechsel, bei erkannten Questabgaben, beim AFK-Gehen, bei der Rückkehr und bei knappen Taschenplätzen. Gelegentlich meldet er sich in ruhigen Situationen. Jede Kategorie hat 15 deutsche Sprüche. Einige zusätzliche Zeilen setzen eine tatsächlich gespeicherte Pause oder mehrere Tode voraus.
+Paulchen kommentiert Reisen, Rastorte und längere Ruhephasen sowie die bisherigen Ereignisse vom Einloggen bis zur Questabgabe. Bei erneut besuchten Gebieten greift er auf tatsächlich gespeicherte Tode zurück. Neue Reaktionen gibt es außerdem für abgeschlossene Kategorien-Transfers, bestätigte Boss-Siege, vom Client gemeldete Dungeonabschlüsse und ausgewertete Bereitschaftschecks.
+
+Bei nachweislich eigener Beute kann Paulchen seltene Gegenstände kommentieren. Einen Hinweis auf besonders wertvolle Beute gibt es bei handelbaren Gegenständen, wenn TSM oder Paulchens Scanner für die erhaltene Menge einen Preis von mindestens 20 Gold liefern. Der Hinweis basiert auf einem Referenzpreis.
 
 Sprüche, Testkommentare und vorübergehende Statusmeldungen beim kleinen Paulchen bleiben 15 Sekunden sichtbar. Flugzeit und Händlerwert werden während der Anzeige aktualisiert. Der Reise-Check zeigt diese Informationen weiterhin, solange sie relevant sind.
 
 Die Erinnerung an den Immergrünbeutel bleibt bis zur Benutzung sichtbar, solange der Beutel und die Zutaten in deinen Taschen sind. Paulchen meldet außerdem, wenn auf deinem Druiden das erlernte Mal der Wildnis fehlt. Die Gruppenversion Gabe der Wildnis zählt ebenfalls. Offene Erinnerungen können zusammen in einer Sprechblase stehen und erscheinen auch im Reise-Check.
 
-Bei einem `/reload` bleibt die Sitzung mit ihrem Todeszähler erhalten. Der nächste echte Login beginnt eine neue Sitzung.
+Bei einem `/reload` bleiben Sitzungszeit und bereits ausgelöste Tipps erhalten. Zonenwechsel setzen die Uhr ebenfalls weiter fort. Beim nächsten echten Login beginnt eine neue Sitzung.
 
 ## Bekannte Grenzen
 
@@ -193,5 +197,14 @@ Bei einem `/reload` bleibt die Sitzung mit ihrem Todeszähler erhalten. Der näc
 ## Tests
 
 Geprüft wurden die Lua-5.1-Syntax, die Datenübernahme und Modulzugänge mit simulierten WoW-Events, die bisherigen QoL-, DTL-, Upgrade- und Auktionsabläufe und der laufende Crit-Import aus einem Testprotokoll. Die Integration im Forever-Client lässt sich nach einem vollständigen Neustart prüfen.
+
+`python tests/test_companion_life.py` spielt alle 180 bisherigen Standardsprüche durch und simuliert unter anderem zwölf Stunden Reisezeit, Kampf, AFK, Reparaturen, Pausenhinweise und frische Lua-Sitzungen nach einem Reload.
+
+Für die Ingame-Prüfung in Forever stehen diese Abläufe aus.
+
+1. Bei **Normal** mehrere Minuten reiten, questen und an einem Rastort bleiben. Im Kampf und beim Laden still bleiben, nach der Rückkehr nur aktuelle Reaktionen anzeigen und den Grafikwechsel nach 15 Sekunden prüfen.
+2. Mit beschädigter Ausrüstung einen Händler mit Reparaturfunktion besuchen und tatsächlich reparieren. Die Schwellen unter 40 und 20 Prozent separat prüfen.
+3. **Pausenerinnerungen** einschalten, eine Stundenschwelle erreichen und anschließend `/reload` ausführen. Der bereits angezeigte Hinweis darf sich innerhalb derselben Sitzung nicht wiederholen.
+4. Eigene seltene Beute mit und ohne verfügbaren AH-Preis prüfen. Im Gruppenspiel einen Bereitschaftscheck, bestätigten Bosssieg und einen Dungeonabschluss beobachten.
 
 `python tests/test_auction_prices.py` prüft die Preisquellen, Cache-Ablauf, spätes Laden der TSM-API, ungültige Preise, Gegenstandsvarianten und simulierte Neuladungen mit Lua 5.1 (Lupa). Für den Clienttest mit TSM einen bekannten DBMarket-Artikel und in **Nur Paulchens Scanner** ein passendes gescanntes Ausrüstungsteil in Taschen und Bank vergleichen. Händler- und Marktwert müssen jeweils zur Stückzahl passen. Beim Bankier beide Listen öffnen, nach **Marktwert** und **Differenz** sortieren und einen Kategorien-Transfer prüfen. Anschließend bei deaktiviertem TSM neu laden und den Ersatzpreis sowie die gespeicherte Einstellung prüfen.

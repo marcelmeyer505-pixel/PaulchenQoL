@@ -1114,6 +1114,7 @@ local function finishTransfer(state, reason)
     bank.transferMessage = text
     transferMessage(text)
     inventory.Refresh()
+    if remaining == 0 and state.moved > 0 and app.companionLife then app.companionLife.BankOrganized() end
     if pricesPending then queuePriceRefresh() end
 end
 local stepTransfer

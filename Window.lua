@@ -48,7 +48,6 @@ end
 
 local function readTravel()
     travel = app.ReadTravel()
-    app.ObserveTravel(travel)
 end
 
 local function hearthText(info)

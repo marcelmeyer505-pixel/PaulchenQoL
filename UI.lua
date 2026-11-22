@@ -111,6 +111,7 @@ end
 function app.SetCompanionReminder(key, text)
     if reminders[key] == text then return end
     reminders[key] = text
+    if text then app.DelayCompanionAmbient(60) end
     app.RenderCompanion()
 end
 
@@ -122,7 +123,7 @@ function app.RenderCompanion()
     if bird then
         local settings = app.Profile()
         local art, comment = app.DialogueView()
-        local inCombat = InCombatLockdown and InCombatLockdown()
+        local inCombat = InCombatLockdown and app.ReadGameValue(InCombatLockdown) ~= false
         local shown = settings.show and not dashboardOpen and not (inCombat and settings.hideCombat)
         bird:SetShown(shown)
         if shown then
@@ -142,6 +143,7 @@ function app.SetCompanionStatus(text, secondLine)
     if status ~= text then
         if statusTimer then statusTimer:Cancel(); statusTimer = nil end
         statusUntil = nil
+        if text then app.DelayCompanionAmbient(20) end
     end
     status, detail = text, secondLine
     app.RenderCompanion()

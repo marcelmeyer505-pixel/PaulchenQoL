@@ -20,6 +20,12 @@ local function readable(value)
 end
 app.Readable = readable
 
+function app.ReadGameValue(api, ...)
+    if type(api) ~= "function" then return end
+    local ok, first, second = pcall(api, ...)
+    if ok then return readable(first), readable(second) end
+end
+
 local function lastBag()
     return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
 end
@@ -41,27 +47,62 @@ function app.BagItemCount(itemID)
     return getItemCount and (readable(getItemCount(itemID, false)) or 0) or 0
 end
 
-function app.ReadTravel()
-    local free, capacity = 0, 0
+function app.ReadBagSpace()
+    local free, capacity, known = 0, 0, true
     if container and container.GetContainerNumFreeSlots and container.GetContainerNumSlots then
         for bag = 0, lastBag() do
-            local count, family = container.GetContainerNumFreeSlots(bag)
-            if generalBag(family) then
-                free = free + (readable(count) or 0)
-                capacity = capacity + (readable(container.GetContainerNumSlots(bag)) or 0)
+            local slots = app.ReadGameValue(container.GetContainerNumSlots, bag)
+            if type(slots) ~= "number" then
+                known = false
+            elseif slots > 0 then
+                local ok, count, family = pcall(container.GetContainerNumFreeSlots, bag)
+                local unknownFamily = issecretvalue and issecretvalue(family)
+                if not ok or unknownFamily then
+                    known = false
+                elseif generalBag(family) then
+                    count = readable(count)
+                    if type(count) == "number" and count >= 0 and count <= slots then
+                        free = free + count
+                    else
+                        known = false
+                    end
+                    capacity = capacity + slots
+                end
             end
         end
-    end
-    local durability
+    else known = false end
+    return free, capacity, known
+end
+
+function app.ReadDurability(trackEquipment)
+    if not GetInventoryItemDurability then return end
+    local minimum, damage, complete = nil, 0, true
+    local pieces = trackEquipment and {}
+    local knownPieces = true
     for slot = INVSLOT_FIRST_EQUIPPED or 1, INVSLOT_LAST_EQUIPPED or 19 do
-        local current, maximum
-        if GetInventoryItemDurability then current, maximum = GetInventoryItemDurability(slot) end
+        local ok, current, maximum = pcall(GetInventoryItemDurability, slot)
+        local unknown = not ok or (issecretvalue and (issecretvalue(current) or issecretvalue(maximum)))
         current, maximum = readable(current), readable(maximum)
-        if current and maximum and maximum > 0 then
+        if not unknown and type(current) == "number" and type(maximum) == "number"
+            and maximum > 0 and current >= 0 and current <= maximum then
             local percent = current / maximum * 100
-            durability = durability and math.min(durability, percent) or percent
+            minimum = minimum and math.min(minimum, percent) or percent
+            damage = damage + maximum - current
+            if pieces then
+                local link = app.ReadGameValue(GetInventoryItemLink, "player", slot)
+                if type(link) == "string" then pieces[#pieces + 1] = slot .. "=" .. link
+                else knownPieces = false end
+            end
+        elseif unknown or current ~= nil or (maximum ~= nil and maximum ~= 0) then
+            complete = false
         end
     end
+    return minimum, minimum and complete and damage or nil,
+        minimum and complete and pieces and knownPieces and table.concat(pieces, "|") or nil
+end
+
+function app.ReadTravel()
+    local free, capacity, known = app.ReadBagSpace()
     local hasHearth = app.BagItemCount(hearthstone) > 0
     local readyAt
     if hasHearth and C_Item and C_Item.GetItemCooldown then
@@ -70,21 +111,21 @@ function app.ReadTravel()
         if start and duration and start > 0 and duration > 1.5 then readyAt = start + duration end
     end
     return {
-        free = free, capacity = capacity, durability = durability,
+        free = free, capacity = capacity, bagSpaceKnown = known, durability = app.ReadDurability(),
         hasHearth = hasHearth, readyAt = readyAt,
         bind = hasHearth and GetBindLocation and readable(GetBindLocation()) or nil,
     }
 end
 
 function app.TravelWarning(travel)
-    if travel.capacity > 0 and travel.free == 0 then
+    if travel.bagSpaceKnown ~= false and travel.capacity > 0 and travel.free == 0 then
         return "full", "Mein Gepäck platzt aus allen Nähten. Deine Taschen sind voll!"
     end
     if travel.durability and travel.durability <= 30 then
         return "repair", ("Psst, Zeit für den Schmied. Dein am stärksten abgenutztes Teil hat noch %d %% Haltbarkeit.")
             :format(math.floor(travel.durability))
     end
-    if travel.capacity > 0 and travel.free <= 4 then
+    if travel.bagSpaceKnown ~= false and travel.capacity > 0 and travel.free <= 4 then
         local space = travel.free == 1 and "1 Platz ist" or travel.free .. " Plätze sind"
         return "space", "Nur noch " .. space .. " frei. Soll ich schon mal nach einem Händler Ausschau halten?"
     end

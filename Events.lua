@@ -1,11 +1,11 @@
 local _, app = ...
 
-local states = { login = false, entered = false, bagsLow = false }
+local states = { login = false, entered = false }
 local previousDeath, previousAFK, previousLevel
+local welcome
 local recentQuests = {}
-local idleTimer, idleToken = nil, 0
-local idleWait = { 145, 110, 80 }
 local readable = app.Readable
+local life = app.companionLife
 local pouch, soil, seeds = 11020, 11018, 11022
 local pouchTimer, pouchRetryAt
 local wildBuffs = {
@@ -47,41 +47,9 @@ local function unitState(api)
 end
 
 local function zoneName()
-    local name = GetRealZoneText and readable(GetRealZoneText())
-    if not name or name == "" then name = GetZoneText and readable(GetZoneText()) end
+    local name = app.ReadGameValue(GetRealZoneText)
+    if not name or name == "" then name = app.ReadGameValue(GetZoneText) end
     return name
-end
-
-local function safeIdle()
-    return not (InCombatLockdown and InCombatLockdown())
-        and unitState(UnitIsDeadOrGhost) == false and unitState(UnitIsAFK) == false
-        and not unitState(UnitOnTaxi) and (not GetUnitSpeed or readable(GetUnitSpeed("player")) == 0)
-end
-
-function app.RestartIdle()
-    idleToken = idleToken + 1
-    if idleTimer then idleTimer:Cancel(); idleTimer = nil end
-    local settings = app.Profile()
-    if not (states.entered and settings.show and settings.comments and settings.bubbles and C_Timer) then return end
-    local token = idleToken
-    local delay = idleWait[settings.frequency] + math.random(5, 30)
-    local function wake()
-        if token ~= idleToken then return end
-        idleTimer = nil
-        if safeIdle() then app.React("idle") end
-        app.RestartIdle()
-    end
-    if C_Timer.NewTimer then idleTimer = C_Timer.NewTimer(delay, wake)
-    elseif C_Timer.After then C_Timer.After(delay, wake) end
-end
-
-function app.ObserveTravel(travel)
-    if not states.entered or travel.capacity <= 0 then return end
-    local low = travel.free <= 4
-    if low == states.bagsLow then return end
-    states.bagsLow = low
-    if low then app.React("bags", { free = travel.free })
-    else app.CancelReaction("bags") end
 end
 
 local function retryPouchAt(readyAt)
@@ -164,7 +132,13 @@ end
 
 local function updateZone()
     local zone = zoneName()
-    if app.VisitZone(zone) then app.React("zone", { zone = zone }) end
+    local changed, remembered = app.VisitZone(zone)
+    life.Activity()
+    if changed then
+        app.CancelReaction("zone")
+        app.CancelReaction("repeatedZone")
+        app.React(remembered and "repeatedZone" or "zone", { zone = zone, valid = function() return app.CurrentZone() == zone end })
+    end
 end
 
 local function updateAFK(report)
@@ -174,6 +148,8 @@ local function updateAFK(report)
     previousAFK = value
     app.CancelReaction(value and "back" or "afk")
     app.SetAFKMood(value)
+    life.Activity()
+    life.Update(true)
     if report and changed then app.React(value and "afk" or "back") end
 end
 
@@ -182,22 +158,33 @@ local function death()
     previousDeath = true
     app.SetCompanionReminder("mark")
     app.CancelReaction("revive")
-    local localDeaths, sessionDeaths = app.RememberDeath(zoneName())
+    local localDeaths, sessionDeaths, recentDeaths = app.RememberDeath(zoneName())
     local special = localDeaths and localDeaths >= 2 and "repeatDeath"
         or sessionDeaths and sessionDeaths >= 3 and "sessionDeaths"
-    app.React("death", { special = special })
+    app.React(recentDeaths and recentDeaths >= 3 and "repeatedDeath" or "death", { special = special })
+    life.Update(true)
 end
 
 local function checkAlive()
     if previousDeath and unitState(UnitIsDeadOrGhost) == false then
         previousDeath = false
         app.CancelReaction("death")
+        app.CancelReaction("repeatedDeath")
         app.React("revive")
+        life.Activity()
+        life.Update(true)
         checkWildBuff()
     end
 end
 
 local handlers = {}
+local function greet()
+    if welcome and not app.CompanionDialogueBlocked() then
+        if GetTime() < welcome.untilAt then app.React("login", welcome) end
+        welcome = nil
+    end
+end
+
 handlers.PLAYER_LOGIN = function()
     app.Profile()
     app.ApplyLevelUpSound()
@@ -207,34 +194,52 @@ handlers.PLAYER_LOGIN = function()
     app.BootCompanion()
 end
 handlers.PLAYER_LOGOUT = function()
+    app.SaveCompanionSession()
     if stockSoundMuted and UnmuteSoundFile then
         if pcall(UnmuteSoundFile, stockLevelUpSound) then stockSoundMuted = false end
     end
 end
 handlers.PLAYER_ENTERING_WORLD = function(initial, reloaded)
+    initial, reloaded = readable(initial), readable(reloaded)
     local first = not states.entered
     states.entered = true
+    life.Enter(initial, reloaded)
     if first then
         previousDeath = unitState(UnitIsDeadOrGhost)
         previousLevel = UnitLevel and readable(UnitLevel("player"))
         app.RememberLevel(previousLevel)
         updateAFK(false)
-        app.RestartIdle()
     end
-    if readable(initial) == true and readable(reloaded) ~= true and not states.login then
+    if initial == true and reloaded ~= true and not states.login then
         states.login = true
         local longPause = app.LogArrival(true)
-        app.React("login", { special = longPause and "longPause" or nil })
+        welcome = { special = longPause and "longPause" or nil, untilAt = GetTime() + 120 }
     end
+    greet()
     updateZone()
     app.CheckEvergreenPouch()
     checkWildBuff()
+    app.RefreshDialogue()
+    life.Update(true)
+    life.ObserveBags(app.ReadBagSpace())
+end
+handlers.PLAYER_LEAVING_WORLD = life.Leave
+handlers.LOADING_SCREEN_ENABLED = function()
+    life.Loading(true)
+    life.Update(true)
+end
+handlers.LOADING_SCREEN_DISABLED = function()
+    life.Loading(false)
+    greet()
+    life.Update(true)
+    life.ObserveBags(app.ReadBagSpace())
 end
 handlers.PLAYER_LEVEL_UP = function(level)
     level = readable(level)
     if type(level) ~= "number" or level < 1 or (previousLevel and level <= previousLevel) then return end
     previousLevel = level
     app.RememberLevel(level)
+    life.Activity()
     if app.Profile().levelUpSound then app.PlayLevelUpSound() end
     app.React("level", { level = level })
 end
@@ -256,6 +261,7 @@ handlers.QUEST_TURNED_IN = function(quest)
     end
     recentQuests[#recentQuests + 1] = { id = quest, at = now }
     app.RememberQuest()
+    life.Activity()
     app.React("quest")
 end
 handlers.PLAYER_FLAGS_CHANGED = function(unit)
@@ -265,7 +271,10 @@ handlers.PLAYER_FLAGS_CHANGED = function(unit)
     end
 end
 handlers.UNIT_FLAGS = handlers.PLAYER_FLAGS_CHANGED
-handlers.BAG_UPDATE_DELAYED = app.CheckEvergreenPouch
+handlers.BAG_UPDATE_DELAYED = function()
+    app.CheckEvergreenPouch()
+    life.ObserveBags(app.ReadBagSpace())
+end
 handlers.BAG_UPDATE_COOLDOWN = app.CheckEvergreenPouch
 handlers.ITEM_DATA_LOAD_RESULT = function(id, success)
     if readable(id) == pouch and readable(success) then app.CheckEvergreenPouch() end
@@ -274,16 +283,43 @@ handlers.UNIT_AURA = function(unit)
     if readable(unit) == "player" then checkWildBuff() end
 end
 handlers.SPELLS_CHANGED = checkWildBuff
-handlers.ADDON_RESTRICTION_STATE_CHANGED = checkWildBuff
-handlers.PLAYER_REGEN_DISABLED = app.RefreshDialogue
+handlers.ADDON_RESTRICTION_STATE_CHANGED = function()
+    checkWildBuff()
+    app.RefreshDialogue()
+    life.Update()
+end
+handlers.PLAYER_REGEN_DISABLED = function() life.Combat(true) end
 handlers.PLAYER_REGEN_ENABLED = function()
     app.CheckEvergreenPouch()
     checkWildBuff()
-    app.RefreshDialogue()
+    life.Combat(false)
+    life.ObserveBags(app.ReadBagSpace())
 end
+handlers.MERCHANT_SHOW = function() life.Merchant(true) end
+handlers.MERCHANT_CLOSED = function() life.Merchant(false) end
+handlers.UPDATE_INVENTORY_DURABILITY = function() life.DurabilityChanged(false) end
+handlers.PLAYER_EQUIPMENT_CHANGED = function() life.DurabilityChanged(true) end
+handlers.PLAYER_STARTED_MOVING = life.Activity
+handlers.PLAYER_STOPPED_MOVING = life.Activity
+handlers.UNIT_SPELLCAST_SUCCEEDED = function(unit)
+    if readable(unit) == "player" then life.Activity() end
+end
+handlers.CHAT_MSG_LOOT = function(message) life.Loot(readable(message)) end
+handlers.ENCOUNTER_START = function() life.Encounter(true) end
+handlers.ENCOUNTER_END = function(_, _, _, _, success) life.Encounter(false, readable(success)) end
+handlers.LFG_COMPLETION_REWARD = life.DungeonFinished
+handlers.GROUP_ROSTER_UPDATE = life.RosterChanged
+handlers.READY_CHECK = life.ReadyCheck
+handlers.READY_CHECK_CONFIRM = function(unit, ready) life.ReadyConfirmed(readable(unit), readable(ready)) end
+handlers.READY_CHECK_FINISHED = life.ReadyFinished
 
 local frame = CreateFrame("Frame")
-for event in pairs(handlers) do app.RegisterSupported(frame, event) end
+for event in pairs(handlers) do
+    if event ~= "UNIT_SPELLCAST_SUCCEEDED" or not frame.RegisterUnitEvent
+        or not pcall(frame.RegisterUnitEvent, frame, event, "player") then
+        app.RegisterSupported(frame, event)
+    end
+end
 frame:SetScript("OnEvent", function(_, event, ...)
     local handler = handlers[event]
     if handler then app.SecureCall(event, handler, ...) end
