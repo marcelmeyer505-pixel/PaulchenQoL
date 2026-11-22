@@ -1,7 +1,7 @@
 local _, app = ...
 
 local TTL = 60
-local prices, tsmMisses, observed = {}, {}, {}
+local prices, tsmMisses, minBuyouts, observed = {}, {}, {}, {}
 local cleanAt, scannerIndex = 0, nil
 local tsmAPI, tsmLoaded
 local onChanged
@@ -44,7 +44,7 @@ local function itemKey(link, itemID)
 end
 
 local function invalidate()
-    prices, tsmMisses, observed = {}, {}, {}
+    prices, tsmMisses, minBuyouts, observed = {}, {}, {}, {}
     cleanAt, scannerIndex = 0, nil
 end
 
@@ -88,14 +88,44 @@ local function availableTSM()
     return tsmLoaded and api or nil
 end
 
-local function getTSMPrice(api, link, id, suffix, bonuses)
+local function getTSMPrice(api, source, link, id, suffix, bonuses)
     local itemString = call(api.ToItemString, link or ("item:" .. id))
     if type(itemString) ~= "string" or tonumber(itemString:match("^i:(%d+)")) ~= id then return end
     local variant = itemString:match("^i:%d+:([^:]*)")
     if suffix and (tonumber(variant) or 0) == 0 then return end
     -- Some link formats collapse bonus items to their base or suffix-only TSM key.
     if bonuses and not itemString:match("^i:%d+:[^:]*:[^:]*:.+") then return end
-    return positive(call(api.GetCustomPriceValue, "DBMarket", itemString))
+    return positive(call(api.GetCustomPriceValue, source, itemString))
+end
+
+local function cacheTime()
+    local now = call(GetTime) or 0
+    if now >= cleanAt then
+        for _, cache in ipairs({ prices, minBuyouts }) do
+            for variant, cached in pairs(cache) do
+                if now >= cached.expires then cache[variant] = nil end
+            end
+        end
+        for variant, expires in pairs(tsmMisses) do
+            if now >= expires then tsmMisses[variant] = nil end
+        end
+        scannerIndex, cleanAt = nil, now + TTL
+    end
+    return now
+end
+
+function app.GetTSMMinBuyout(itemLink, itemID)
+    local tsm = app.GetAuctionPriceMode() ~= "scanner" and availableTSM()
+    if not tsm then return end
+    itemLink = app.Readable(itemLink)
+    local key, id, suffix, bonuses = itemKey(itemLink, app.Readable(itemID))
+    if not key then return end
+    local now = cacheTime()
+    local cached = minBuyouts[key]
+    if cached and now < cached.expires then return cached.price end
+    local price = getTSMPrice(tsm, "DBMinBuyout", itemLink, id, suffix, bonuses)
+    minBuyouts[key] = { price = price, expires = now + TTL }
+    return price
 end
 
 local function readScanner()
@@ -148,22 +178,13 @@ function app.GetAuctionPrice(itemLink, itemID)
     local key, id, suffix, bonuses = itemKey(itemLink, app.Readable(itemID))
     if not key then return nil, "NONE" end
     local tsm = app.GetAuctionPriceMode() ~= "scanner" and availableTSM()
-    local now = call(GetTime) or 0
-    if now >= cleanAt then
-        for variant, cached in pairs(prices) do
-            if now >= cached.expires then prices[variant] = nil end
-        end
-        for variant, expires in pairs(tsmMisses) do
-            if now >= expires then tsmMisses[variant] = nil end
-        end
-        scannerIndex, cleanAt = nil, now + TTL
-    end
+    local now = cacheTime()
     local cached = prices[key]
     if cached and now < cached.expires then return cached.price, cached.source, cached.info end
 
     local price
     if tsm and now >= (tsmMisses[key] or 0) then
-        price = getTSMPrice(tsm, itemLink, id, suffix, bonuses)
+        price = getTSMPrice(tsm, "DBMarket", itemLink, id, suffix, bonuses)
         if not price then tsmMisses[key] = now + TTL end
     end
     local source, info, expires = "NONE", nil, now + TTL

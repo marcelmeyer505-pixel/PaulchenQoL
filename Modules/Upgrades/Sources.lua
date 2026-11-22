@@ -606,13 +606,27 @@ function app.GetSources(scan, id, item)
     end
     local offers = item and scan.auctions and scan.auctions[id]
     local offer = offers and offers[key]
-    if offer then
-        list[#list + 1] = { kind = "auction", title = "Sofortkauf", price = offer.price, at = offer.at, effort = 2 }
-    elseif scan.browseItems and scan.browseItems[key] then
-        list[#list + 1] = { kind = "auction", title = "AH-Übersicht", price = scan.browseItems[key].price, effort = 2 }
+    local browse = scan.browseItems and scan.browseItems[key]
+    local tradeable = released and item and item.boe
+    local estimate
+    if item and (tradeable or offer or browse) and suite.GetTSMMinBuyout then
+        estimate = suite.GetTSMMinBuyout(item.link, id)
     end
-    if availability.ItemAllowed(scan, id) and item and item.boe then
+    if offer then
+        list[#list + 1] = {
+            kind = "auction", title = "Sofortkauf", price = offer.price, at = offer.at, tsmPrice = estimate, effort = 2,
+        }
+    elseif browse then
+        list[#list + 1] = {
+            kind = "auction", title = "AH-Übersicht", price = browse.price or estimate,
+            isEstimate = not browse.price and estimate ~= nil, tsmPrice = browse.price and estimate, effort = 2,
+        }
+    end
+    if tradeable then
         local effort = item.quality >= 4 and 7 or item.quality >= 3 and 5 or 3
+        if estimate and not offer and not browse then
+            list[#list + 1] = { kind = "auction", title = "TSM-Schätzpreis", price = estimate, isEstimate = true, effort = effort }
+        end
         list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = "Bestand und Preis unbekannt", effort = effort }
     end
     table.sort(list, function(a, b)

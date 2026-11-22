@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 — 2026-11-22
+
+- Show TSM DBMinBuyout in the upgrade window as a `[PREIS]` estimate. Saved buyout offers and live auction results remain available. The tooltip can show both the actual offer and the TSM estimate.
+
 ## 0.11.0 — 2026-11-22
 
 - Add sortable vendor, market and percentage difference columns to Paulchen's bag and personal bank lists. The market tooltip shows the source, unit price, stack value and scan time when available.

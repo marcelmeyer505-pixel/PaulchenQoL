@@ -104,7 +104,8 @@ local function number(n, places)
 end
 
 local function sourceTitle(source)
-    return app.sourceNames[source.kind] .. " · " .. source.title
+    local tag = source.isEstimate and " · [PREIS] " or " · "
+    return app.sourceNames[source.kind] .. tag .. source.title
 end
 
 local function exportCell(text)
@@ -149,9 +150,17 @@ local function exportReady()
     return #display > 0 and not scan and not waitingForGear and not resultsStale and not scanFailure and not displayFailure
 end
 
-local function auctionPrice(source)
-    if GetCoinTextureString then return GetCoinTextureString(source.price) end
-    return ("%d G %02d S %02d K"):format(math.floor(source.price / 10000), math.floor(source.price / 100) % 100, source.price % 100)
+local function auctionPrice(price)
+    price = math.floor(price + 0.5)
+    if GetCoinTextureString then return GetCoinTextureString(price) end
+    return ("%d G %02d S %02d K"):format(math.floor(price / 10000), math.floor(price / 100) % 100, price % 100)
+end
+
+local function addPriceEstimate(source)
+    local price = source.isEstimate and source.price or source.tsmPrice
+    if not price then return end
+    GameTooltip:AddDoubleLine("[PREIS] TSM-Schätzpreis pro Stück", auctionPrice(price))
+    GameTooltip:AddLine("TSM DBMinBuyout · Verfügbarkeit im Auktionshaus prüfen.", unpack(MUTED))
 end
 
 local function isAuction(source)
@@ -239,10 +248,11 @@ local function tip(row)
     local action, quest = rowAction(entry)
     if isAuction(source) then
         if source.kind == "auction" then
-            if source.price then
-                GameTooltip:AddDoubleLine(source.at and "Sofortkauf pro Stück" or "Preis in der AH-Übersicht", auctionPrice(source))
+            if source.price and not source.isEstimate then
+                GameTooltip:AddDoubleLine(source.at and "Sofortkauf pro Stück" or "Preis in der AH-Übersicht", auctionPrice(source.price))
             end
             if source.at then GameTooltip:AddLine("Erfasst am " .. date("%d.%m. um %H:%M", source.at), unpack(MUTED)) end
+            addPriceEstimate(source)
         else
             GameTooltip:AddLine("BoE", unpack(MUTED))
         end
@@ -258,6 +268,7 @@ local function tip(row)
             text = (text and text .. " · " or "") .. number(s.pct, 1) .. " % Dropchance"
         end
         if text then GameTooltip:AddLine(text, unpack(MUTED)) end
+        addPriceEstimate(s)
     end
     addSource(source)
     for _, alternative in ipairs(item.sources) do
@@ -298,7 +309,7 @@ local function renderRows()
             if color then row.name:SetTextColor(color.r, color.g, color.b) else row.name:SetTextColor(unpack(TEXT)) end
             row.slot:SetText(app.slotNames[item.slot])
             row.source:SetText(sourceTitle(source))
-            row.where:SetText(source.price and auctionPrice(source) or source.zone or source.detail
+            row.where:SetText(source.price and auctionPrice(source.price) or source.zone or source.detail
                 or (source.pct and source.pct > 0 and number(source.pct, 1) .. " % Dropchance") or "")
             row.new:SetText(number(item.new, 2))
             row.delta:SetText("+" .. number(item.delta, 2))
@@ -417,13 +428,8 @@ local function render(reset)
     if instances and type(instance) == "table" and db.slot == 0 and search == "" then
         empty = "Für die aktuelle Instanz sind keine erreichbaren Boss-Upgrades erfasst."
     elseif auctions then
-        if not PaulchenAuktionsscan then
-            empty = "Aktiviere Paulchen Auktionsscan in der Addon-Liste."
-        elseif not current or not current.auctionAt then
-            empty = "Lade Treffer im Auktionshaus und klicke auf „Aktualisieren“. Ein Vollscan ist mit /pah möglich."
-        else
-            empty = "Im gespeicherten AH-Stand gibt es keine Upgrades für diese Filter."
-        end
+        empty = current and current.auctionAt and "Keine AH-Angebote oder TSM-Preise für diese Filter."
+            or "Keine AH-Angebote oder TSM-Preise gefunden. Lade Treffer im AH und klicke auf „Aktualisieren“."
     end
     window.empty:SetText(empty)
     for _, col in ipairs(columns) do

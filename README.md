@@ -1,4 +1,4 @@
-# Paulchen QoL v0.11.0
+# Paulchen QoL v0.11.1
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -33,6 +33,8 @@ Sichere Rüstungs- und Schmuckwertungen einschließlich ihrer Varianten werden p
 Echte Ausrüstungs-, Stufen-, Profil- oder Gewichtungsänderungen erneuern den Vergleichsstand. Neue Itemdaten verwerfen nur die Wertungen des betroffenen Items und seiner Varianten. Fundorte, Queststatus, Taschenbesitz und Auktionsangebote werden bei jedem Check frisch aus den verfügbaren Quellen ermittelt. Verkauftes oder entferntes Inventar bleibt dadurch nicht als Taschenfundort stehen. Die Wiederverwendung ändert keine Stat-Gewichtungen und keine Gegenstandsaktionen.
 
 Der Ausrüstungsvergleich nutzt die Itemwerte des WoW-Clients. Die Suche berücksichtigt deine Taschen, aktive Questbelohnungen, die geladene AH-Übersicht und gespeicherte Auktionsscans. Polestar, AtlasLoot und Forever Dungeon Journal können zusätzliche Fundorte beitragen. Im Reiter **Instanzen** erscheint derselbe Fundort einmal. Wenn AtlasLoot eine Dropchance für den Boss kennt, wird sie übernommen.
+
+Im Quellenfilter **Auktionshaus** zeigt Paulchen für handelbare BoE-Upgrades ohne erfasstes Angebot **[PREIS] TSM-Schätzpreis** an, sofern TSM für die Itemvariante einen `DBMinBuyout` liefert. Der Wert gibt das günstigste Angebot aus dem letzten TSM-Datenstand pro Stück an. Bei einem konkreten Angebot zeigt die Zeile dessen Preis. Falls TSM ebenfalls einen Wert liefert, steht er zusätzlich im Tooltip. Rechtsklick startet die AH-Suche nach dem Item. **Nur Paulchens Scanner** in den Preiseinstellungen schaltet TSM auch hier ab.
 
 **Upgrades → Spielinhalte** speichert die Freigaben pro Charakter. Für den aktuell gemeldeten Serverstand starten Geschmolzener Kern, Onyxia, Pechschwingenhort, Zul'Gurub, beide Ahn'Qiraj-Raids, Naxxramas und weitere Raids ausgeschaltet. UBRS und die normalen Dungeons bleiben verfügbar. Klassische Weltbosse haben einen eigenen Schalter und bleiben zunächst eingeschaltet; ihre Verfügbarkeit wurde nicht bestätigt. Sobald ein Inhalt auf deinem Server öffnet, kannst du ihn hier aktivieren. Die Freigaben werden nicht automatisch aus dem Kalender erkannt; AtlasLoot meldet momentan bereits sämtliche klassischen Phasen als offen.
 
