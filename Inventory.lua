@@ -4,9 +4,10 @@ local inventory = { slots = {}, offset = 0, query = "", searchCollapsed = {}, ca
 local bank = { slots = {}, offset = 0, query = "", searchCollapsed = {}, categoryHeaders = {}, isBank = true }
 app.inventory = inventory
 inventory.bank = bank
-local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor
+local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor, bankDock
 local layout, refreshView, openBank, transferCategory, transfer
 local rowHeight, rowCount = 32, 14
+local windowWidth, windowHeight, windowGap, screenMargin = 718, 678, 14, 12
 local builtinMarkCount = #app.markOrder
 local clearMarkLabel = "Ohne Markierung"
 local itemCategories = {
@@ -409,6 +410,7 @@ local function showMarkMenu(row)
     markMenu.ownerRow, markMenu.item = row, row.item
     markMenu.title:SetText(row.item.name)
     markMenu:SetFrameLevel(row.view.window:GetFrameLevel() + 20)
+    markMenu:SetScale(row.view.window:GetScale())
     markMenu.list.Select(app.Settings().marks[row.item.markKey], true)
     markMenu:SetSize(238, 38 + markMenu.list:GetHeight())
     markMenu:ClearAllPoints()
@@ -1019,37 +1021,103 @@ transferCategory = function(view, key)
     if state.total == 0 then return end
     transfer = state
     showTransferProgress(state)
-    categorize(view, view.filtered)
-    layout(view)
+    for _, panel in ipairs({ inventory, bank }) do
+        for _, header in pairs(panel.categoryHeaders) do header.transferButton:SetEnabled(false) end
+    end
     stepTransfer(state)
+end
+local function visibleBankFrame()
+    local frames = Bagnon and Bagnon.Frames
+    local bagnonBank = frames and frames.Get and frames:Get("bank")
+    if bagnonBank and bagnonBank:IsVisible() then return bagnonBank end
+    if BankFrame and BankFrame:IsVisible() then return BankFrame end
+end
+local function positionWindow(view)
+    local frame, position = view.window, view.settings
+    frame:ClearAllPoints()
+    frame:SetScale(1)
+    if type(position.x) == "number" and type(position.y) == "number" then
+        frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", position.x, position.y)
+    else
+        local native = view.isBank and visibleBankFrame()
+        if native then frame:SetPoint("TOPLEFT", native, "TOPLEFT")
+        else frame:SetPoint("CENTER") end
+    end
+end
+local function arrangeBankPair()
+    local width = windowWidth * 2 + windowGap
+    local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
+    local scale = math.min(1, (screenWidth - 2 * screenMargin) / width,
+        (screenHeight - 2 * screenMargin) / windowHeight)
+    if scale <= 0 then return end
+    if not bankDock then
+        bankDock = CreateFrame("Frame", nil, UIParent)
+        bankDock:SetSize(width, windowHeight)
+        bankDock:SetMovable(true)
+        bankDock:SetClampedToScreen(true)
+    end
+    bankDock:SetScale(scale)
+    bankDock:ClearAllPoints()
+    local halfWidth, halfHeight = width * scale / 2, windowHeight * scale / 2
+    local x, y = bank.settings.pairX, bank.settings.pairY
+    if type(x) ~= "number" or type(y) ~= "number" then
+        x, y = screenWidth / 2, screenHeight / 2
+        local native = visibleBankFrame()
+        local left, top = native and readable(native:GetLeft()), native and readable(native:GetTop())
+        if left and top then
+            local ratio = native:GetEffectiveScale() / UIParent:GetEffectiveScale()
+            x, y = left * ratio + halfWidth, top * ratio - halfHeight
+        end
+    end
+    x = math.max(halfWidth + screenMargin, math.min(x, screenWidth - halfWidth - screenMargin))
+    y = math.max(halfHeight + screenMargin, math.min(y, screenHeight - halfHeight - screenMargin))
+    bankDock:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    bankDock:Show()
+    bank.window:ClearAllPoints()
+    bank.window:SetScale(scale)
+    bank.window:SetPoint("TOPLEFT", bankDock, "TOPLEFT")
+    window:ClearAllPoints()
+    window:SetScale(scale)
+    window:SetPoint("TOPRIGHT", bankDock, "TOPRIGHT")
+    bank.paired = true
+end
+local function updateBankNavigation()
+    if not bank.window then return end
+    local available = canBank()
+    window.bankTab:SetShown(available and not bank.window:IsShown())
+    bank.window.bagTab:SetShown(available and not window:IsShown())
 end
 local function createWindow(view)
     local isBank, settings = view.isBank, view.settings
     local f = CreateFrame("Frame", isBank and "PaulchenQoLBank" or "PaulchenQoLInventory", UIParent, "BackdropTemplate")
     view.window = f
     if not isBank then window = f end
-    f:SetSize(718, 678)
+    f:SetSize(windowWidth, windowHeight)
     f:SetFrameStrata(isBank and "DIALOG" or "HIGH")
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     style.Panel(f, style.background)
-    if type(settings.x) == "number" and type(settings.y) == "number" then
-        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", settings.x, settings.y)
-    else
-        local native = isBank and BankFrame
-        local frames = isBank and Bagnon and Bagnon.Frames
-        local bagnonBank = frames and frames.Get and frames:Get("bank")
-        if bagnonBank and bagnonBank:IsVisible() then native = bagnonBank end
-        if native and native:IsVisible() then f:SetPoint("TOPLEFT", native, "TOPLEFT")
-        else f:SetPoint("CENTER") end
-    end
+    positionWindow(view)
     local title = CreateFrame("Frame", nil, f)
     title:SetPoint("TOPLEFT"); title:SetSize(420, 42)
     title:EnableMouse(true); title:RegisterForDrag("LeftButton")
-    title:SetScript("OnDragStart", function() f:StartMoving() end)
+    local moving
+    title:SetScript("OnDragStart", function()
+        moving = bank.paired and bankDock or f
+        moving:StartMoving()
+    end)
     title:SetScript("OnDragStop", function()
-        f:StopMovingOrSizing(); settings.x, settings.y = f:GetCenter()
+        if not moving then return end
+        moving:StopMovingOrSizing()
+        local x, y = moving:GetCenter()
+        if x and y then
+            if moving == bankDock then
+                local scale = moving:GetScale()
+                bank.settings.pairX, bank.settings.pairY = x * scale, y * scale
+            else settings.x, settings.y = x, y end
+        end
+        moving = nil
     end)
     style.Label(title, isBank and "Paulchens Bank" or "Paulchens Taschen", 18, -9, 390, 28, "GameFontNormalLarge", style.gold)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -1140,10 +1208,14 @@ local function createWindow(view)
     if bank.transferMessage then f.transferStatus:SetText(bank.transferMessage) end
     style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
     f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
-    f:SetScript("OnShow", function() refreshView(view) end)
+    f:SetScript("OnShow", function()
+        refreshView(view)
+        updateBankNavigation()
+    end)
     f:SetScript("OnHide", function()
         if markMenu and markMenu:IsShown() and markMenu.ownerRow.view == view then markMenu:Hide() end
         if not isBank and categoryEditor then categoryEditor:Hide() end
+        updateBankNavigation()
     end)
     f:Hide()
     UISpecialFrames[#UISpecialFrames + 1] = f:GetName()
@@ -1158,12 +1230,15 @@ openBank = function()
     if not canBank() then return end
     pendingAction = nil
     if not bank.window then createWindow(bank) end
-    window:Hide()
+    arrangeBankPair()
+    if settings.enabled then
+        hideOtherBags()
+        if window:IsShown() then refreshView(inventory) else window:Show() end
+    end
     if bank.window:IsShown() then refreshView(bank) else bank.window:Show() end
 end
 function inventory.Open()
     if not window then return end
-    if bank.window then bank.window:Hide() end
     hideOtherBags()
     if window:IsShown() then refreshView(inventory) else window:Show() end
 end
@@ -1190,7 +1265,7 @@ local function request(action)
         if not settings.enabled or not nextAction then return end
         if nextAction == "close" then if window then window:Hide() end
         elseif nextAction == "toggle" then hideOtherBags(); inventory.Toggle()
-        elseif not (bank.window and bank.window:IsShown()) then inventory.Open() end
+        else inventory.Open() end
     end)
 end
 local function initializeViewSettings(view, config)
@@ -1205,7 +1280,8 @@ end
 local events = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_LOGIN", "BAG_UPDATE_DELAYED", "BAG_UPDATE_COOLDOWN", "ITEM_LOCK_CHANGED",
     "GET_ITEM_INFO_RECEIVED", "QUEST_LOG_UPDATE", "PLAYER_MONEY", "PLAYER_REGEN_ENABLED", "MERCHANT_SHOW", "MERCHANT_CLOSED",
-    "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BANK_TABS_CHANGED", "PLAYERBANKSLOTS_CHANGED" }) do
+    "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BANK_TABS_CHANGED", "PLAYERBANKSLOTS_CHANGED",
+    "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED" }) do
     app.RegisterSupported(events, event)
 end
 events:SetScript("OnEvent", function(_, event)
@@ -1243,21 +1319,32 @@ events:SetScript("OnEvent", function(_, event)
         return
     end
     if not window then return end
+    if event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
+        if bank.paired then arrangeBankPair() end
+        return
+    end
     if event == "BANKFRAME_OPENED" then
         if bank.atBank then return end
         bank.atBank = true
+        bank.bagsWereShown = window:IsShown()
         bank.transferMessage = nil
         transferMessage()
         C_Timer.After(0, function()
-            window.bankTab:SetShown(canBank())
             openBank()
         end)
         return
     elseif event == "BANKFRAME_CLOSED" then
         bank.atBank = false
         if transfer then finishTransfer(transfer, "Bank geschlossen") end
-        window.bankTab:Hide()
         if bank.window then bank.window:Hide() end
+        if bank.paired then
+            bank.paired = false
+            bankDock:StopMovingOrSizing()
+            bankDock:Hide()
+            if not bank.bagsWereShown then window:Hide() end
+            positionWindow(inventory)
+        end
+        updateBankNavigation()
     end
     if (not window:IsShown() and not (bank.window and bank.window:IsShown())) or refreshQueued then return end
     refreshQueued = true

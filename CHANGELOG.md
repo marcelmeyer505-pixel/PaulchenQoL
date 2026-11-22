@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.2 — 2026-11-22
+
+- Show the personal bank and bag lists side by side at the banker. Move the panes together, fit them to the screen and restore the regular bag position after closing the bank.
+
 ## 0.10.1 — 2026-11-22
 
 - Withdraw an entire category from the personal bank into your bags. Fill compatible stacks first and report how many items moved or stayed in the bank.

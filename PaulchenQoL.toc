@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Paulchen QoL
 ## Notes: Begleiter, Logbuch, Upgrades, Auktionsscan und Questabgaben
-## Version: 0.10.1
+## Version: 0.10.2
 ## SavedVariables: PaulchenQoLSettings, PaulchenQoLAuctionDB
 ## SavedVariablesPerCharacter: PaulchenQoLDB, PaulchenQoLTimelineDB, PaulchenQoLUpgradesDB
 ## OptionalDeps: Details, Polestar, AtlasLootClassic, ForeverDungeonJournal, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan, Bagnon, BagBrother
