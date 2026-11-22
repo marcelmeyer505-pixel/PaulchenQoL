@@ -46,6 +46,7 @@ local sources = {
     { "all", "Alle Quellen" }, { "bag", "Eigene Taschen" }, { "quest", "Quests" }, { "boe", "BoE / Handel" },
     { "dungeon", "Instanzen" }, { "raid", "Raids" }, { "drop", "Sonstige Drops" }, { "vendor", "Händler" },
     { "undermine", app.sourceNames.undermine },
+    { "pvp", app.sourceNames.pvp },
     { "craft", "Herstellung" },
     { "auction", "Auktionshaus" },
 }
@@ -431,6 +432,8 @@ local function render(reset)
     elseif auctions then
         empty = current and current.auctionAt and "Keine AH-Angebote oder TSM-Preise für diese Filter."
             or "Keine AH-Angebote oder TSM-Preise gefunden. Lade Treffer im AH und klicke auf „Aktualisieren“."
+    elseif not instances and db.source == "pvp" and not app.content.Snapshot().pvp then
+        empty = "Aktiviere „PvP-Händler“ unter Spielinhalte und klicke auf „Aktualisieren“."
     end
     window.empty:SetText(empty)
     for _, col in ipairs(columns) do

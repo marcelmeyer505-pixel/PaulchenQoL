@@ -369,6 +369,7 @@ content.quests[9270] = "aq40"
 content.quests[9271] = "aq40"
 
 content.choices = {
+    { "pvp", "PvP-Händler" },
     { "mc", "Geschmolzener Kern" }, { "onyxia", "Onyxias Hort" },
     { "bwl", "Pechschwingenhort" }, { "zg", "Zul'Gurub / Stamm der Zandalar" },
     { "aq20", "Ruinen von Ahn'Qiraj (20)" }, { "aq40", "Tempel von Ahn'Qiraj / Brut Nozdormus" },

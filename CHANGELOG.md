@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.3 — 2026-11-22
+
+- Add an opt-in PvP vendor setting under Game Content and a dedicated upgrade source filter for recognized Honor and battleground sellers.
+
 ## 0.11.2 — 2026-11-22
 
 - Add an Undermine Real source filter for upgrade items sold by Pix Xizzix.

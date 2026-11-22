@@ -5,9 +5,17 @@ local pole = Polestar
 local availability = app.content
 local moduleName = "AtlasLootClassic_DungeonsAndRaids"
 local pixXizzix = 227853
+-- Honor and battleground sellers can also be listed as ordinary vendors in the Codex.
+local pvpVendors = {
+    [12777] = true, [12781] = true, [12782] = true, [12784] = true, [12785] = true, [12792] = true,
+    [12795] = true, [12799] = true, [12805] = true, [14581] = true,
+    [12096] = true, [12097] = true, [13216] = true, [13217] = true, [13218] = true, [13219] = true,
+    [14753] = true, [14754] = true, [15126] = true, [15127] = true, [263569] = true, [263570] = true,
+}
 local sourceNames = {
     quest = "Quest", boe = "BoE", dungeon = "Instanz", raid = "Raid", drop = "Drop", vendor = "Händler",
     craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen", undermine = "Undermine Real",
+    pvp = "PvP-Händler",
 }
 app.sourceNames = sourceNames
 
@@ -476,13 +484,14 @@ local function futureCodexSource(scan, route, item)
         local npc = raw.npc and pole.Codex.Npc and pole.Codex.Npc(raw.npc)
         return math.max(raw.minLevel or 0, npc and npc.level or 0) <= scan.level + 5
     end
-    if (route.type ~= "vendor" and route.type ~= "gift") or not item then return false end
+    local purchase = route.type == "vendor" or route.type == "pvp"
+    if not item or (not purchase and route.type ~= "gift") then return false end
     local faction, standing
     if pole.Lookup.PurchaseRep then
-        faction, standing = pole.Lookup.PurchaseRep(item, raw.npc, route.type == "vendor")
+        faction, standing = pole.Lookup.PurchaseRep(item, raw.npc, purchase)
     end
     if faction and (pole.Compat.GetFactionStanding(faction) or 4) < standing then return false end
-    return route.type ~= "vendor" or not item.reqSkill or not item.reqSkillRank
+    return not purchase or not item.reqSkill or not item.reqSkillRank
         or (pole.Compat.GetSkillRank(item.reqSkill) or 0) >= item.reqSkillRank
 end
 
@@ -537,12 +546,18 @@ local function addCodexSources(scan, id, list, quests, drops, crafts, restricted
         app.RecordIssue(scan, id, routes)
         return
     end
-    local vendors = {}
+    local vendors, pvpSellers = {}, {}
+    local pvpEnabled = scan.content and scan.content.pvp
+    for _, route in ipairs(routes) do
+        if route.type == "pvp" and route.src and route.src.npc then pvpSellers[route.src.npc] = true end
+    end
     for _, route in ipairs(routes) do
         local raw = route.src
+        local pvp = route.type == "pvp" or raw and route.type == "vendor"
+            and (pvpVendors[raw.npc] or pvpSellers[raw.npc])
         if raw and route.type == "craft" and not restricted then
             addCraft(scan, list, crafts, raw.skillLine, raw.skill, raw.spell)
-        elseif raw and (route.available or futureCodexSource(scan, route, item)) then
+        elseif raw and (not pvp or pvpEnabled) and (route.available or futureCodexSource(scan, route, item)) then
             if route.type == "quest" and raw.quest and not restricted then
                 addQuest(scan, list, quests, raw.quest)
             elseif route.type == "drop" or route.type == "world" then
@@ -552,18 +567,24 @@ local function addCodexSources(scan, id, list, quests, drops, crafts, restricted
                 if not restricted or location and not availability.LocationGroup(location) then
                     addDrop(scan, list, drops, location, title, route.chance, route.zone)
                 end
-            elseif not restricted and (route.type == "vendor" or route.type == "gift") then
+            elseif not restricted and (pvp and raw.npc or route.type == "vendor" or route.type == "gift") then
                 local undermine = route.type == "vendor" and raw.npc == pixXizzix
-                local key = undermine and "undermine" or raw.npc or route.label
-                if not vendors[key] then
-                    vendors[key] = true
-                    local price = type(route.price) == "number" and route.price or nil
-                    local effort = raw.limited and 4 or price and price >= 100000 and 3 or 2
-                    list[#list + 1] = {
-                        kind = undermine and "undermine" or "vendor", title = route.label, zone = route.zone, effort = effort,
+                local kind = pvp and "pvp" or undermine and "undermine" or "vendor"
+                local key = kind .. ":" .. tostring(raw.npc or route.label)
+                local rank = pvp and type(raw.rank) == "number" and raw.rank > 0 and ("PvP-Rang " .. raw.rank) or nil
+                local existing = vendors[key]
+                if existing then
+                    if rank then existing.detail = rank end
+                else
+                    local price = not pvp and type(route.price) == "number" and route.price or nil
+                    local effort = pvp and 7 or raw.limited and 4 or price and price >= 100000 and 3 or 2
+                    local source = {
+                        kind = kind, title = route.label, zone = route.zone, effort = effort,
                         detail = price and price > 0 and GetCoinTextureString and GetCoinTextureString(price)
-                            or (raw.limited and "Begrenzter Vorrat") or nil,
+                            or rank or (raw.limited and "Begrenzter Vorrat") or nil,
                     }
+                    vendors[key] = source
+                    list[#list + 1] = source
                 end
             end
         end

@@ -1,4 +1,4 @@
-# Paulchen QoL v0.11.2
+# Paulchen QoL v0.11.3
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -37,6 +37,8 @@ Der Ausrüstungsvergleich nutzt die Itemwerte des WoW-Clients. Die Suche berück
 Im Quellenfilter **Auktionshaus** zeigt Paulchen für handelbare BoE-Upgrades ohne erfasstes Angebot **[PREIS] TSM-Schätzpreis** an, sofern TSM für die Itemvariante einen `DBMinBuyout` liefert. Der Wert gibt das günstigste Angebot aus dem letzten TSM-Datenstand pro Stück an. Bei einem konkreten Angebot zeigt die Zeile dessen Preis. Falls TSM ebenfalls einen Wert liefert, steht er zusätzlich im Tooltip. Rechtsklick startet die AH-Suche nach dem Item. **Nur Paulchens Scanner** in den Preiseinstellungen schaltet TSM auch hier ab.
 
 Der Quellenfilter **Undermine Real** zeigt verfügbare Upgrades vom Händler Pix Xizzix in Beutebucht, die der optionale Polestar-Codex als Händlerquelle meldet.
+
+Unter **Spielinhalte** kannst du **PvP-Händler** pro Charakter freischalten. Der Haken ist anfangs aus und gilt beim nächsten Klick auf **Aktualisieren**. Mit dem Quellenfilter **PvP-Händler** siehst du anschließend die vom Polestar-Codex erfassten Ehren- und Schlachtfeldhändler. Ein bekannter PvP-Rang steht beim Fundort im Tooltip.
 
 **Upgrades → Spielinhalte** speichert die Freigaben pro Charakter. Für den aktuell gemeldeten Serverstand starten Geschmolzener Kern, Onyxia, Pechschwingenhort, Zul'Gurub, beide Ahn'Qiraj-Raids, Naxxramas und weitere Raids ausgeschaltet. UBRS und die normalen Dungeons bleiben verfügbar. Klassische Weltbosse haben einen eigenen Schalter und bleiben zunächst eingeschaltet; ihre Verfügbarkeit wurde nicht bestätigt. Sobald ein Inhalt auf deinem Server öffnet, kannst du ihn hier aktivieren. Die Freigaben werden nicht automatisch aus dem Kalender erkannt; AtlasLoot meldet momentan bereits sämtliche klassischen Phasen als offen.
 
