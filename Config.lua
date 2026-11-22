@@ -165,6 +165,9 @@ local function createWindow()
     button(f, "Buffwächter einstellen", 252, -348, 210):SetScript("OnClick", function()
         if app.buffCheck then app.buffCheck.OpenConfig() end
     end)
+    button(f, "Taschen / Preise", 18, -368, 180):SetScript("OnClick", function()
+        if app.inventory then app.inventory.OpenPriceSettings() end
+    end)
     button(f, "Position zurücksetzen", 18, -392, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
     button(f, "Testkommentar", 252, -392, 210):SetScript("OnClick", function() app.TestComment() end)
     label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -425)

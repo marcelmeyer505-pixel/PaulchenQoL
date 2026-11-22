@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 — 2026-11-22
+
+- Add sortable vendor, market and percentage difference columns to Paulchen's bag and personal bank lists. The market tooltip shows the source, unit price, stack value and scan time when available.
+- Use TradeSkillMaster DBMarket through its optional public addon API. Fall back to matching buyout offers recorded by Paulchen's auction scanner.
+- Choose a price source and check its status under Bag / Prices. Cache prices by item variant and share the cache between bags and bank.
+
 ## 0.10.3 — 2026-11-22
 
 - Drag a whole category between the bag and personal bank lists. The receiving pane highlights as a drop target and uses the same transfer rules as the deposit and withdraw buttons.

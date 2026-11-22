@@ -1,4 +1,4 @@
-# Paulchen QoL v0.10.3
+# Paulchen QoL v0.11.0
 
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
@@ -79,7 +79,11 @@ Unten stehen die Vormerkungen für **Behalten** (einschließlich Tank- und DPS-A
 
 ## Taschen als Liste
 
-Die normale Taschentaste öffnet **Paulchens Taschen**: eine verschiebbare Liste aller mitgeführten Gegenstände. Gleiche Gegenstandsvarianten erscheinen zusammen in einer Zeile mit Gesamtanzahl und addiertem Händlerwert. Beispielsweise werden 20 und 11 Runenstoff als 31 Runenstoff angezeigt. Unterschiedliche Verzauberungen, Sockel, Zufallsattribute und Bonusvarianten bleiben getrennt. Die Suche findet Namen, Gegenstandsarten und Item-IDs. Klicke auf **Gegenstand**, **Anzahl**, **Qualität**, **Händler / Gesamt** oder **Tasche**, um auf- oder absteigend zu sortieren. Die Sortierung betrifft nur die Anzeige und bleibt pro Charakter gespeichert.
+Die normale Taschentaste öffnet **Paulchens Taschen**, eine verschiebbare Liste aller mitgeführten Gegenstände. Gleiche Gegenstandsvarianten erscheinen zusammen in einer Zeile mit Gesamtanzahl und addiertem Händlerwert. Beispielsweise werden 20 und 11 Runenstoff als 31 Runenstoff angezeigt. Unterschiedliche Verzauberungen, Sockel, Zufallsattribute und Bonusvarianten bleiben getrennt. Die Suche findet Namen, Gegenstandsarten und Item-IDs. Klicke auf **Gegenstand**, **Anzahl**, **Händler**, **Marktwert** oder **Differenz**, um auf- oder absteigend zu sortieren. Die Sortierung betrifft nur die Anzeige und bleibt pro Charakter gespeichert.
+
+Taschen und Bank zeigen den Marktwert des gesamten Stapels und die prozentuale Abweichung zum Händlerwert. Positive Abweichungen sind grün, negative rot. Fehlt ein AH-Preis oder ist der Händlerwert null, erscheint die Differenz als grauer Strich. Beim Überfahren des Marktwerts siehst du Stück- und Gesamtpreise, die Quelle und bei Scannerpreisen den Scanzeitpunkt. Der Vergleich zeigt Bruttowerte vor Auktionsgebühren. Der tatsächliche Verkaufserlös kann abweichen.
+
+Unter **Taschen / Preise** in den Einstellungen oder über **Preise** in Taschen und Bank wählst du die Quelle. **Automatisch** und **TradeSkillMaster bevorzugen** verwenden zuerst TSMs DBMarket, wenn die optionale Erweiterung geladen ist und einen gültigen Wert meldet. Andernfalls zeigt Paulchen passende gespeicherte Sofortkaufangebote aus seinem Scanner. Dieser erfasst Ausrüstung. **Nur Paulchens Scanner** schaltet TSM als Preisquelle ab. Das Fenster zeigt den Quellenstatus und bietet **Preise neu abfragen**. Preise werden pro Variante bis zu 60 Sekunden zwischengespeichert. [TSM-Dokumentation zu DBMarket](https://support.tradeskillmaster.com/en_US/custom-strings/which-price-sources-can-i-use-and-what-do-they-mean)
 
 **Questitems ausblenden** ist anfangs angehakt. Entferne den Haken, um Questgegenstände wieder in der Liste zu sehen. Die Auswahl bleibt pro Charakter gespeichert und gilt auch bei der Suche. Die Anzeige freier Taschenplätze berücksichtigt weiterhin alle belegten Plätze.
 
@@ -183,3 +187,5 @@ Bei einem `/reload` bleibt die Sitzung mit ihrem Todeszähler erhalten. Der näc
 ## Tests
 
 Geprüft wurden die Lua-5.1-Syntax, die Datenübernahme und Modulzugänge mit simulierten WoW-Events, die bisherigen QoL-, DTL-, Upgrade- und Auktionsabläufe und der laufende Crit-Import aus einem Testprotokoll. Die Integration im Forever-Client lässt sich nach einem vollständigen Neustart prüfen.
+
+`python tests/test_auction_prices.py` prüft die Preisquellen, Cache-Ablauf, spätes Laden der TSM-API, ungültige Preise, Gegenstandsvarianten und simulierte Neuladungen mit Lua 5.1 (Lupa). Für den Clienttest mit TSM einen bekannten DBMarket-Artikel und in **Nur Paulchens Scanner** ein passendes gescanntes Ausrüstungsteil in Taschen und Bank vergleichen. Händler- und Marktwert müssen jeweils zur Stückzahl passen. Beim Bankier beide Listen öffnen, nach **Marktwert** und **Differenz** sortieren und einen Kategorien-Transfer prüfen. Anschließend bei deaktiviertem TSM neu laden und den Ersatzpreis sowie die gespeicherte Einstellung prüfen.

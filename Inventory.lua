@@ -6,6 +6,7 @@ app.inventory = inventory
 inventory.bank = bank
 local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor, bankDock
 local layout, refreshView, openBank, transferCategory, transfer, draggedCategory
+local priceSettings, pricesPending, queuePriceRefresh
 local rowHeight, rowCount = 32, 14
 local windowWidth, windowHeight, windowGap, screenMargin = 718, 678, 14, 12
 local builtinMarkCount = #app.markOrder
@@ -18,10 +19,12 @@ local itemCategories = {
 }
 local categories, categoryNames = {}, {}
 local columns = {
-    { "name", "Gegenstand", 52, 268 }, { "count", "Anzahl", 324, 54 },
-    { "quality", "Qualität", 382, 92 }, { "value", "Händler / Gesamt", 478, 128 },
-    { "bag", "Tasche", 610, 76 },
+    { "name", "Gegenstand", 52, 248 }, { "count", "Anzahl", 302, 57 },
+    { "value", "Händler", 361, 110 }, { "market", "Marktwert", 473, 120 },
+    { "difference", "Differenz", 595, 91 },
 }
+local priceColumn = columns[4]
+local negativePriceColor = { 1, 0.38, 0.39 }
 local function lastBag() return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4 end
 local function combat() return InCombatLockdown and InCombatLockdown() end
 local function characterBankType() return Enum and Enum.BankType and Enum.BankType.Character end
@@ -185,6 +188,38 @@ local function money(value)
         :format(math.floor(value / 10000), math.floor(value / 100) % 100, value % 100)
 end
 inventory.MoneyText = money
+local function marketMoney(value)
+    return value and money(math.floor(value + 0.5)) or "–"
+end
+local function differenceText(value)
+    if not value then return "–" end
+    if math.abs(value) < 0.05 then return "0,0 %" end
+    return ("%+.1f %%"):format(value):gsub("%.", ",")
+end
+local function showPriceTooltip(row)
+    local item = row.item
+    if not item or not item.id then return end
+    local tsm = item.marketSource == "TSM_DBMarket"
+    local scanner = item.marketSource == "PAULCHEN_SCAN"
+    GameTooltip:SetOwner(row.marketCell, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(item.name, unpack(style.gold))
+    local source = tsm and "TradeSkillMaster (DBMarket)"
+        or scanner and "Paulchens Scanner (Sofortkauf)" or "Kein AH-Preis verfügbar"
+    GameTooltip:AddLine("Preisquelle: " .. source, unpack(style.cream))
+    local at = item.marketInfo and item.marketInfo.at
+    if scanner and at and date then
+        local ok, stamp = pcall(date, "%d.%m.%Y %H:%M", at)
+        if ok then GameTooltip:AddLine("Scan vom " .. stamp, unpack(style.muted)) end
+    end
+    GameTooltip:AddDoubleLine(tsm and "TSM-Marktwert pro Stück" or "AH-Wert pro Stück", marketMoney(item.marketUnit))
+    GameTooltip:AddDoubleLine(("AH-Wert gesamt (%d Stück)"):format(item.count), marketMoney(item.market))
+    GameTooltip:AddDoubleLine("Händlerwert pro Stück", money(item.vendorUnit))
+    GameTooltip:AddDoubleLine("Händlerwert gesamt", money(item.value))
+    GameTooltip:AddDoubleLine("Differenz zum Händler", differenceText(item.difference))
+    GameTooltip:AddLine("Geschätzter Verkaufserlös vor Auktionsgebühren. Der tatsächliche Erlös kann abweichen.",
+        style.muted[1], style.muted[2], style.muted[3], true)
+    GameTooltip:Show()
+end
 local function groupKey(id, link)
     local payload = link and (link:match("|Hitem:([^|]+)|h") or link:match("^item:(.*)$"))
     if not payload then return tostring(id) end
@@ -272,6 +307,7 @@ local function cancelTransferDrag()
     draggedCategory.source.window:SetScript("OnUpdate", nil)
     draggedCategory.destination.window.dropOverlay:Hide()
     draggedCategory = nil
+    if pricesPending then queuePriceRefresh() end
 end
 local function finishTransferDrag()
     local drag = draggedCategory
@@ -678,8 +714,22 @@ local function createSlot(view, bag, slot)
     row.labels = {}
     for _, col in ipairs(columns) do
         row.labels[col[1]] = style.Label(row, "", col[3] - 14, 0, col[4] - 6, rowHeight - 1,
-            "GameFontHighlightSmall", style.cream, col[1] == "count" and "RIGHT" or "LEFT")
+            "GameFontHighlightSmall", style.cream, col[1] == "name" and "LEFT" or "RIGHT")
     end
+    local marketCell = CreateFrame("Button", nil, row)
+    row.marketCell = marketCell
+    marketCell:SetPoint("TOPLEFT", priceColumn[3] - 14, 0)
+    marketCell:SetSize(priceColumn[4] - 4, rowHeight - 1)
+    marketCell:RegisterForClicks("RightButtonUp")
+    marketCell:SetScript("OnEnter", function() showPriceTooltip(row) end)
+    local function hidePriceTooltip()
+        if GameTooltip:IsOwned(marketCell) then GameTooltip:Hide() end
+    end
+    marketCell:SetScript("OnLeave", hidePriceTooltip)
+    marketCell:SetScript("OnHide", hidePriceTooltip)
+    marketCell:SetScript("OnClick", function()
+        if row.item and row.item.markKey then showMarkMenu(row) end
+    end)
     row.button:HookScript("OnEnter", function() groupTooltip(row) end)
     row.button.UpdateTooltip = function(self) self:OnUpdate(); groupTooltip(row) end
     row:SetScript("OnEnter", function() row.button:OnEnter(); groupTooltip(row) end)
@@ -712,7 +762,8 @@ local function readSlot(row, marks)
     row.item = {
         id = id, name = name or (id and "Gegenstand " .. id or "Freier Platz"), count = count,
         quality = quality or (info and readable(info.quality)) or 0,
-        value = price and price * count, category = category or "", subcategory = subcategory or "", classID = classID,
+        value = price and price * count, vendorUnit = price,
+        category = category or "", subcategory = subcategory or "", classID = classID,
         bag = row.bag, slot = row.slot, link = link,
         key = groupKey(id, link), locked = info and readable(info.isLocked),
         markKey = markKey, mark = marks[markKey],
@@ -737,10 +788,6 @@ local function readSlot(row, marks)
     row.labels.name:SetText(row.item.name .. suffix)
     local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[row.item.quality]
     row.labels.name:SetTextColor(unpack(id and color and {color.r, color.g, color.b} or style.muted))
-    row.labels.count:SetText(id and count or "–")
-    row.labels.quality:SetText(id and (_G["ITEM_QUALITY" .. row.item.quality .. "_DESC"] or row.item.quality) or "–")
-    row.labels.value:SetText(id and money(row.item.value) or "–")
-    row.labels.bag:SetText(slotText(row))
 end
 function inventory.Compare(a, b, viewSettings)
     viewSettings = viewSettings or settings
@@ -749,7 +796,7 @@ function inventory.Compare(a, b, viewSettings)
     local key = viewSettings.sort
     local av, bv = x[key], y[key]
     if key == "name" then av, bv = lower(av), lower(bv) end
-    -- Uncached merchant values always come last, including descending order.
+    -- Missing values always come last, including descending order.
     if av == nil or bv == nil then
         if av ~= bv then return av ~= nil end
     elseif av ~= bv then
@@ -872,6 +919,18 @@ local function categorize(view, rows)
     view.displayRows = display
     updateTransferControls(view)
 end
+local function updatePrices(row)
+    local item = row.item
+    item.marketUnit, item.marketSource, item.marketInfo = app.GetAuctionPrice(item.link, item.id)
+    item.market = item.marketUnit and item.marketUnit * item.count
+    item.difference = item.market and item.value and item.value > 0 and (item.market / item.value - 1) * 100 or nil
+    item.vendorUnit = item.value and item.value / item.count
+    local diff = item.difference
+    row.labels.market:SetText(marketMoney(item.market))
+    row.labels.market:SetTextColor(unpack(item.market and style.cream or style.muted))
+    row.labels.difference:SetText(differenceText(diff))
+    row.labels.difference:SetTextColor(unpack(diff and (diff > 0 and style.green or diff < 0 and negativePriceColor) or style.muted))
+end
 refreshView = function(view)
     if not view.window or not view.window:IsShown() or (view.isBank and not canBank()) then return end
     updateMoney(view)
@@ -917,10 +976,12 @@ refreshView = function(view)
         row.item, row.group = group.item, group
         row.labels.count:SetText(row.item.count)
         row.labels.value:SetText(money(row.item.value))
-        row.labels.bag:SetText(#group.members > 1 and (#group.members .. " Stapel")
-            or slotText(row))
         SetItemButtonCount(row.button, row.item.count > 1 and row.item.count or 0)
-        if inventory.Matches(row.item, view) then filtered[#filtered + 1] = row end
+        if inventory.Matches(row.item, view) then
+            updatePrices(row)
+            filtered[#filtered + 1] = row
+            if GameTooltip:IsOwned(row.marketCell) then showPriceTooltip(row) end
+        end
     end
     view.groupsBySlot = bySlot
     table.sort(filtered, function(a, b) return inventory.Compare(a, b, view.settings) end)
@@ -931,6 +992,60 @@ end
 function inventory.Refresh()
     refreshView(inventory)
     refreshView(bank)
+    if priceSettings and priceSettings:IsShown() then priceSettings:Refresh() end
+end
+queuePriceRefresh = function()
+    if not pricesPending or not window or refreshQueued then return end
+    if transfer or draggedCategory or (GetCursorInfo and GetCursorInfo()) then return end
+    refreshQueued = true
+    C_Timer.After(0, function()
+        refreshQueued = false
+        if transfer or draggedCategory or (GetCursorInfo and GetCursorInfo()) then return end
+        pricesPending = false
+        inventory.Refresh()
+    end)
+end
+app.OnAuctionPricesChanged(function()
+    pricesPending = true
+    queuePriceRefresh()
+end)
+
+function inventory.OpenPriceSettings()
+    if not priceSettings then
+        local frame = CreateFrame("Frame", "PaulchenQoLPriceSettings", UIParent, "BackdropTemplate")
+        priceSettings = frame
+        frame:SetFrameStrata("FULLSCREEN_DIALOG")
+        frame:SetSize(360, 238)
+        frame:SetPoint("CENTER")
+        frame:SetClampedToScreen(true)
+        frame:EnableMouse(true)
+        style.Panel(frame, style.background)
+        style.Label(frame, "Taschen / Preise", 18, -9, 300, 30, "GameFontNormalLarge", style.gold)
+        style.Label(frame, "Preisquelle", 18, -44, 324, 21, "GameFontNormal", style.cream)
+        local buttons = {}
+        for index, entry in ipairs(app.AuctionPriceModes) do
+            local mode, label = entry[1], entry[2]
+            buttons[mode] = categoryButton(frame, label, 18, -69 - (index - 1) * 28, 324, function()
+                app.SetAuctionPriceMode(mode)
+                frame:Refresh()
+            end)
+        end
+        local tsmStatus = style.Label(frame, "", 20, -157, 320, 19, "GameFontHighlightSmall", style.muted)
+        local scanStatus = style.Label(frame, "", 20, -177, 320, 19, "GameFontHighlightSmall", style.muted)
+        function frame:Refresh()
+            local selected = app.GetAuctionPriceMode()
+            for mode, button in pairs(buttons) do style.SetButtonState(button, selected == mode) end
+            local tsm, scanner = app.GetAuctionPriceStatus()
+            tsmStatus:SetText(tsm)
+            scanStatus:SetText(scanner)
+        end
+        categoryButton(frame, "Preise neu abfragen", 18, -204, 324, app.RefreshAuctionPrices)
+        local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+        close:SetPoint("TOPRIGHT", -3, -3)
+        table.insert(UISpecialFrames, frame:GetName())
+    end
+    priceSettings:Refresh()
+    priceSettings:Show()
 end
 -- Only transfer between verified slots in the player's bags and personal bank.
 local function physicalStack(bag, slot)
@@ -999,6 +1114,7 @@ local function finishTransfer(state, reason)
     bank.transferMessage = text
     transferMessage(text)
     inventory.Refresh()
+    if pricesPending then queuePriceRefresh() end
 end
 local stepTransfer
 local function confirmMove(state, entry, target, tries)
@@ -1234,6 +1350,7 @@ local function createWindow(view)
         refreshView(view)
     end)
     f.hideQuestItems = hideQuest
+    categoryButton(f, "Preise", 440, -82, 100, inventory.OpenPriceSettings)
     if not isBank then
         f.categories = categoryButton(f, "Kategorien", 550, -82, 136, function()
             if markMenu then markMenu:Hide() end
@@ -1248,7 +1365,7 @@ local function createWindow(view)
         b:SetPoint("TOPLEFT", col[3], -119); b:SetSize(col[4] - 4, 25); b:SetText(col[2])
         b:SetScript("OnClick", function()
             if settings.sort == key then settings.ascending = not settings.ascending
-            else settings.ascending = key == "name" or key == "bag" end
+            else settings.ascending = key == "name" end
             settings.sort, view.offset = key, 0
             refreshView(view)
         end)
@@ -1357,11 +1474,12 @@ local events = CreateFrame("Frame")
 for _, event in ipairs({ "PLAYER_LOGIN", "BAG_UPDATE_DELAYED", "BAG_UPDATE_COOLDOWN", "ITEM_LOCK_CHANGED",
     "GET_ITEM_INFO_RECEIVED", "QUEST_LOG_UPDATE", "PLAYER_MONEY", "PLAYER_REGEN_ENABLED", "MERCHANT_SHOW", "MERCHANT_CLOSED",
     "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BANK_TABS_CHANGED", "PLAYERBANKSLOTS_CHANGED",
-    "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED" }) do
+    "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED", "CURSOR_UPDATE" }) do
     app.RegisterSupported(events, event)
 end
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_MONEY" then updateMoney(inventory); updateMoney(bank); return end
+    if event == "CURSOR_UPDATE" then queuePriceRefresh(); return end
     if event == "PLAYER_LOGIN" then
         if not C or not ContainerFrameItemButtonMixin then return end
         local db = app.Settings()
@@ -1424,5 +1542,9 @@ events:SetScript("OnEvent", function(_, event)
     end
     if (not window:IsShown() and not (bank.window and bank.window:IsShown())) or refreshQueued then return end
     refreshQueued = true
-    C_Timer.After(0.1, function() refreshQueued = false; inventory.Refresh() end)
+    C_Timer.After(0.1, function()
+        refreshQueued = false
+        inventory.Refresh()
+        queuePriceRefresh()
+    end)
 end)
