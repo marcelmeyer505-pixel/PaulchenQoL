@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.3 — 2026-11-22
+
+- Drag a whole category between the bag and personal bank lists. The receiving pane highlights as a drop target and uses the same transfer rules as the deposit and withdraw buttons.
+
 ## 0.10.2 — 2026-11-22
 
 - Show the personal bank and bag lists side by side at the banker. Move the panes together, fit them to the screen and restore the regular bag position after closing the bank.

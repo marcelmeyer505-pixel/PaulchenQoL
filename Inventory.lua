@@ -5,7 +5,7 @@ local bank = { slots = {}, offset = 0, query = "", searchCollapsed = {}, categor
 app.inventory = inventory
 inventory.bank = bank
 local window, settings, refreshQueued, suppress, pendingAction, markMenu, categoryEditor, bankDock
-local layout, refreshView, openBank, transferCategory, transfer
+local layout, refreshView, openBank, transferCategory, transfer, draggedCategory
 local rowHeight, rowCount = 32, 14
 local windowWidth, windowHeight, windowGap, screenMargin = 718, 678, 14, 12
 local builtinMarkCount = #app.markOrder
@@ -237,6 +237,83 @@ local function categoryButton(parent, text, x, y, width, onClick)
     button:SetScript("OnClick", onClick)
     return button
 end
+local function categoryGrip(parent)
+    local grip = CreateFrame("Button", nil, parent)
+    grip:SetSize(24, 24)
+    grip:EnableMouse(true)
+    grip:RegisterForDrag("LeftButton")
+    for row = 0, 2 do
+        for column = 0, 1 do
+            local dot = grip:CreateTexture(nil, "ARTWORK")
+            dot:SetSize(2, 2)
+            dot:SetPoint("CENTER", -3 + column * 6, 5 - row * 5)
+            dot:SetColorTexture(unpack(style.gold))
+        end
+    end
+    return grip
+end
+local function canDragTransfer()
+    return canTransfer() and window and window:IsVisible() and bank.window and bank.window:IsVisible()
+end
+local function updateTransferControls(view)
+    local available = canTransfer()
+    local enabled = available and not transfer and not combat()
+    local canDrag = not not canDragTransfer()
+    for _, header in pairs(view.categoryHeaders) do
+        header.transferButton:SetShown(available)
+        header.transferButton:SetEnabled(enabled)
+        header.transferGrip:SetShown(canDrag)
+        header.transferGrip:SetEnabled(enabled)
+        header.transferGrip:SetAlpha(enabled and 1 or 0.45)
+    end
+end
+local function cancelTransferDrag()
+    if not draggedCategory then return end
+    draggedCategory.source.window:SetScript("OnUpdate", nil)
+    draggedCategory.destination.window.dropOverlay:Hide()
+    draggedCategory = nil
+end
+local function finishTransferDrag()
+    local drag = draggedCategory
+    if not drag then return end
+    local dropped = canDragTransfer() and drag.destination.window:IsMouseOver()
+    cancelTransferDrag()
+    if dropped then transferCategory(drag.source, drag.key) end
+end
+local function updateTransferDrag()
+    if not canDragTransfer() or transfer or combat() or GetCursorInfo() then
+        cancelTransferDrag()
+    elseif not IsMouseButtonDown("LeftButton") then
+        finishTransferDrag()
+    else
+        local target = draggedCategory.destination.window
+        target.dropOverlay:SetShown(target:IsMouseOver())
+    end
+end
+local function transferGrip(header, view, key)
+    local grip = categoryGrip(header)
+    grip:SetPoint("TOPLEFT", 526, -4)
+    grip:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(view.isBank and "Kategorie in die Taschen ziehen" or "Kategorie in die Bank ziehen")
+        GameTooltip:Show()
+    end)
+    grip:SetScript("OnLeave", function(self)
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
+    grip:SetScript("OnDragStart", function(self)
+        if not self:IsVisible() or not canDragTransfer() or transfer or combat() or GetCursorInfo() then return end
+        cancelTransferDrag()
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+        draggedCategory = { source = view, destination = view.isBank and inventory or bank, key = key, grip = self }
+        view.window:SetScript("OnUpdate", updateTransferDrag)
+        updateTransferDrag()
+    end)
+    grip:SetScript("OnDragStop", function(self)
+        if draggedCategory and draggedCategory.grip == self and not IsMouseButtonDown("LeftButton") then finishTransferDrag() end
+    end)
+    return grip
+end
 local function enableCategoryDrag(list)
     local draggedKey, markedRow, markedAfter
     local line = list:CreateTexture(nil, "OVERLAY")
@@ -280,20 +357,9 @@ local function enableCategoryDrag(list)
         end
     end
     for _, option in ipairs(list.options) do
-        local grip = CreateFrame("Button", nil, option.button)
+        local grip = categoryGrip(option.button)
         option.handle = grip
         grip:SetPoint("RIGHT", -1, 0)
-        grip:SetSize(24, 24)
-        grip:EnableMouse(true)
-        grip:RegisterForDrag("LeftButton")
-        for row = 0, 2 do
-            for column = 0, 1 do
-                local dot = grip:CreateTexture(nil, "ARTWORK")
-                dot:SetSize(2, 2)
-                dot:SetPoint("CENTER", -3 + column * 6, 5 - row * 5)
-                dot:SetColorTexture(unpack(style.gold))
-            end
-        end
         grip:SetScript("OnDragStart", function(self)
             if not self:IsVisible() then return end
             draggedKey = option.key
@@ -762,8 +828,6 @@ end
 local function categorize(view, rows)
     local buckets, display = {}, {}
     local window, settings, categoryHeaders = view.window, view.settings, view.categoryHeaders
-    local transferAvailable = canTransfer()
-    local transferEnabled = transferAvailable and not transfer and not combat()
     -- Search starts expanded and has its own temporary folds, preserving the
     -- character's normal category layout when the query is cleared.
     local collapsed = view.query:find("%S") and view.searchCollapsed or settings.collapsed
@@ -781,7 +845,7 @@ local function categorize(view, rows)
                 header = style.TextButton(window)
                 header:SetSize(672, rowHeight - 1)
                 header.categoryHeader = true
-                header.caption = style.Label(header, "", 8, 0, 650, rowHeight - 1, "GameFontNormal", style.gold)
+                header.caption = style.Label(header, "", 8, 0, 510, rowHeight - 1, "GameFontNormal", style.gold)
                 header:SetScript("OnClick", function()
                     local folds = view.query:find("%S") and view.searchCollapsed or settings.collapsed
                     folds[key] = not folds[key]
@@ -790,10 +854,9 @@ local function categorize(view, rows)
                 end)
                 header.transferButton = categoryButton(header, view.isBank and "Auslagern" or "Einlagern", 552, -4, 110,
                     function() transferCategory(view, key) end)
+                header.transferGrip = transferGrip(header, view, key)
                 categoryHeaders[key] = header
             end
-            header.transferButton:SetShown(transferAvailable)
-            header.transferButton:SetEnabled(transferEnabled)
             if color then
                 header.caption:SetTextColor(unpack(color))
                 header:SetBackdropColor(color[1] * 0.22, color[2] * 0.22, color[3] * 0.22, 1)
@@ -807,6 +870,7 @@ local function categorize(view, rows)
         end
     end
     view.displayRows = display
+    updateTransferControls(view)
 end
 refreshView = function(view)
     if not view.window or not view.window:IsShown() or (view.isBank and not canBank()) then return end
@@ -1021,9 +1085,8 @@ transferCategory = function(view, key)
     if state.total == 0 then return end
     transfer = state
     showTransferProgress(state)
-    for _, panel in ipairs({ inventory, bank }) do
-        for _, header in pairs(panel.categoryHeaders) do header.transferButton:SetEnabled(false) end
-    end
+    updateTransferControls(inventory)
+    updateTransferControls(bank)
     stepTransfer(state)
 end
 local function visibleBankFrame()
@@ -1086,6 +1149,8 @@ local function updateBankNavigation()
     local available = canBank()
     window.bankTab:SetShown(available and not bank.window:IsShown())
     bank.window.bagTab:SetShown(available and not window:IsShown())
+    updateTransferControls(inventory)
+    updateTransferControls(bank)
 end
 local function createWindow(view)
     local isBank, settings = view.isBank, view.settings
@@ -1208,11 +1273,22 @@ local function createWindow(view)
     if bank.transferMessage then f.transferStatus:SetText(bank.transferMessage) end
     style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
     f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
+    f.dropOverlay = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    f.dropOverlay:SetAllPoints(f)
+    f.dropOverlay:SetFrameLevel(f:GetFrameLevel() + 30)
+    f.dropOverlay:EnableMouse(false)
+    style.Panel(f.dropOverlay, { 0.50, 0.28, 0.08, 0.20 }, style.gold)
+    local dropText = style.Label(f.dropOverlay, isBank and "Zum Einlagern hier ablegen" or "Zum Auslagern hier ablegen",
+        14, -5, windowWidth - 28, 34, "GameFontNormalLarge", style.gold, "CENTER")
+    dropText:ClearAllPoints()
+    dropText:SetPoint("CENTER")
+    f.dropOverlay:Hide()
     f:SetScript("OnShow", function()
         refreshView(view)
         updateBankNavigation()
     end)
     f:SetScript("OnHide", function()
+        cancelTransferDrag()
         if markMenu and markMenu:IsShown() and markMenu.ownerRow.view == view then markMenu:Hide() end
         if not isBank and categoryEditor then categoryEditor:Hide() end
         updateBankNavigation()
