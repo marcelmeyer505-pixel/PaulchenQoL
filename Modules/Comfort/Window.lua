@@ -77,6 +77,7 @@ local categories = {
         { "mapHideReset", "Filter-Reset der Karte ausblenden" },
         { "questTurnIns", "Questabgaben auf der Weltkarte", nil, nil, true },
         { "mapFlight", "Zusätzliche Flugpunkte anzeigen" },
+        { "mapFlightsOnWorld", "Flugpunkte auch auf der Azeroth-Übersicht", nil, "mapFlight" },
         { "mapPortals", "Portale anzeigen" },
         { "mapCrossings", "Gebietsübergänge anzeigen" },
         { "mapLearnCrossings", "Gelaufene Übergänge merken" },

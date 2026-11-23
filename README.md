@@ -200,6 +200,8 @@ Unter **Weltkarte & Erkundung** findest du den kompakten Kartenrahmen, Maus- und
 
 Ein Linksklick auf einen **Instanzeingang** öffnet die verfügbare Innenkarte in DungeonJournal oder, wenn dort keine Karte verfügbar ist, in Forever DungeonRoutes. Per Rechtsklick kommst du zu Instanzquests, Bossen und Beute oder zur passenden Route. Eng benachbarte Eingänge bieten eine Auswahl der Flügel. DungeonJournal und Forever DungeonRoutes sind optionale Addons und liefern die jeweiligen Karten, Quests und Routen. Paulchen bindet die installierten Addons direkt an.
 
+Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Paulchens zusätzliche Flugpunkte starten auf den Kontinentkarten. Die Option **Flugpunkte auch auf der Azeroth-Übersicht** blendet sie dort ebenfalls ein. Falls Titan Panel Koordinaten auf derselben Karte anzeigt, blendet Paulchen die entsprechenden Titan-Labels aus, solange seine eigene Anzeige aktiv ist.
+
 - **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.
 - **Quests & Dialoge** bietet getrennte Schalter für normale, tägliche und wöchentliche Quests, Abgaben und einzelne NPC-Dialoge per Alt. Quests mit mehr als einer Belohnung zur Wahl, Kosten sowie normalen oder vorgemerkten Abgabeitems bleiben zur manuellen Prüfung offen.
 - Mit **Umschalt** beim Ansprechen kannst du die Automatik überspringen.

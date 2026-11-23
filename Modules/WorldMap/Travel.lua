@@ -111,6 +111,24 @@ local function collectSources(id)
     return maps
 end
 
+local function dungeonSources(id, maps, isWorld)
+    if not isWorld then return maps end
+    local result, seen = { id }, { [id] = true }
+    local function include(zones)
+        for _, zone in ipairs(zones) do
+            if not seen[zone.id] then
+                seen[zone.id] = true
+                result[#result + 1] = zone.id
+            end
+        end
+    end
+    include(world.Children(id, mapType.Zone, true))
+    for _, continent in ipairs(world.Children(id, mapType.Continent, false)) do
+        include(world.Children(continent.id, mapType.Zone, true))
+    end
+    return result
+end
+
 function world.PoiKind(atlas)
     if type(atlas) ~= "string" then return end
     atlas = atlas:lower()
@@ -126,7 +144,9 @@ end
 
 function world.Collect(id)
     local points = {}
-    if not map or not world.Info(id) then return points end
+    local info = world.Info(id)
+    if not info then return points end
+    local isWorld = plain(info.mapType) == mapType.World
     local faction = read(UnitFactionGroup, "player")
     local showOpposing = options.Enabled("mapOtherFaction")
     local function allowed(owner)
@@ -143,7 +163,7 @@ function world.Collect(id)
         points[#points + 1] = { kind = kind, x = x, y = y, name = name, target = target, note = note, atlas = atlas }
     end
 
-    local showFlight = options.Enabled("mapFlight")
+    local showFlight = options.Enabled("mapFlight") and (not isWorld or options.Enabled("mapFlightsOnWorld"))
     local showPortal = options.Enabled("mapPortals")
     local showCross = options.Enabled("mapCrossings")
     local showTransport = options.Enabled("mapTransport")
@@ -236,7 +256,7 @@ function world.Collect(id)
             end
         end
     end
-    if options.Enabled("mapDungeons") then world.CollectDungeons(id, sources, points) end
+    if options.Enabled("mapDungeons") then world.CollectDungeons(id, dungeonSources(id, sources, isWorld), points) end
     return points
 end
 

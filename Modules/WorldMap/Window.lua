@@ -144,9 +144,30 @@ local function coords(x, y)
     return app.LocalizeDecimal(("%.1f / %.1f"):format(x * 100, y * 100))
 end
 
+local function syncTitanCoordinates(state, active)
+    local function sync(region, covered)
+        if not (region and region.GetAlpha and region.SetAlpha) then return end
+        local previous = state.titanAlpha[region]
+        if covered then
+            local alpha = read(region.GetAlpha, region)
+            if alpha and alpha ~= 0 then
+                if previous == nil then state.titanAlpha[region] = alpha end
+                region:SetAlpha(0)
+            end
+        elseif previous ~= nil then
+            region:SetAlpha(previous)
+            state.titanAlpha[region] = nil
+        end
+    end
+    sync(_G.TitanMapPlayerLocation, active and options.Enabled("mapPlayerCoords"))
+    sync(_G.TitanMapCursorLocation, active and options.Enabled("mapMouseCoords"))
+end
+
 local function updateFooter(state)
     local map, footer = state.map, state.footer
-    if not footer:IsShown() then return end
+    local active = footer:IsVisible()
+    syncTitanCoordinates(state, active)
+    if not active then return end
     local id = read(map.GetMapID, map)
     if not id then return end
     local entries = {}
@@ -330,6 +351,14 @@ local function updateView(state)
         or options.Enabled("mapBattlefield"))
     bar.zones:SetShown(navigation)
     bar.discovery:SetShown(discovery)
+    if state.zonesVisible ~= navigation or state.discoveryVisible ~= discovery then
+        state.zonesVisible, state.discoveryVisible = navigation, discovery
+        local x = navigation and 278 or 196
+        bar.discovery:ClearAllPoints()
+        bar.discovery:SetPoint("LEFT", bar, "LEFT", x, 0)
+        bar.layout:ClearAllPoints()
+        bar.layout:SetPoint("LEFT", bar, "LEFT", x + (discovery and 98 or 0), 0)
+    end
     bar.title:SetText(world.Name(id, L("Weltkarte")))
     local footer = state.footer
     local showBackground = options.Enabled("mapCoordsBackground")
@@ -344,7 +373,7 @@ local function attach()
     if view or not (map and map.ScrollContainer and map.GetMapID and map.GetSize and C_Map) then return end
     local canvas = map.ScrollContainer
     view = { map = map, scroll = canvas, baseScale = map:GetScale(), baseMovable = map:IsMovable(),
-        alpha = {}, resetAlpha = {}, hiddenCities = setmetatable({}, { __mode = "k" }) }
+        alpha = {}, resetAlpha = {}, titanAlpha = {}, hiddenCities = setmetatable({}, { __mode = "k" }) }
     local state = view
     local header = CreateFrame("Frame", nil, map, "BackdropTemplate")
     header:SetHeight(23)
@@ -355,7 +384,7 @@ local function attach()
     header.title = style.Label(header, "", 8, 0, 183, 22, "GameFontNormal", style.gold)
     header.zones = button(header, "Gebiete", 196, 77, function(self) showZones(self, map) end)
     header.discovery = button(header, "Erkundung", 278, 93, function(self) showDiscovery(self, map) end)
-    button(header, "Kartenoptionen", 376, 112, showLayout)
+    header.layout = button(header, "Kartenoptionen", 376, 112, showLayout)
     header:EnableMouse(true)
     header:RegisterForDrag("LeftButton")
     header:SetScript("OnDragStart", function()
@@ -378,7 +407,7 @@ local function attach()
 
     local footer = CreateFrame("Frame", nil, map, "BackdropTemplate")
     footer:SetPoint("BOTTOMLEFT", canvas, "BOTTOMLEFT", 5, 4)
-    footer:SetPoint("BOTTOMRIGHT", canvas, "BOTTOMRIGHT", -5, 4)
+    footer:SetPoint("BOTTOMRIGHT", canvas, "BOTTOMRIGHT", -37, 4)
     footer:SetHeight(21)
     footer:SetFrameStrata("HIGH")
     footer:SetFrameLevel(header:GetFrameLevel())
@@ -397,6 +426,7 @@ local function attach()
         world.Refresh()
     end)
     map:HookScript("OnHide", function()
+        syncTitanCoordinates(state, false)
         if state.dragging then map:StopMovingOrSizing(); state.dragging = nil end
     end)
     if hooksecurefunc then

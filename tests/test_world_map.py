@@ -195,6 +195,7 @@ C_Map = {
     GetWorldPosFromMapPos = function() return 1, {x = worldX, y = 200} end,
 }
 C_TaxiMap = { GetTaxiNodesForMap = function(id)
+    if id == 947 then return { {name = "Capital", faction = 1, position = {x = .2, y = .5}} } end
     if id ~= 1411 then return {} end
     return {
         {name = "Horde", faction = 1, position = { x = .3, y = .4 }},
@@ -229,6 +230,10 @@ local function count(id, kind)
 end
 assert(count(1411, "flight") == 1 and count(1411, "portal") == 2 and count(1411, "cross") == 1)
 assert(count(1414, "flight") == 1 and count(1414, "cross") == 1)
+assert(count(947, "flight") == 0 and count(947, "dungeon") == 1)
+comfort.SetEnabled("mapFlightsOnWorld", true)
+assert(count(947, "flight") == 1)
+comfort.SetEnabled("mapFlightsOnWorld", false)
 comfort.SetEnabled("mapOtherFaction", true)
 assert(count(1411, "flight") == 2)
 comfort.SetEnabled("mapPortals", false)
@@ -247,9 +252,18 @@ explored = savedExploration
 
 fire("PLAYER_LOGIN")
 assert(not map:IsVisible())
+TitanMapPlayerLocation = CreateFrame("Frame")
+TitanMapCursorLocation = CreateFrame("Frame")
+TitanMapCursorLocation:SetAlpha(.7)
 PaulchenQoLOpenPlayerMap()
 flush()
 assert(map:IsVisible() and map:GetMapID() == playerMap)
+assert(TitanMapPlayerLocation:GetAlpha() == 0 and TitanMapCursorLocation:GetAlpha() == 0)
+comfort.SetEnabled("mapMouseCoords", false)
+flush()
+assert(TitanMapPlayerLocation:GetAlpha() == 0 and TitanMapCursorLocation:GetAlpha() == .7)
+comfort.SetEnabled("mapMouseCoords", true)
+flush()
 assert(#map.providers == 2 and map.providers[1].used == 1, "Ready quests remain on the map without other addons")
 local waypoints = map.providers[2]
 for _, pin in ipairs(waypoints.pins) do
@@ -264,6 +278,7 @@ local function widget(text)
     error("Missing text: " .. text)
 end
 widget("Spieler  25,0 / 50,0     ·     Maus  30,0 / 40,0")
+assert(select(4, widget("Kartenoptionen"):GetPoint()) == 278, "A hidden tab does not leave a gap")
 local zones = widget("Gebiete")
 zones.scripts.OnClick(zones)
 menu.children.Kalimdor.children.Brachland.callback()
@@ -281,6 +296,7 @@ comfort.SetEnabled("mapDiscovery", true)
 comfort.SetEnabled("mapShowDiscovered", true)
 flush()
 assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -67 and map.BorderFrame.NineSlice:GetAlpha() == 1)
+assert(select(4, widget("Kartenoptionen"):GetPoint()) == 376)
 local provider = map.providers[#map.providers]
 assert(provider.used > 1 and provider.tileCount > 0)
 assert(map.providers[1].used == 1, "Exploration and travel layers preserve quest turn-ins")
@@ -290,6 +306,7 @@ for _, pin in ipairs(provider.pins) do if pin.point.kind == "discovered" then pe
 assert(persisted)
 map:Hide()
 assert(provider.used == 0 and provider.tileCount == 0)
+assert(TitanMapPlayerLocation:GetAlpha() == 1 and TitanMapCursorLocation:GetAlpha() == .7)
 
 sample()
 playerMap, worldX, clock = 1413, 125, 10.65
@@ -390,6 +407,11 @@ local function findPin(predicate)
 end
 local single = findPin(function(point) return point.dungeon and point.dungeon.route == "wailingcaverns" end)
 assert(single.point.x == .46 and single.point.dungeon.journal == journalName)
+local rootEntrance
+for _, point in ipairs(world.Collect(947)) do
+    if point.dungeon and point.dungeon.route == "wailingcaverns" then rootEntrance = point; break end
+end
+assert(rootEntrance and rootEntrance.dungeon.waypoint[1] == 1413)
 single.scripts.OnClick(single, "LeftButton")
 assert(selections[#selections] == "map")
 single.scripts.OnClick(single, "RightButton")
