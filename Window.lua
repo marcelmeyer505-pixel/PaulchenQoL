@@ -97,10 +97,10 @@ local function paintTravel()
     local hearth, color = hearthText(travel)
     travelPage.hearth.value:SetText(hearth)
     travelPage.hearth.value:SetTextColor(unpack(color))
-    travelPage.hearth.detail:SetText(travel.bind or "Heimatort")
+    travelPage.hearth.detail:SetText(travel.bind or app.L("Heimatort"))
     for _, key in ipairs({ "keep", "auction", "vendor" }) do
         local marked, _, total = app.FindItems(items, db.marks, key, "")
-        travelPage[key].value:SetText(#marked == 1 and "1 Gegenstandsart" or (#marked .. " Gegenstandsarten"))
+        travelPage[key].value:SetText(#marked == 1 and app.L("1 Gegenstandsart") or (#marked .. app.L(" Gegenstandsarten")))
         if key == "vendor" then
             local formatMoney = app.inventory and app.inventory.MoneyText or coinText
             travelPage[key].detail:SetText(formatMoney(total))
@@ -248,7 +248,7 @@ local function createTravelPage(parent)
     f.hearth = travelCard(f, 454, "Ruhestein", "Heimatort", -87)
     if app.CreateOverviewPanel then f.overview = app.CreateOverviewPanel(f) end
 
-    label(f, "Vormerkungen", 18, -556, 350, 27, "GameFontNormalLarge", gold)
+    label(f, app.L("Vormerkungen"), 18, -556, 350, 27, "GameFontNormalLarge", gold)
     local openBags = button(f, app.L(app.L("Taschen öffnen")), 502, -556, 160, 27)
     openBags:SetScript("OnClick", function()
         app.CloseDashboard()
@@ -259,7 +259,7 @@ local function createTravelPage(parent)
     f.keep = travelCard(f, 18, app.L(app.L("Behalten")), "inkl. der Ausrüstungssets", -591)
     f.auction = travelCard(f, 236, app.L(app.L("Auktionshaus")), app.L(app.L("Vorgemerkte Gegenstände")), -591)
     f.vendor = travelCard(f, 454, app.L(app.L("Händler")), app.L(app.L("Vorgemerkter Verkaufswert")), -591)
-    label(f, "Vormerken: Rechtsklick auf eine Gegenstandszeile in Paulchens Taschen.",
+    label(f, app.L("Vormerken: Rechtsklick auf eine Gegenstandszeile in Paulchens Taschen."),
         18, -669, 644, 22, "GameFontHighlightSmall", muted)
 
     local elapsed = 0
@@ -510,11 +510,11 @@ local function createMinimap()
         if travel then
             local hearth = hearthText(travel)
             GameTooltip:AddLine("Taschen · " .. travel.free .. app.L(app.L(" freie Plätze")), unpack(cream))
-            if travel.durability then GameTooltip:AddLine("Haltbarkeit · " .. math.floor(travel.durability) .. " %", unpack(cream)) end
-            GameTooltip:AddLine("Ruhestein · " .. hearth, unpack(cream))
+            if travel.durability then GameTooltip:AddLine(app.L("Haltbarkeit · ") .. math.floor(travel.durability) .. " %", unpack(cream)) end
+            GameTooltip:AddLine(app.L("Ruhestein · ") .. hearth, unpack(cream))
         end
         GameTooltip:AddLine(app.L(app.L("Linksklick · Paulchen öffnen  |  Rechtsklick · Schnellzugriff")), unpack(muted))
-        GameTooltip:AddLine("Ziehen · Verschieben", unpack(muted))
+        GameTooltip:AddLine(app.L("Ziehen · Verschieben"), unpack(muted))
         GameTooltip:Show()
     end)
     icon:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
