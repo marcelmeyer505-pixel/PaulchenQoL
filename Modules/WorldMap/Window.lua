@@ -368,6 +368,12 @@ local function updateView(state)
     updateFooter(state)
 end
 
+local function refreshInstanceMap(map)
+    if app.instances and app.instances.UpdateWorldOverlay then
+        app.SecureCall(L("Instanzkarte"), app.instances.UpdateWorldOverlay, map)
+    end
+end
+
 local function attach()
     local map = WorldMapFrame
     if view or not (map and map.ScrollContainer and map.GetMapID and map.GetSize and C_Map) then return end
@@ -423,6 +429,7 @@ local function attach()
 
     map:HookScript("OnShow", function()
         state.positionMode = nil
+        refreshInstanceMap(map)
         world.Refresh()
     end)
     map:HookScript("OnHide", function()
@@ -435,6 +442,7 @@ local function attach()
         end
     end
     state.pins = world.AttachPins(map, true)
+    state.entrances = world.AttachPins(map, true, true)
 end
 
 local function attachBattlefield()
@@ -442,6 +450,7 @@ local function attachBattlefield()
     if battlefield or not options.Enabled("mapBattlefield") or not (map and map.AddDataProvider and map.GetScale) then return end
     battlefield = { map = map, scale = map:GetScale() }
     battlefield.pins = world.AttachPins(map, false)
+    battlefield.entrances = world.AttachPins(map, false, true)
     map:HookScript("OnShow", world.Refresh)
     if hooksecurefunc and map.UpdateUnitsVisibility then hooksecurefunc(map, "UpdateUnitsVisibility", world.Refresh) end
 end
@@ -471,6 +480,7 @@ local function refreshBattlefield()
     end
     battlefield.enabled = enabled
     if battlefield.pins then battlefield.pins:RefreshAllData() end
+    if battlefield.entrances then battlefield.entrances:RefreshAllData() end
 end
 
 function world.Refresh()
@@ -480,7 +490,9 @@ function world.Refresh()
         queued = nil
         if view then
             app.SecureCall(L("Weltkarte"), updateView, view)
+            refreshInstanceMap(view.map)
             if view.pins then view.pins:RefreshAllData() end
+            if view.entrances then view.entrances:RefreshAllData() end
         end
         app.SecureCall(L("Schlachtfeldkarte"), refreshBattlefield)
     end)

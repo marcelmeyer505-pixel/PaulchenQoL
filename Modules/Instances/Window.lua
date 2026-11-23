@@ -1,6 +1,6 @@
 local _, app = ...
 local guide, style, L, read = app.instances, app.style, app.L, app.ReadGameValue
-local page, queued, mapQueued
+local page, queued, mapQueued, worldView, outdoorRequested
 local width, height, rowCount = 984, 546, 13
 local mapWidth, mapHeight = 594, 396
 local requestedItems, requestedQuests = {}, {}
@@ -173,7 +173,7 @@ local function artTexture(view, index)
     return texture
 end
 
-local function renderArt(view, floor, scheme)
+local function renderArt(view, floor, scheme, mapWidth, mapHeight)
     local used = 0
     if floor and not scheme then
         local tiles = floor.tiles
@@ -207,13 +207,13 @@ local function renderArt(view, floor, scheme)
     return used > 0
 end
 
-local function renderMap()
-    local f, s = page, current()
+local function renderMap(f, s, showRoute)
     local view, entry = f.map, s.entry
+    local mapWidth, mapHeight = view:GetSize()
     local floor = guide.floors[s.floor]
-    local art = renderArt(view, floor, s.tab == "route")
+    local art = renderArt(view, floor, s.tab == "route", mapWidth, mapHeight)
     local lineCount, pinCount = 0, 0
-    for _, path in ipairs(entry.paths) do
+    for _, path in ipairs(showRoute and entry.paths or {}) do
         if path.floor == s.floor then
             for i = 1, #path.pts - 3, 2 do
                 local x, y, nextX, nextY = unpack(path.pts, i, i + 3)
@@ -237,7 +237,7 @@ local function renderMap()
             if not pin then
                 pin = style.TextButton(view.overlay)
                 pin:SetSize(22, 22)
-                pin:SetScript("OnClick", function(self) showLoot(self.stop.loot) end)
+                pin:SetScript("OnClick", function(self) f.openBoss(self.stop) end)
                 pin:SetScript("OnEnter", function(self)
                     if not GameTooltip or GameTooltip:IsForbidden() then return end
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -280,7 +280,7 @@ function guide.Refresh(drawMap)
         .. (locked and " · " .. L("Im Inhaltsfilter gesperrt") or ""))
     page.entrance:SetEnabled(entry.entrance ~= nil)
     for key, tab in pairs(page.tabs) do style.SetButtonState(tab, key == s.tab) end
-    if drawMap then renderMap() end
+    if drawMap then renderMap(page, s, true) end
     renderList()
 end
 
@@ -294,6 +294,16 @@ function guide.QueueRefresh(drawMap)
         queued, mapQueued = nil, nil
         guide.Refresh(redraw)
     end)
+end
+
+local function mapCanvas(parent)
+    local view = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    style.Panel(view, style.background)
+    view.art, view.lines, view.pins = {}, {}, {}
+    view.overlay = CreateFrame("Frame", nil, view)
+    view.overlay:SetAllPoints(view)
+    if view.SetClipsChildren then view:SetClipsChildren(true) end
+    return view
 end
 
 function guide.GetPage(parent)
@@ -330,15 +340,11 @@ function guide.GetPage(parent)
             guide.Refresh(true)
         end)
     end
-    local view = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    local view = mapCanvas(f)
     f.map = view
+    f.openBoss = function(stop) showLoot(stop.loot) end
     view:SetSize(mapWidth, mapHeight)
     view:SetPoint("TOPLEFT", 16, -98)
-    style.Panel(view, style.background)
-    view.art, view.lines, view.pins = {}, {}, {}
-    view.overlay = CreateFrame("Frame", nil, view)
-    view.overlay:SetAllPoints(view)
-    if view.SetClipsChildren then view:SetClipsChildren(true) end
     f.mapNote = style.Label(f, "", 16, -503, 245, 22, "GameFontHighlightSmall", style.muted)
     f.floorName = style.Label(f, "", 297, -503, 282, 22, "GameFontHighlightSmall", style.cream, "CENTER")
     f.prevFloor = button(f, "<", 265, -503, 25, function() moveFloor(-1) end)
@@ -388,4 +394,118 @@ function guide.GetPage(parent)
     f.next = button(f, ">", 936, -479, 30, function() scroll(rowCount) end)
     f:SetScript("OnShow", function() guide.Refresh(true) end)
     return f
+end
+
+local function changeWorldFloor(delta)
+    local state = worldView
+    for index, floor in ipairs(state.selection.entry.floors) do
+        if floor == state.selection.floor then
+            state.manualFloor = state.selection.entry.floors[index + delta]
+            guide.UpdateWorldOverlay(state.owner)
+            return
+        end
+    end
+end
+
+local function createWorldOverlay(map)
+    local host = map.ScrollContainer
+    local panel = CreateFrame("Frame", nil, map, "BackdropTemplate")
+    panel:SetAllPoints(host)
+    panel:EnableMouse(true)
+    style.Panel(panel, style.background)
+    local state = { owner = map, host = host, panel = panel }
+    state.map = mapCanvas(panel)
+    state.map:SetPoint("CENTER", panel, "CENTER", 0, -4)
+    state.title = style.Label(panel, "", 12, -7, 350, 26, "GameFontNormal", style.gold)
+    state.floorName = style.Label(panel, "", 45, 0, 300, 23, "GameFontHighlightSmall", style.cream)
+    state.floorName:ClearAllPoints()
+    state.floorName:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 46, 8)
+    state.mapNote = style.Label(panel, "", 0, 0, 175, 22, "GameFontHighlightSmall", style.muted, "RIGHT")
+    state.mapNote:ClearAllPoints()
+    state.mapNote:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -45, 8)
+    state.prevFloor = button(panel, "<", 0, 0, 25, function() changeWorldFloor(-1) end)
+    state.prevFloor:ClearAllPoints()
+    state.prevFloor:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 11, 8)
+    state.nextFloor = button(panel, ">", 0, 0, 25, function() changeWorldFloor(1) end)
+    state.nextFloor:ClearAllPoints()
+    state.nextFloor:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 8)
+    state.wings = button(panel, "Flügel", 0, 0, 76, function(self)
+        menu(self, function(root)
+            for _, entry in ipairs(state.candidates) do
+                root:CreateButton(guide.Name(entry), function()
+                    state.manualEntry, state.manualFloor = entry, nil
+                    guide.RememberWing(entry)
+                    guide.UpdateWorldOverlay(map)
+                end)
+            end
+        end)
+    end)
+    state.wings:ClearAllPoints()
+    state.wings:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -146, -6)
+    state.switch = button(map, "Weltkarte", 0, 0, 126, function()
+        state.outdoor = not state.outdoor
+        guide.UpdateWorldOverlay(map)
+    end)
+    state.switch:ClearAllPoints()
+    state.switch:SetPoint("TOPRIGHT", host, "TOPRIGHT", -10, -6)
+    state.openBoss = function(stop)
+        local entry, floor = state.selection.entry, state.selection.floor
+        if HideUIPanel then HideUIPanel(map) elseif map.Hide then map:Hide() end
+        guide.Open(entry.key, "loot", floor)
+        showLoot(stop.loot)
+    end
+    return state
+end
+
+function guide.ResetWorldOverlay()
+    outdoorRequested = nil
+    if worldView then
+        worldView.outdoor, worldView.manualEntry, worldView.manualFloor = nil, nil, nil
+    end
+end
+
+function guide.UseOutdoorMap()
+    if guide.CurrentMap() then
+        outdoorRequested = true
+        app.worldMap.Refresh()
+    end
+end
+
+function guide.UpdateWorldOverlay(map)
+    local entry, floor, candidates = guide.CurrentMap()
+    local enabled = entry and map:IsVisible() and app.comfort.Enabled("mapInterior")
+    if not enabled then
+        if worldView then
+            worldView.panel:Hide()
+            worldView.switch:Hide()
+        end
+        return
+    end
+    worldView = worldView or createWorldOverlay(map)
+    local state = worldView
+    if outdoorRequested then state.outdoor, outdoorRequested = true, nil end
+    if state.detectedEntry ~= entry or state.detectedFloor ~= floor then
+        state.detectedEntry, state.detectedFloor = entry, floor
+        state.manualEntry, state.manualFloor = nil, nil
+    end
+    local level = math.max(map:GetFrameLevel(), state.host:GetFrameLevel()) + 100
+    state.panel:SetFrameStrata(map:GetFrameStrata())
+    state.panel:SetFrameLevel(level)
+    state.switch:SetFrameStrata(map:GetFrameStrata())
+    state.switch:SetFrameLevel(level + 20)
+    state.switch:SetText(L(state.outdoor and "Instanzkarte" or "Weltkarte"))
+    state.switch:Show()
+    state.panel:SetShown(not state.outdoor)
+    if state.outdoor then return end
+    local width, height = state.host:GetSize()
+    local fit = math.min((width - 16) / 3, (height - 72) / 2)
+    if fit <= 0 then return end
+    state.map:SetSize(fit * 3, fit * 2)
+    state.candidates = candidates
+    state.wings:SetShown(#candidates > 1)
+    local selected = state.manualEntry or entry
+    local selectedFloor = state.manualFloor or (selected == entry and floor) or selected.floors[1]
+    state.selection = { entry = selected, floor = selectedFloor, tab = "map" }
+    state.title:SetText(guide.Name(selected))
+    renderMap(state, state.selection, app.comfort.Enabled("mapInteriorRoute"))
 end

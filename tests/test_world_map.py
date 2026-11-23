@@ -33,9 +33,9 @@ function flush()
     end
     error("Map updates kept scheduling themselves")
 end
-function fire(event)
+function fire(event, ...)
     for _, frame in ipairs(frames) do
-        if frame.events[event] then frame.scripts.OnEvent(frame, event) end
+        if frame.events[event] then frame.scripts.OnEvent(frame, event, ...) end
     end
 end
 
@@ -67,6 +67,7 @@ local methods = {
     GetWidth = function(self) return self.width end,
     GetHeight = function(self) return self.height end,
     GetFrameLevel = function() return 1 end,
+    GetFrameStrata = function() return "HIGH" end,
     GetScale = function(self) return self.scale or 1 end,
     SetScale = function(self, scale) self.scale = scale end,
     GetAlpha = function(self) return self.alpha or 1 end,
@@ -98,7 +99,11 @@ function CreateFrame(_, _, parent)
 end
 methods.CreateTexture = function(self) return CreateFrame("Texture", nil, self) end
 methods.CreateFontString = methods.CreateTexture
-methods.CreateLine = methods.CreateTexture
+methods.CreateLine = function(self)
+    local line = self:CreateTexture()
+    line.isRouteLine = true
+    return line
+end
 UIParent = CreateFrame("Frame")
 UIParent:SetSize(1600, 900)
 GameTooltip = { IsOwned = function() return false end }
@@ -171,6 +176,8 @@ local maps = {
     [1414] = {mapID = 1414, name = "Kalimdor", mapType = 2, parentMapID = 947},
     [1411] = {mapID = 1411, name = "Durotar", mapType = 3, parentMapID = 1414},
     [1413] = {mapID = 1413, name = "Brachland", mapType = 3, parentMapID = 1414},
+    [1415] = {mapID = 1415, name = "Östliche Königreiche", mapType = 2, parentMapID = 947},
+    [1423] = {mapID = 1423, name = "Östliche Pestländer", mapType = 3, parentMapID = 1415},
     [1454] = {mapID = 1454, name = "Orgrimmar", mapType = 3, parentMapID = 1414},
     [1458] = {mapID = 1458, name = "Undercity", mapType = 3, parentMapID = 1414},
 }
@@ -267,7 +274,7 @@ flush()
 assert(TitanMapPlayerLocation:GetAlpha() == 0 and TitanMapCursorLocation:GetAlpha() == .7)
 comfort.SetEnabled("mapMouseCoords", true)
 flush()
-assert(#map.providers == 2 and map.providers[1].used == 1, "Ready quests remain on the map without other addons")
+assert(#map.providers == 3 and map.providers[1].used == 1, "Ready quests remain on the map without other addons")
 local waypoints = map.providers[2]
 for _, pin in ipairs(waypoints.pins) do
     assert(pin.point.name ~= "Horde", "A native flight pin takes precedence over the same location")
@@ -300,7 +307,7 @@ comfort.SetEnabled("mapShowDiscovered", true)
 flush()
 assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -67 and map.BorderFrame.NineSlice:GetAlpha() == 1)
 assert(select(4, widget("Kartenoptionen"):GetPoint()) == 376)
-local provider = map.providers[#map.providers]
+local provider = map.providers[2]
 assert(provider.used > 1 and provider.tileCount > 0)
 assert(map.providers[1].used == 1, "Exploration and travel layers preserve quest turn-ins")
 assert(type(provider.tiles[1].textureID) == "number", "Reveal loads the original client texture")
@@ -509,6 +516,84 @@ instancePage.nextFloor.scripts.OnClick()
 assert(guide.selection.floor == custom.floors[2])
 assert(instancePage.map.art[1]:IsShown() and type(instancePage.map.art[1].textureID) == "number")
 
+local collect = app.worldMap.Collect
+local guard = app.SecureCall
+local travelError
+app.worldMap.Collect = function() error("Simulated travel layer failure") end
+app.SecureCall = function(_, callback, ...)
+    local ok, message = pcall(callback, ...)
+    if not ok then
+        assert(message:find("Simulated travel layer failure", 1, true), message)
+        travelError = true
+    end
+end
+map:SetMapID(1423)
+flush()
+local stratholme = {}
+for index = 1, provider.used do
+    local entrance = provider.pins[index].point.dungeon
+    if entrance then stratholme[entrance.guideKey] = true end
+end
+assert(travelError and stratholme.stratholme_living and stratholme.stratholme_undead,
+    "Both Stratholme entrances render even if the travel and exploration layer fails")
+app.worldMap.Collect, app.SecureCall = collect, guard
+
+local inDungeon, dungeonID, interiorFloor = false, nil, nil
+local outdoorMap, outdoorPosition
+local bestMap = C_Map.GetBestMapForUnit
+local playerPosition = C_Map.GetPlayerMapPosition
+function IsInInstance() return inDungeon, inDungeon and "party" or "none" end
+function GetInstanceInfo() return "Test", inDungeon and "party" or "none", nil, nil, nil, nil, nil, dungeonID end
+C_Map.GetBestMapForUnit = function() return interiorFloor or outdoorMap or bestMap() end
+C_Map.GetPlayerMapPosition = function(id)
+    if outdoorMap == id then return outdoorPosition end
+    return playerPosition(id)
+end
+instancePage:Hide()
+outdoorMap, outdoorPosition = 1420, { x = .8529, y = .3028 }
+fire("PLAYER_LEAVING_WORLD")
+inDungeon, dungeonID = true, 189
+fire("PLAYER_ENTERING_WORLD")
+local entry = guide.CurrentMap()
+assert(entry.key == "sm_cathedral", "The last portal identifies an otherwise ambiguous wing")
+flush()
+textWidget("Scharlachrotes Kloster: Kathedrale")
+local function hasVisibleRoute()
+    for _, frame in ipairs(frames) do
+        if frame.isRouteLine and frame:IsVisible() then return true end
+    end
+    return false
+end
+assert(hasVisibleRoute())
+app.comfort.SetEnabled("mapInteriorRoute", false)
+flush()
+assert(not hasVisibleRoute())
+app.comfort.SetEnabled("mapInteriorRoute", true)
+flush()
+assert(hasVisibleRoute())
+textWidget("Weltkarte").scripts.OnClick()
+assert(not hasVisibleRoute())
+textWidget("Instanzkarte").scripts.OnClick()
+textWidget("Scharlachrotes Kloster: Kathedrale")
+textWidget("Flügel").scripts.OnClick(textWidget("Flügel"))
+menu.children["Scharlachrotes Kloster: Bibliothek"].callback()
+textWidget("Scharlachrotes Kloster: Bibliothek")
+app.comfort.SetEnabled("mapInterior", false)
+flush()
+for _, frame in ipairs(frames) do
+    assert(not (frame:IsVisible() and frame.textValue == "Scharlachrotes Kloster: Bibliothek"))
+end
+app.comfort.SetEnabled("mapInterior", true)
+flush()
+map:Hide()
+map:Show()
+flush()
+textWidget("Scharlachrotes Kloster: Bibliothek")
+inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
+fire("PLAYER_ENTERING_WORLD")
+flush()
+assert(not guide.CurrentMap())
+
 app.upgrades = { gear = { SkillRank = function() return nil end } }
 ''')
 for path in ("Modules/Upgrades/Content.lua", "Modules/Upgrades/Sources.lua"):
@@ -521,4 +606,4 @@ assert(drop[1].location.instanceID == 43 and #app.upgrades.GetSources(scan, 6473
 assert(not app.upgrades.CanSearchItem(scan, 17063), "The standalone loot index respects locked raids")
 assert(next(scan.instanceQuestRewards), "The standalone quest reward index is populated")
 ''')
-print("Standalone instance guide, map art, quest and loot tabs, floors, and upgrade sources passed with all three addons absent.")
+print("Standalone instance guide, Stratholme markers, map switching, wings, routes, and loot passed with all three addons absent.")

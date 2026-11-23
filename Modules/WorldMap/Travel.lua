@@ -65,7 +65,7 @@ function world.Info(id)
 end
 
 function world.Vector(point)
-    if not point then return end
+    if type(point) ~= "table" and type(point) ~= "userdata" then return end
     if point.GetXY then return read(point.GetXY, point) end
     return plain(point.x), plain(point.y)
 end
@@ -142,7 +142,17 @@ local function nameAndPosition(record)
     return plain(record.name), world.Vector(plain(record.position))
 end
 
-function world.Collect(id)
+function world.CollectEntrances(id)
+    local points = {}
+    local info = world.Info(id)
+    if info and options.Enabled("mapDungeons") then
+        local sources = dungeonSources(id, collectSources(id), plain(info.mapType) == mapType.World)
+        world.CollectDungeons(id, sources, points)
+    end
+    return points
+end
+
+function world.Collect(id, excludeDungeons)
     local points = {}
     local info = world.Info(id)
     if not info then return points end
@@ -256,7 +266,9 @@ function world.Collect(id)
             end
         end
     end
-    if options.Enabled("mapDungeons") then world.CollectDungeons(id, dungeonSources(id, sources, isWorld), points) end
+    if not excludeDungeons then
+        for _, point in ipairs(world.CollectEntrances(id)) do points[#points + 1] = point end
+    end
     return points
 end
 

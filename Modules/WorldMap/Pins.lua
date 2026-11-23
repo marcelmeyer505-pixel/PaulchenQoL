@@ -103,7 +103,8 @@ local function configure(pin, point)
     pin.point = point
     local choice = colors[point.kind]
     local label, width = point.label or choice[2], point.kind == "level" and 42 or 18
-    pin:SetSize(width, 18)
+    local dungeon = point.kind == "dungeon"
+    pin:SetSize(dungeon and 24 or width, dungeon and 24 or 18)
     local acceptsLeft = point.dungeons ~= nil
     if acceptsLeft ~= pin.acceptsLeft then
         if acceptsLeft then pin:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -114,10 +115,16 @@ local function configure(pin, point)
     pin.text:SetText(label)
     pin.text:SetTextColor(choice[3], choice[4], choice[5])
     local atlas = point.atlas
-    local icon = type(atlas) == "string" and C_Texture and read(C_Texture.GetAtlasInfo, atlas)
-    pin.icon:SetShown(not not icon)
-    pin.text:SetShown(not icon)
-    if icon then pin.icon:SetAtlas(atlas) end
+    local icon = not dungeon and type(atlas) == "string" and C_Texture and read(C_Texture.GetAtlasInfo, atlas)
+    local dungeonIcon = dungeon and not point.label
+    pin.icon:SetShown(not not icon or dungeonIcon)
+    pin.text:SetShown(not icon and not dungeonIcon)
+    if dungeonIcon then
+        pin.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+        pin.icon:SetTexCoord(0, 1, 0, 1)
+    elseif icon then
+        pin.icon:SetAtlas(atlas)
+    end
     if pin.SetMouseClickEnabled then pin:SetMouseClickEnabled(point.target ~= nil or point.dungeons ~= nil) end
     if pin.SetMouseMotionEnabled then pin:SetMouseMotionEnabled(true) end
 end
@@ -137,19 +144,22 @@ local function placePins(provider)
 end
 
 local nativeTemplates = { flight = "FlightPointPinTemplate", cross = "MapLinkPinTemplate", dungeon = "DungeonEntrancePinTemplate" }
-local function nativePositions(map)
+local function nativePositions(map, entrancesOnly)
     local result = {}
     if not map.EnumeratePinsByTemplate then return result end
     for kind, template in pairs(nativeTemplates) do
-        local positions = {}
-        result[kind] = positions
-        for pin in map:EnumeratePinsByTemplate(template) do
-            local x, y = read(pin.GetPosition, pin)
-            if app.ValidMapPoint(x, y) and pin:IsShown() then
-                positions[#positions + 1] = { x, y, read(pin.GetFrameLevel, pin) }
+        if (kind == "dungeon") == entrancesOnly then
+            local positions = {}
+            result[kind] = positions
+            for pin in map:EnumeratePinsByTemplate(template) do
+                local x, y = read(pin.GetPosition, pin)
+                if app.ValidMapPoint(x, y) and pin:IsShown() then
+                    positions[#positions + 1] = { x, y, read(pin.GetFrameLevel, pin) }
+                end
             end
         end
     end
+    if entrancesOnly then return result end
     for _, template in ipairs({ "AreaPOIPinTemplate", "MapLinkPinTemplate" }) do
         for pin in map:EnumeratePinsByTemplate(template) do
             local poi = plain(pin.poiInfo)
@@ -304,17 +314,25 @@ local function draw(provider)
     local canvas, mapID = map:GetCanvas(), read(map.GetMapID, map)
     if not canvas or not mapID or not map:IsVisible()
         or (not provider.showLevels and not options.Enabled("mapBattlefield")) then return clear(provider) end
-    local points, native = world.Collect(mapID), nativePositions(map)
-    explore(provider, canvas, mapID, points)
-    if provider.showLevels then levelMarkers(mapID, points) end
+    local entrancesOnly = provider.entrancesOnly
+    local points = entrancesOnly and world.CollectEntrances(mapID) or world.Collect(mapID, true)
+    local native = nativePositions(map, entrancesOnly)
+    if not entrancesOnly then
+        explore(provider, canvas, mapID, points)
+        if provider.showLevels then levelMarkers(mapID, points) end
+    end
     local used = 0
-    for _, point in ipairs(groupDungeonEntrances(points, canvas)) do
+    if entrancesOnly then points = groupDungeonEntrances(points, canvas) end
+    for _, point in ipairs(points) do
         local nativePin, nativeLevel = hasNative(point, native)
         if not nativePin or point.dungeons then
             used = used + 1
             local pin = provider.pins[used] or createPin(canvas, map)
             provider.pins[used] = pin
-            local level = canvas:GetFrameLevel() + 18
+            local level = canvas:GetFrameLevel() + (entrancesOnly and 30 or 18)
+            if entrancesOnly then
+                pin:SetFrameStrata(map:GetFrameStrata())
+            end
             pin:SetFrameLevel(nativeLevel and math.max(level, nativeLevel + 1) or level)
             configure(pin, point)
             pin:Show()
@@ -325,11 +343,11 @@ local function draw(provider)
     placePins(provider)
 end
 
-function world.AttachPins(map, showLevels)
+function world.AttachPins(map, showLevels, entrancesOnly)
     if not (map.AddDataProvider and map.GetCanvas and MapCanvasDataProviderMixin and CreateFromMixins and C_Timer) then return end
     local provider = CreateFromMixins(MapCanvasDataProviderMixin)
     provider.pins, provider.tiles, provider.used, provider.tileCount = {}, {}, 0, 0
-    provider.showLevels = showLevels
+    provider.showLevels, provider.entrancesOnly = showLevels, entrancesOnly == true
     provider.RefreshAllData = function(self)
         if self.pending or not self:GetMap():IsVisible() then return end
         self.pending = true

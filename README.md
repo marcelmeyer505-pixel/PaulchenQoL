@@ -202,6 +202,8 @@ Ein Linksklick auf einen **Instanzeingang** öffnet die Innenkarte im Reiter **I
 
 Der Instanzführer und seine Fundorte für Upgrades funktionieren bei deaktiviertem DungeonJournal, Forever DungeonRoutes und AtlasLoot. Die Karte verwendet nach Möglichkeit die Texturen des WoW-Clients. Bei fehlender Kartenart zeigt Paulchen die Route schematisch. Weitere Angaben zur Herkunft der Daten stehen in [INSTANCE_DATA.md](INSTANCE_DATA.md).
 
+In bekannten Instanzen startet die normale Kartentaste mit der Innenkarte und der Route. **Weltkarte** wechselt zur Außenansicht, **Instanzkarte** wieder zurück. Über **Flügel** und die Pfeile kannst du den Abschnitt und die Ebene manuell wählen. Die Innenkarte und die Routenlinie lassen sich in **Komfort → Weltkarte & Erkundung** getrennt schalten.
+
 Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Paulchens zusätzliche Flugpunkte starten auf den Kontinentkarten. Die Option **Flugpunkte auch auf der Azeroth-Übersicht** blendet sie dort ebenfalls ein. Falls Titan Panel Koordinaten auf derselben Karte anzeigt, blendet Paulchen die entsprechenden Titan-Labels aus, solange seine eigene Anzeige aktiv ist.
 
 - **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.

@@ -144,13 +144,11 @@ function world.CollectDungeons(mapID, sources, points)
             kind = "dungeon", x = x, y = y, name = name, dungeon = entry, note = note, atlas = atlas,
         }
     end
-    local included = {}
-    for _, source in ipairs(sources) do
-        included[source] = true
+    local function nativeEntrances(source)
         local records = read(C_EncounterJournal and C_EncounterJournal.GetDungeonEntrancesForMap, source)
         for _, value in ipairs(type(records) == "table" and records or {}) do
             local native = plain(value)
-            if native then
+            if type(native) == "table" then
                 local name = plain(native.name)
                 local title, instance = read(nativeIdentity, plain(native.journalInstanceID))
                 local entry = byName[normalized(title)] or byName[normalized(name)] or byInstance[instance] or nil
@@ -158,6 +156,11 @@ function world.CollectDungeons(mapID, sources, points)
                 add(source, x, y, entry and entry.name or name, entry, plain(native.description), plain(native.atlasName))
             end
         end
+    end
+    local included = {}
+    for _, source in ipairs(sources) do
+        included[source] = true
+        app.SecureCall(L("Instanzeingänge"), nativeEntrances, source)
     end
     for _, entry in ipairs(entries) do
         local entrance = entry.routeEntrance or entry.journalEntrance
