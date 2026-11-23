@@ -121,11 +121,11 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
     sync:SetText("Warte auf Abgleich")
     local description = label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -55)
     description:SetTextColor(unpack(style.muted))
-    description:SetText("Höchster kritischer Einzeltreffer pro Fähigkeit")
+    description:SetText(suite.L("Höchster kritischer Einzeltreffer pro Fähigkeit"))
 
     local empty = label(panel, "GameFontHighlight", "TOP", "TOP", 0, -109)
     empty:SetWidth(width - 40)
-    empty:SetText("Noch keine Crits geladen.\n\nStarte die Crit-Erfassung und aktiviere /combatlog.")
+    empty:SetText(suite.L("Noch keine Crits geladen.\n\nStarte die Crit-Erfassung und aktiviere /combatlog."))
 
     local rows = {}
     for index = 1, visibleRows do
@@ -162,7 +162,7 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
         pages = math.ceil(#records / visibleRows)
         page = math.max(1, math.min(pages, page))
         empty:SetShown(#records == 0)
-        footer:SetText(#records > 0 and ("%d Fähigkeiten · Seite %d/%d"):format(#records, page, pages) or "")
+        footer:SetText(#records > 0 and (suite.L("%d Fähigkeiten · Seite %d/%d")):format(#records, page, pages) or "")
         back:SetShown(pages > 1)
         forward:SetShown(pages > 1)
         back:SetEnabled(page > 1)
@@ -227,7 +227,7 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
         local saved = PaulchenQoLTimelineDB.critRecords
         for id, damage in pairs(hits) do
             if damage > 0 and (not saved[id] or damage > saved[id].damage) then
-                local name = id == 0 and "Nahkampfangriff" or C_Spell.GetSpellName(id) or ("Fähigkeit #%d"):format(id)
+                local name = id == 0 and "Nahkampfangriff" or C_Spell.GetSpellName(id) or (suite.L("Fähigkeit #%d")):format(id)
                 saved[id] = { damage = damage, name = name }
                 changed = true
             end
