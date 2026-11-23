@@ -39,7 +39,7 @@ local function copyLocation(text)
         local f = CreateFrame("Frame", "PaulchenQoLCopyLocation", UIParent, "BackdropTemplate")
         f:SetSize(430, 100); f:SetPoint("CENTER"); f:SetFrameStrata("DIALOG")
         style.Panel(f, style.background)
-        style.Label(f, "Standort kopieren · Strg+C", 14, -10, 380, 22, "GameFontNormal", style.gold)
+        style.Label(f, app.L("Standort kopieren · Strg+C"), 14, -10, 380, 22, "GameFontNormal", style.gold)
         local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
         close:SetPoint("TOPRIGHT"); close:SetScript("OnClick", function() f:Hide() end)
         f.box = style.EditBox(f)
@@ -57,7 +57,7 @@ function overview.Data()
     local data = { elapsed = played(), gold = session and session.gold or 0, deaths = session and session.deaths or 0, tasks = {} }
     local travel = app.ReadTravel()
     local mark, pouch = app.CompanionReminders()
-    if mark then data.tasks[#data.tasks + 1] = { text = mark .. " · Zauberbuch", action = function()
+    if mark then data.tasks[#data.tasks + 1] = { text = mark .. app.L(" · Zauberbuch"), action = function()
         if ToggleSpellBook and not (InCombatLockdown and InCombatLockdown()) then ToggleSpellBook("spell") end
     end } end
     if pouch then data.tasks[#data.tasks + 1] = { text = pouch, action = function() openBags("11020") end } end
@@ -187,7 +187,7 @@ function overview.Render()
     end
     local xp = data.xp
     local balance = (data.gold < 0 and "−" or data.gold > 0 and "+" or "") .. app.inventory.MoneyText(math.abs(data.gold))
-    f.session.body:SetText(("Spielzeit %s · Tode %d\n%s EP · %s EP/h\nGoldbilanz %s")
+    f.session.body:SetText((app.L("Spielzeit %s · Tode %d\n%s EP · %s EP/h\nGoldbilanz %s"))
         :format(duration(data.elapsed), data.deaths, (xp and xp.partial and "≥ " or "") .. count(xp and xp.total),
             (xp and xp.partial and "≥ " or "") .. count(xp and xp.rate), balance))
     if xp and xp.maximum > 0 then
@@ -198,12 +198,12 @@ function overview.Render()
                 xp.paused and "EP-Stopp" or xp.eta and ("ca. " .. duration(xp.eta)) or "Zeit noch offen", count(xp.mobs)))
     else
         f.level.progress:SetValue(xp and 1 or 0)
-        f.level.body:SetText(xp and "Maximalstufe erreicht" or "EP-Daten werden geladen …")
+        f.level.body:SetText(xp and app.L("Maximalstufe erreicht") or app.L("EP-Daten werden geladen …"))
     end
     local farm = data.farm
     f.farm.toggle:SetEnabled(farm.ready == true)
     f.farm.stop:SetEnabled(farm.ready == true and farm.active == true)
-    f.farm.toggle:SetText(farm.active and (farm.paused and "Fortsetzen" or "Pause") or "Start")
+    f.farm.toggle:SetText(farm.active and (farm.paused and app.L("Fortsetzen") or "Pause") or "Start")
     f.farm.progress:SetValue(farm.goal and math.min(1, farm.itemCount / farm.goal) or 0)
     if farm.active then
         local target = farm.goal and (" · Ziel %d/%d"):format(farm.itemCount, farm.goal) or ""
@@ -222,7 +222,7 @@ function overview.Render()
         f.upgrade.body:SetText(best.name .. " · " .. gain .. "\n" .. upgrade.profile
             .. (upgrade.state ~= "ready" and (" · " .. (statuses[upgrade.state] or "")) or upgrade.partial and " · Teilergebnis" or ""))
     else
-        local status = upgrade and (upgrade.state == "ready" and upgrade.partial and "Teilergebnis · Itemdaten fehlen" or statuses[upgrade.state])
+        local status = upgrade and (upgrade.state == "ready" and upgrade.partial and app.L("Teilergebnis · Itemdaten fehlen") or statuses[upgrade.state])
         f.upgrade.body:SetText(upgrade and ((status or "") .. "\n" .. upgrade.profile) or app.L("Bewertung nicht verfügbar"))
     end
 end
