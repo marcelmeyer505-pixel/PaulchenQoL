@@ -39,10 +39,11 @@ end
 
 local function selectLine(category, context, expression)
     local settings = app.Profile()
-    local lists = app.Dialogue[category]
+    local english = app.GetLanguage and app.GetLanguage() == "enUS"
+    local lists = (english and app.DialogueEnglish and app.DialogueEnglish[category]) or app.Dialogue[category]
     local special = context and context.special
     if settings.sarcasm >= 2 and special and app.ContextLines[special] and not recent(special) then
-        return app.ContextLines[special], special
+        return (english and app.ContextLinesEnglish and app.ContextLinesEnglish[special]) or app.ContextLines[special], special
     end
     local first = (settings.sarcasm - 1) * 5
     -- Good moods favor a gentler delivery, even on the harsh setting.
@@ -75,7 +76,7 @@ local function selectLine(category, context, expression)
             if age > oldest then oldest, index = age, i end
         end
     end
-    local text = lists[index]:gsub("{(%a+)}", function(key) return tostring(context and context[key] or "?") end)
+    local text = lists[index]:gsub("{(%a+)}", function(key) return tostring(app.LocalizeContext(context and context[key]) or "?") end)
     return text, category .. ":" .. index
 end
 
