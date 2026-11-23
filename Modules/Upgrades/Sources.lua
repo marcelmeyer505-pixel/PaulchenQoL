@@ -13,9 +13,9 @@ local pvpVendors = {
     [14753] = true, [14754] = true, [15126] = true, [15127] = true, [263569] = true, [263570] = true,
 }
 local sourceNames = {
-    quest = "Quest", boe = "BoE", dungeon = "Instanz", raid = "Raid", drop = "Drop", vendor = "Händler",
-    craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen", undermine = "Undermine Real",
-    pvp = "PvP-Händler",
+    quest = "Quest", boe = "BoE", dungeon = suite.L("Instanz"), raid = suite.L("Raid"), drop = suite.L("Drop"), vendor = suite.L("Händler"),
+    craft = suite.L("Herstellung"), auction = suite.L("Auktionshaus"), bag = suite.L("Taschen"), undermine = "Undermine Real",
+    pvp = suite.L("PvP-Händler"),
 }
 app.sourceNames = sourceNames
 
@@ -96,8 +96,8 @@ local function addCraft(scan, list, seen, profession, skill, spell)
     seen[info[1]] = true
     skill = type(skill) == "number" and skill > 0 and skill or nil
     local rank = scan.professionRanks[info[3]]
-    local detail = skill and ("Benötigt Skill " .. skill) or "Skill unbekannt"
-    if rank then detail = detail .. " · Dein Skill " .. rank end
+    local detail = skill and (suite.L("Benötigt Skill ") .. skill) or "Skill unbekannt"
+    if rank then detail = detail .. suite.L(" · Dein Skill ") .. rank end
     list[#list + 1] = {
         kind = "craft", title = info[2], detail = detail,
         profession = info[1], skill = skill, spell = spell,
@@ -650,7 +650,7 @@ function app.GetSources(scan, id, item)
         if estimate and not offer and not browse then
             list[#list + 1] = { kind = "auction", title = "TSM-Schätzpreis", price = estimate, isEstimate = true, effort = effort }
         end
-        list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = "Bestand und Preis unbekannt", effort = effort }
+        list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = suite.L("Bestand und Preis unbekannt"), effort = effort }
     end
     table.sort(list, function(a, b)
         if a.effort ~= b.effort then return a.effort < b.effort end
