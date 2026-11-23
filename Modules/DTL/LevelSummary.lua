@@ -58,7 +58,7 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
     local comparisonLabel = label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -80)
     label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -101):SetText(suite.L("STUFE"))
     label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -231, -101):SetText("DAUER")
-    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -130, -101):SetText("EP/H")
+    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -130, -101):SetText(suite.L("EP/H"))
     label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -101):SetText(suite.L("TOP-QUELLE"))
     local empty = label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -130)
     empty:SetText(suite.L("Die Bilanz füllt sich bei deinen nächsten Stufenaufstiegen."))
@@ -84,7 +84,7 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
             GameTooltip:SetText((suite.L("Stufe %d · %s EP")):format(entry.level, numberText(entry.xp)), 1, 0.82, 0)
             for _, source in ipairs(sourceList) do
                 local amount = entry.sources[source[1]] or 0
-                GameTooltip:AddDoubleLine(source[2], numberText(amount) .. " EP", source[3], source[4], source[5], 1, 1, 1)
+                GameTooltip:AddDoubleLine(source[2], numberText(amount) .. suite.L(" EP"), source[3], source[4], source[5], 1, 1, 1)
             end
             if entry.partial then
                 GameTooltip:AddLine(suite.L("Zeit und EP für den aufgezeichneten Teil der Stufe."), 0.7, 0.75, 0.82, true)
