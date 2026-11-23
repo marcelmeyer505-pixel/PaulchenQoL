@@ -10,10 +10,10 @@ local function safe(value)
 end
 
 function addon.CreateQuestExperiencePanel(panel, label, numberText)
-    label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34):SetText("Quest-EP")
+    label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34):SetText(suite.L("Quest-EP"))
     local totalText = label(panel, "GameFontNormal", "TOPLEFT", "TOPLEFT", 12, -61)
     local remainingText = label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -81)
-    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -106):SetText("ABGABEBEREITE QUESTS")
+    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -106):SetText(suite.L("ABGABEBEREITE QUESTS"))
     local rows = {}
     for index = 1, 10 do
         local row = CreateFrame("Frame", nil, panel)
@@ -43,7 +43,7 @@ function addon.CreateQuestExperiencePanel(panel, label, numberText)
                     xp = nil
                     unknown = unknown + 1
                 end
-                local title = safe(info.title) or ("Quest #%d"):format(id)
+                local title = safe(info.title) or (suite.L("Quest #%d")):format(id)
                 quests[#quests + 1] = { title = title, xp = xp }
             end
         end
@@ -54,25 +54,25 @@ function addon.CreateQuestExperiencePanel(panel, label, numberText)
     end
     return function(progress, paused)
         if dirty then scan() end
-        totalText:SetText(("%d bereit · %s%s EP"):format(#quests, unknown > 0 and "≥ " or "", numberText(total)))
+        totalText:SetText((suite.L("%d bereit · %s%s EP")):format(#quests, unknown > 0 and "≥ " or "", numberText(total)))
         if not progress or progress.maximum == 0 then
-            remainingText:SetText(progress and "Maximalstufe" or "Lade Stufenfortschritt …")
+            remainingText:SetText(progress and suite.L("Maximalstufe") or suite.L("Lade Stufenfortschritt …"))
         elseif paused then
-            remainingText:SetText("EP-Stopp aktiv")
+            remainingText:SetText(suite.L("EP-Stopp aktiv"))
         elseif total >= progress.maximum - progress.xp then
-            remainingText:SetText(("Genug für Stufe %d"):format(progress.level + 1))
+            remainingText:SetText((suite.L("Genug für Stufe %d")):format(progress.level + 1))
         else
-            remainingText:SetText(("Nach Abgabe %snoch %s EP"):format(unknown > 0 and "höchstens " or "", numberText(progress.maximum - progress.xp - total)))
+            remainingText:SetText((suite.L("Nach Abgabe %snoch %s EP")):format(unknown > 0 and suite.L("höchstens ") or "", numberText(progress.maximum - progress.xp - total)))
         end
         for index, row in ipairs(rows) do
             local quest = quests[index]
             row:SetShown(quest ~= nil)
             if quest then
                 row.title:SetText((quest.title:gsub("|", "||")))
-                row.xp:SetText(quest.xp and numberText(quest.xp) .. " EP" or "–")
+                row.xp:SetText(quest.xp and numberText(quest.xp) .. suite.L(" EP") or "–")
             end
         end
         local extra = #quests - #rows
-        footer:SetText((extra > 0 and ("+ %d weitere · "):format(extra) or "") .. "EP laut Questlog")
+        footer:SetText((extra > 0 and (suite.L("+ %d weitere · ")):format(extra) or "") .. suite.L("EP laut Questlog"))
     end, function() dirty = true end
 end
