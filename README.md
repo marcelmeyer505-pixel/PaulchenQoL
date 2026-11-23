@@ -208,6 +208,8 @@ Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Paulchens zus�
 
 Kleine runde Marker bündeln nahe Reisepunkte und Instanzeingänge auf Übersichtskarten. Ein Rechtsklick auf einen Reise-Sammelmarker öffnet seine Ziele. Auf Gebietskarten werden Reisepunkte einzeln angezeigt. Eng benachbarte Eingänge bleiben über die Flügelauswahl erreichbar.
 
+Paulchen verwendet für Eingänge, Flugpunkte, Portale, Geistheiler und Übergänge dieselben WoW-Symbole wie Leatrix Maps. Für Boote, Zeppeline und Bahnen verwendet Paulchen vorhandene Client-Symbole.
+
 - **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.
 - **Quests & Dialoge** bietet getrennte Schalter für normale, tägliche und wöchentliche Quests, Abgaben und einzelne NPC-Dialoge per Alt. Quests mit mehr als einer Belohnung zur Wahl, Kosten sowie normalen oder vorgemerkten Abgabeitems bleiben zur manuellen Prüfung offen.
 - Mit **Umschalt** beim Ansprechen kannst du die Automatik überspringen.

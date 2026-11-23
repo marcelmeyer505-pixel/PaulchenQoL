@@ -49,6 +49,36 @@ local colors = {
     level = { "Gebietsstufe", "", 0.96, 0.87, 0.66 },
 }
 
+local stockAtlases = {
+    cross = "Garr_LevelUpgradeArrow",
+    healer = "Vehicle-TempleofKotmogu-GreenBall",
+}
+local flightAtlases = {
+    Alliance = "TaxiNode_Alliance", Horde = "TaxiNode_Horde", Neutral = "TaxiNode_Neutral",
+}
+
+-- Leatrix Maps uses these Blizzard atlases directly. Only reference client artwork.
+local function markerAtlas(point)
+    local atlasAPI = C_Texture and C_Texture.GetAtlasInfo
+    if not atlasAPI or point.members then return end
+    local atlas = stockAtlases[point.kind]
+    if point.kind == "dungeon" then
+        atlas = point.raid and "Raid" or "Dungeon"
+    elseif point.kind == "flight" then
+        atlas = flightAtlases[point.faction] or flightAtlases.Neutral
+    elseif point.kind == "portal" then
+        local horde = point.faction == "Horde" or not point.faction and point.atlas == "MagePortalHorde"
+        atlas = horde and "MagePortalHorde" or "MagePortalAlliance"
+    elseif point.kind == "transport" then
+        atlas = point.atlas or "Vehicle-TempleofKotmogu-CyanBall"
+    end
+    if atlas and read(atlasAPI, atlas) then return atlas end
+    if point.atlas and point.atlas ~= atlas and read(atlasAPI, point.atlas) then return point.atlas end
+    if point.kind == "transport" and read(atlasAPI, "Vehicle-TempleofKotmogu-CyanBall") then
+        return "Vehicle-TempleofKotmogu-CyanBall"
+    end
+end
+
 local function navigate(map, target)
     local combat, known = options.Read(InCombatLockdown)
     if target and known and not combat and world.Info(target) then map:SetMapID(target) end
@@ -144,28 +174,42 @@ local function configure(pin, point, overview, mapID)
     local choice = colors[point.kind]
     local label = point.label or choice[2]
     local dungeon = point.kind == "dungeon"
-    local size = dungeon and (overview and 19 or 22) or (overview and 16 or 19)
+    local atlas = markerAtlas(point)
+    local size = dungeon and (overview and 23 or 30) or (overview and 17 or 22)
     pin:SetSize(point.kind == "level" and 44 or size, size)
-    pin.icon:SetSize(size - 6, size - 6)
+    local iconSize = atlas and size or size - 6
+    pin.icon:SetSize(atlas == "Garr_LevelUpgradeArrow" and iconSize * 48 / 54 or iconSize, iconSize)
     local acceptsLeft = point.dungeons ~= nil
     if acceptsLeft ~= pin.acceptsLeft then
         if acceptsLeft then pin:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         else pin:RegisterForClicks("RightButtonUp") end
         pin.acceptsLeft = acceptsLeft
     end
-    pin.badge:SetShown(point.kind ~= "level")
+    local showCount = atlas ~= nil and dungeon and point.label ~= nil
+    pin.badge:ClearAllPoints()
+    pin.text:ClearAllPoints()
+    if showCount then
+        pin.badge:SetDrawLayer("OVERLAY", -1)
+        pin.badge:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", 1, -1)
+        pin.badge:SetSize(13, 13)
+        pin.text:SetPoint("CENTER", pin.badge, "CENTER")
+    else
+        pin.badge:SetDrawLayer("BACKGROUND")
+        pin.badge:SetAllPoints()
+        pin.text:SetPoint("CENTER", 0, 0)
+    end
+    pin.badge:SetShown(showCount or not atlas and point.kind ~= "level")
     pin.badge:SetVertexColor(choice[3], choice[4], choice[5])
     pin.text:SetText(label)
-    pin.text:SetTextColor(choice[3], choice[4], choice[5])
-    local atlas = point.atlas
-    local icon = not dungeon and not point.members and type(atlas) == "string" and C_Texture and read(C_Texture.GetAtlasInfo, atlas)
-    local dungeonIcon = dungeon and not point.label
-    pin.icon:SetShown(not not icon or dungeonIcon)
-    pin.text:SetShown(not icon and not dungeonIcon)
+    if showCount then pin.text:SetTextColor(unpack(style.cream))
+    else pin.text:SetTextColor(choice[3], choice[4], choice[5]) end
+    local dungeonIcon = not atlas and dungeon and not point.label
+    pin.icon:SetShown(atlas ~= nil or dungeonIcon)
+    pin.text:SetShown(showCount or not atlas and not dungeonIcon)
     if dungeonIcon then
         pin.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
         pin.icon:SetTexCoord(0, 1, 0, 1)
-    elseif icon then
+    elseif atlas then
         pin.icon:SetAtlas(atlas)
     end
     if pin.SetMouseClickEnabled then
@@ -272,6 +316,7 @@ local function groupMarkers(points, canvas, scale, overview, entrancesOnly)
             end
             local contents = group.contents
             contents[#contents + 1] = entrancesOnly and point.dungeon or point
+            if entrancesOnly and not point.raid then group.raid = false end
         else
             result[#result + 1] = point
         end

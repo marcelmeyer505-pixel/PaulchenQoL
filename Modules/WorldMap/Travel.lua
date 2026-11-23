@@ -162,7 +162,7 @@ function world.Collect(id, excludeDungeons)
     local function allowed(owner)
         return showOpposing or not owner or not faction or owner == faction
     end
-    local function add(kind, source, x, y, name, target, note, atlas)
+    local function add(kind, source, x, y, name, target, note, atlas, owner)
         if not app.ValidMapPoint(x, y) then return end
         x, y = app.ProjectMapPoint(source, id, x, y)
         if not x then return end
@@ -172,6 +172,7 @@ function world.Collect(id, excludeDungeons)
         end
         points[#points + 1] = {
             kind = kind, x = x, y = y, name = name, target = target, source = source, note = note, atlas = atlas,
+            faction = owner,
         }
     end
 
@@ -193,7 +194,7 @@ function world.Collect(id, excludeDungeons)
                     if allowed(owner) then
                         local name, x, y = nameAndPosition(node)
                         local note = plain(node.isUndiscovered) == true and app.L("Noch nicht entdeckt") or nil
-                        add("flight", source, x, y, name, nil, note, plain(node.atlasName))
+                        add("flight", source, x, y, name, nil, note, plain(node.atlasName), owner)
                     end
                 end
             end
@@ -224,7 +225,7 @@ function world.Collect(id, excludeDungeons)
                     if allowed(owner) and ((kind == "portal" and showPortal) or (kind == "transport" and showTransport)
                         or (kind == "healer" and showHealer)) then
                         local name, x, y = nameAndPosition(poi)
-                        add(kind, source, x, y, name, plain(poi.linkedUiMapID), plain(poi.description), atlas)
+                        add(kind, source, x, y, name, plain(poi.linkedUiMapID), plain(poi.description), atlas, owner)
                     end
                 end
             end
@@ -232,7 +233,8 @@ function world.Collect(id, excludeDungeons)
         if showPortal then
             for _, node in ipairs(portals[source] or {}) do
                 if allowed(node[4]) then
-                    add("portal", source, node[1], node[2], node[5] or world.Name(node[3]), node[3], app.L("Verfügbarkeit kann von Quests abhängen."))
+                    add("portal", source, node[1], node[2], node[5] or world.Name(node[3]), node[3],
+                        app.L("Verfügbarkeit kann von Quests abhängen."), nil, node[4])
                 end
             end
         end

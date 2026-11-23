@@ -85,7 +85,8 @@ local methods = {
     ClearAllPoints = function(self) self.anchor = nil end,
     GetChildren = function(self) return unpack(self.children) end,
     SetText = function(self, text) self.textValue = text end,
-    SetTexture = function(self, id) self.textureID = id end,
+    SetTexture = function(self, id) self.textureID, self.atlasID = id, nil end,
+    SetAtlas = function(self, id) self.atlasID, self.textureID = id, nil end,
 }
 for _, name in ipairs({
     "SetAllPoints", "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor",
@@ -192,6 +193,7 @@ local maps = {
     [1413] = {mapID = 1413, name = "Brachland", mapType = 3, parentMapID = 1414},
     [1415] = {mapID = 1415, name = "Östliche Königreiche", mapType = 2, parentMapID = 947},
     [1423] = {mapID = 1423, name = "Östliche Pestländer", mapType = 3, parentMapID = 1415},
+    [1445] = {mapID = 1445, name = "Düstermarschen", mapType = 3, parentMapID = 1414},
     [1454] = {mapID = 1454, name = "Orgrimmar", mapType = 3, parentMapID = 1414},
     [1458] = {mapID = 1458, name = "Undercity", mapType = 3, parentMapID = 1414},
 }
@@ -228,6 +230,7 @@ C_TaxiMap = { GetTaxiNodesForMap = function(id)
     }
 end }
 C_MapExplorationInfo = { GetExploredMapTextures = function() return explored end }
+C_Texture = {GetAtlasInfo = function() return {} end}
 C_QuestLog = {
     GetNumQuestLogEntries = function() return 2 end,
     GetInfo = function(index) return {questID = index, title = "Quest " .. index} end,
@@ -253,8 +256,8 @@ local function count(id, kind)
     return n
 end
 assert(count(1411, "flight") == 1 and count(1411, "portal") == 2 and count(1411, "cross") == 1)
-assert(count(1414, "flight") == 1 and count(1414, "cross") == 1)
-assert(count(947, "flight") == 0 and count(947, "dungeon") == 1)
+assert(count(1414, "flight") == 1 and count(1414, "cross") == 2)
+assert(count(947, "flight") == 0 and count(947, "dungeon") == 2)
 comfort.SetEnabled("mapFlightsOnWorld", true)
 assert(count(947, "flight") == 1)
 comfort.SetEnabled("mapFlightsOnWorld", false)
@@ -604,7 +607,8 @@ local layer = assert(provider.layer)
 assert(strath:GetParent() == layer and layer:GetParent() == map and layer.clipsChildren,
     "Entrance buttons sit in a separate clipped viewport, outside the map artwork")
 assert(layer:GetFrameStrata() == "DIALOG" and strath:GetFrameLevel() > map.BorderFrame:GetFrameLevel())
-assert(strath.badge.tint[3] > strath.badge.tint[2] and strath.badge.tint[2] > strath.badge.tint[1])
+assert(strath.icon.atlasID == "Dungeon" and not strath.badge:IsShown(), "Use the game's blue dungeon icon")
+assert(north.icon.atlasID == "TaxiNode_Horde")
 local _, _, _, anchorX, anchorY = strath:GetPoint()
 assert(anchorX == strath.point.x * 700 and anchorY == -strath.point.y * 500)
 map.canvasScale = 1.8
@@ -620,6 +624,33 @@ provider:OnCanvasPanChanged()
 assert(not strath:IsShown(), "An off-map entrance does not leak beyond the viewport or intercept clicks")
 canvas.scrollX, canvas.scrollY = nil, nil
 map.canvasScale, C_TaxiMap.GetTaxiNodesForMap = nil, getTaxiNodes
+
+map.canvasScale = 1
+map:SetMapID(1445)
+flush()
+local onyxia
+for index = 1, provider.used do
+    local pin = provider.pins[index]
+    if pin.point.dungeon and pin.point.dungeon.guideKey == "onyxia" then onyxia = pin; break end
+end
+assert(onyxia and onyxia.icon.atlasID == "Raid" and onyxia:IsVisible())
+local getAtlas = C_Texture.GetAtlasInfo
+C_Texture.GetAtlasInfo = function(atlas) if atlas ~= "Raid" then return getAtlas(atlas) end end
+provider:RefreshAllData()
+flush()
+assert(onyxia.badge:IsVisible() and onyxia.icon.textureID:match("UI%-RaidTargetingIcon_8$"),
+    "Missing stock artwork falls back to Paulchen's entrance symbol")
+C_Texture.GetAtlasInfo = getAtlas
+app.comfort.SetEnabled("mapPortals", true)
+map:SetMapID(1411)
+flush()
+local seenAtlases = {}
+for index = 1, travelProvider.used do
+    local pin = travelProvider.pins[index]
+    if pin.icon.atlasID then seenAtlases[pin.icon.atlasID] = true end
+end
+assert(seenAtlases.MagePortalHorde and seenAtlases.TaxiNode_Alliance and seenAtlases.Garr_LevelUpgradeArrow)
+map.canvasScale = nil
 
 local inDungeon, dungeonID, interiorFloor = false, nil, nil
 local outdoorMap, outdoorPosition

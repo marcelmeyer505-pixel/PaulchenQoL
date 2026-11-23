@@ -32,7 +32,7 @@ local function catalog(journal, routes)
         for _, dungeon in ipairs(guide.entries) do
             local at = dungeon.entrance
             local entry = add({
-                guideKey = dungeon.key, instance = dungeon.id, name = guide.Name(dungeon),
+                guideKey = dungeon.key, instance = dungeon.id, name = guide.Name(dungeon), raid = dungeon.raid == true,
                 routeEntrance = at and { map = at[1], x = at[2], y = at[3] },
             })
             alias(entry, dungeon.name)
@@ -92,6 +92,7 @@ local function catalog(journal, routes)
             if not paired then
                 entry = entry or add({ name = display })
                 entry.route, entry.instance = route.key, route.instanceID or entry.instance
+                entry.raid = route.raid == true
                 entry.routeEntrance = read(routes.GetEntrance, routes, route.key)
                 local wings = routes.WingPortals and routes.WingPortals[route.instanceID]
                 for _, door in ipairs(wings or {}) do
@@ -118,15 +119,15 @@ end
 
 local function nativeIdentity(id)
     if type(id) ~= "number" or id <= 0 or type(EJ_GetInstanceInfo) ~= "function" then return end
-    local name, _, _, _, _, _, _, _, _, instanceID = EJ_GetInstanceInfo(id)
-    return plain(name), plain(instanceID)
+    local name, _, _, _, _, _, _, _, _, instanceID, _, isRaid = EJ_GetInstanceInfo(id)
+    return { name = plain(name), instance = plain(instanceID), raid = plain(isRaid) == true }
 end
 
 function world.CollectDungeons(mapID, sources, points)
     local journal, routes = providers()
     local entries, byName, byInstance = catalog(journal, routes)
     local seen = {}
-    local function add(source, x, y, name, entry, note, atlas)
+    local function add(source, x, y, name, entry, note, atlas, raid)
         if not app.ValidMapPoint(x, y) then return end
         local sourceX, sourceY = x, y
         x, y = app.ProjectMapPoint(source, mapID, x, y)
@@ -142,6 +143,7 @@ function world.CollectDungeons(mapID, sources, points)
         end
         points[#points + 1] = {
             kind = "dungeon", x = x, y = y, name = name, dungeon = entry, note = note, atlas = atlas,
+            raid = raid or entry and entry.raid or atlas == "Raid",
         }
     end
     local function nativeEntrances(source)
@@ -150,10 +152,12 @@ function world.CollectDungeons(mapID, sources, points)
             local native = plain(value)
             if type(native) == "table" then
                 local name = plain(native.name)
-                local title, instance = read(nativeIdentity, plain(native.journalInstanceID))
-                local entry = byName[normalized(title)] or byName[normalized(name)] or byInstance[instance] or nil
+                local identity = read(nativeIdentity, plain(native.journalInstanceID))
+                local entry = byName[normalized(identity and identity.name)] or byName[normalized(name)]
+                    or identity and byInstance[identity.instance] or nil
                 local x, y = world.Vector(plain(native.position))
-                add(source, x, y, entry and entry.name or name, entry, plain(native.description), plain(native.atlasName))
+                add(source, x, y, entry and entry.name or name, entry, plain(native.description), plain(native.atlasName),
+                    identity and identity.raid)
             end
         end
     end
