@@ -183,7 +183,7 @@ local function createWindow()
     end
     f.controls[#f.controls+1] = syncLanguage
     button(f, "Level-up-Sound testen", 252, -332, 210):SetScript("OnClick", function()
-        if not app.PlayLevelUpSound() then print("Paulchen QoL · Der Level-up-Sound konnte nicht abgespielt werden.") end
+        if not app.PlayLevelUpSound() then print(L("Paulchen QoL · Der Level-up-Sound konnte nicht abgespielt werden.")) end
     end)
     button(f, "Buffwächter einstellen", 252, -366, 210):SetScript("OnClick", function()
         if app.buffCheck then app.buffCheck.OpenConfig() end
@@ -221,7 +221,7 @@ function app.CompanionCommand(message)
         app.TestComment()
     elseif cmd == "debug" then
         write("debug", not app.Profile().debug)
-        print("Paulchen QoL · Debugmodus " .. (app.Profile().debug and "an" or "aus"))
+        print(L("Paulchen QoL · Debugmodus ") .. (app.Profile().debug and L(" an") or L(" aus")))
     elseif cmd == "" then
         app.OpenConfig()
     else
