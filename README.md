@@ -1,5 +1,22 @@
 # Paulchen QoL v0.11.3
 
+## Deutsch / English localization (development branch)
+
+Paulchen QoL now offers **German and English**. By default, the addon follows the World of Warcraft client locale: `deDE` uses German, while `enUS`, `enGB` and other client locales use English. You can override this independently of your game client in **Paulchen Settings → Language**:
+
+- **Automatic / Automatisch** – follow the game client
+- **German / Deutsch** – always use German UI text and companion speech
+- **English / Englisch** – always use English UI text and companion speech
+
+You can also enter `/pq lang auto`, `/pq lang de`, or `/pq lang en` in chat. The selection is saved globally in `PaulchenQoLSettings.language`, and the interface reloads after a change to refresh existing text labels.
+
+The original German companion dialogue and the complete corresponding English dialogue are stored separately in `Dialogue.lua` and `Dialogue_enUS.lua`. The central translation dictionary is `Localization.lua`. UI labels fall back safely to their original German text when an English translation has not yet been added; names provided by the WoW client (items, spells, places and players) remain in the client's own language. This is a separate language setting and does not change the game client's locale.
+
+The test `tests/localization_fixture.lua` checks both selection modes, language override, the main translation mechanism, all 180 existing companion lines and their dynamic placeholders. The workflow `.github/workflows/localization.yml` runs these checks and validates Lua syntax in pull requests.
+
+---
+
+
 Paulchen ist ein Hordevogel mit Headset für **World of Warcraft: Forever** (Interface `16001`). Er kommentiert Ereignisse mit einer von fünf Illustrationen. Die Übersicht mit Reise-Check, die sortierbare Taschenliste mit Vormerkungen, die Markierung des günstigsten Stapels und der Flugtimer gehören ebenfalls zum Addon.
 
 **Paulchens Buffwächter** prüft eigene, Gruppen- und Raidbuffs im neuen Reiter **Buffs**. Er unterscheidet grün **vorhanden**, rot **fehlt** und grau **unbekannt**. Geschützte, nicht lesbare, tote, ausgeloggte oder entfernte Spieler werden niemals allein deswegen als ungebufft gemeldet. Buffsymbole bieten Tooltips; Raidmitglieder erscheinen in einer scrollbaren Übersicht. Aura-Ereignisse werden 0,2 Sekunden gebündelt und betreffen normalerweise nur den geänderten Spieler. Roster-/Fähigkeitsänderungen und bewusste Checks erneuern die ganze Übersicht. Während der Reiter offen ist, werden unbekannte oder inzwischen entfernte Spieler alle zwei Sekunden gezielt nachgeprüft.
