@@ -4,7 +4,7 @@ if not addon then return end
 local style = suite.style
 
 function addon.CreateFarmArchivePanel(panel, label, farm, back)
-    label(panel, "GameFontNormal", "TOPLEFT", "TOPLEFT", 12, -35):SetText("Farmarchiv")
+    label(panel, "GameFontNormal", "TOPLEFT", "TOPLEFT", 12, -35):SetText(suite.L("Farmarchiv"))
     local function button(text, x, y, width)
         local control = style.TextButton(panel)
         control:SetPoint("TOPRIGHT", x, y)
@@ -12,9 +12,9 @@ function addon.CreateFarmArchivePanel(panel, label, farm, back)
         control:SetText(text)
         return control
     end
-    button("Zur Farm", -12, -32, 67):SetScript("OnClick", back)
-    local favorites = button("Alle Runden", -12, -56, 90)
-    label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -60):SetText("Suche")
+    button(suite.L("Zur Farm"), -12, -32, 67):SetScript("OnClick", back)
+    local favorites = button(suite.L("Alle Runden"), -12, -56, 90)
+    label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -60):SetText(suite.L("Suche"))
     local search = style.EditBox(panel)
     search:SetPoint("TOPLEFT", 59, -56)
     search:SetSize(185, 20)
@@ -27,10 +27,10 @@ function addon.CreateFarmArchivePanel(panel, label, farm, back)
     local difference = label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -98)
     local pageText = label(panel, "GameFontHighlightSmall", "BOTTOMLEFT", "BOTTOMLEFT", 12, 8)
     local previous, nextPage = button("<", -41, -283, 26), button(">", -12, -283, 26)
-    label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 33, -117):SetText("Runde · Gebiet")
-    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -126, -117):SetText("Dauer")
-    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -68, -117):SetText("EP")
-    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -12, -117):SetText("EP/h")
+    label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 33, -117):SetText(suite.L("Runde · Gebiet"))
+    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -126, -117):SetText(suite.L("Dauer"))
+    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -68, -117):SetText(suite.L("EP"))
+    label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -12, -117):SetText(suite.L("EP/h"))
     local rows, page, onlyFavorites, render = {}, 1, false
     for index = 1, 8 do
         local row = CreateFrame("Button", nil, panel)
@@ -70,14 +70,14 @@ function addon.CreateFarmArchivePanel(panel, label, farm, back)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(farm.AreaText(run), 1, 1, 1)
             if run.name then GameTooltip:AddLine(run.name:gsub("|", "||"), 1, 0.82, 0.38) end
-            GameTooltip:AddLine((run.partial and "≥ " or "") .. BreakUpLargeNumbers(run.xp) .. " EP", 0.8, 0.85, 0.9)
+            GameTooltip:AddLine((run.partial and "≥ " or "") .. BreakUpLargeNumbers(run.xp) .. suite.L(" EP"), 0.8, 0.85, 0.9)
             if run.item then
                 GameTooltip:AddLine(("%d × %s"):format(run.itemCount or 0, ((run.itemLabel or run.item):gsub("|", "||"))), 0.8, 0.85, 0.9)
                 if run.goal then
-                    GameTooltip:AddLine(("Farmziel · %d/%d"):format(run.itemCount or 0, run.goal), 0.8, 0.85, 0.9)
+                    GameTooltip:AddLine((suite.L("Farmziel · %d/%d")):format(run.itemCount or 0, run.goal), 0.8, 0.85, 0.9)
                 end
             end
-            if farm.State() == "idle" then GameTooltip:AddLine("Klick wählt die Runde für A/B.", 0.7, 0.75, 0.82) end
+            if farm.State() == "idle" then GameTooltip:AddLine(suite.L("Klick wählt die Runde für A/B."), 0.7, 0.75, 0.82) end
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -123,7 +123,7 @@ function addon.CreateFarmArchivePanel(panel, label, farm, back)
     end)
     favorites:SetScript("OnClick", function()
         onlyFavorites = not onlyFavorites
-        favorites:SetText(onlyFavorites and "Nur Favoriten" or "Alle Runden")
+        favorites:SetText(onlyFavorites and "Nur Favoriten" or suite.L("Alle Runden"))
         page = 1
         render()
     end)
