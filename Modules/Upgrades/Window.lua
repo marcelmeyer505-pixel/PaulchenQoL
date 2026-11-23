@@ -211,7 +211,7 @@ end
 local function searchAuctionHouse(item)
     local auction = AuctionHouseFrame
     if not auction or not auction:IsShown() then
-        print("Paulchen Upgrades · Öffne das Auktionshaus und klicke das Upgrade erneut mit der rechten Maustaste an.")
+        print(suite.L("Paulchen Upgrades · Öffne das Auktionshaus und klicke das Upgrade erneut mit der rechten Maustaste an."))
         return
     end
     local name = item.link:match("|h%[([^%]]+)%]|h") or item.name
@@ -246,14 +246,14 @@ local function tip(row)
     else gain = gain .. " Punkte" end
     local equipped = item.empty and suite.L("Freier Slot") or number(item.old, 2)
     GameTooltip:AddDoubleLine(equipped .. " -> " .. number(item.new, 2) .. " Punkte", gain, 0.8, 0.83, 0.88, unpack(GREEN))
-    if item.future then GameTooltip:AddLine("Tragbar ab Charakterstufe " .. item.requiredLevel, unpack(GOLD)) end
+    if item.future then GameTooltip:AddLine(suite.L("Tragbar ab Charakterstufe ") .. item.requiredLevel, unpack(GOLD)) end
     local action, quest = rowAction(entry)
     if isAuction(source) then
         if source.kind == "auction" then
             if source.price and not source.isEstimate then
                 GameTooltip:AddDoubleLine(source.at and suite.L("Sofortkauf pro Stück") or suite.L("Preis in der AH-Übersicht"), auctionPrice(source.price))
             end
-            if source.at then GameTooltip:AddLine("Erfasst am " .. date("%d.%m. um %H:%M", source.at), unpack(MUTED)) end
+            if source.at then GameTooltip:AddLine(suite.L("Erfasst am ") .. date("%d.%m. um %H:%M", source.at), unpack(MUTED)) end
             addPriceEstimate(source)
         else
             GameTooltip:AddLine("BoE", unpack(MUTED))
@@ -267,7 +267,7 @@ local function tip(row)
         local text = s.zone or s.detail
         if s.zone and s.detail then text = s.zone .. " · " .. s.detail end
         if s.pct and s.pct > 0 then
-            text = (text and text .. " · " or "") .. number(s.pct, 1) .. " % Dropchance"
+            text = (text and text .. " · " or "") .. number(s.pct, 1) .. suite.L(" % Dropchance")
         end
         if text then GameTooltip:AddLine(text, unpack(MUTED)) end
         addPriceEstimate(s)
@@ -307,7 +307,7 @@ local function renderRows()
             local item, source = entry.item, entry.source
             local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[item.quality]
             row.icon:SetTexture(item.icon or (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(item.id)) or 134400)
-            row.name:SetText(item.future and ("|cffffcf75Ab Stufe " .. item.requiredLevel .. "|r · " .. item.name) or item.name)
+            row.name:SetText(item.future and (suite.L("|cffffcf75Ab Stufe ") .. item.requiredLevel .. "|r · " .. item.name) or item.name)
             if color then row.name:SetTextColor(color.r, color.g, color.b) else row.name:SetTextColor(unpack(TEXT)) end
             row.slot:SetText(app.slotNames[item.slot])
             row.source:SetText(sourceTitle(source))
@@ -411,7 +411,7 @@ local function render(reset)
         status = suite.L("Auf Aktualisieren klicken, um Upgrades zu suchen.")
     end
     if auctions and current and current.auctionAt then
-        status = status .. " · AH-Stand " .. date("%d.%m. %H:%M", current.auctionAt)
+        status = status .. suite.L(" · AH-Stand ") .. date("%d.%m. %H:%M", current.auctionAt)
     end
     window.status:SetText(status)
     local canExport = exportReady()
@@ -738,7 +738,7 @@ local function createProfileEditor(parent)
     f:EnableMouse(true)
     style.Panel(f, style.background, style.accent)
     f:Hide()
-    label(f, "GameFontNormalLarge", GOLD, 16, -11, 420, 27):SetText("Statprofile")
+    label(f, "GameFontNormalLarge", GOLD, 16, -11, 420, 27):SetText(suite.L("Statprofile"))
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
     close:SetScript("OnClick", function() f:Hide() end)
@@ -762,7 +762,7 @@ local function createProfileEditor(parent)
     local tooltip = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     tooltip:SetPoint("TOPLEFT", 13, -346)
     tooltip:SetSize(23, 23)
-    label(f, "GameFontHighlightSmall", TEXT, 40, -346, 222, 23):SetText("Vergleich im Item-Tooltip")
+    label(f, "GameFontHighlightSmall", TEXT, 40, -346, 222, 23):SetText(suite.L("Vergleich im Item-Tooltip"))
     local feedback = label(f, "GameFontHighlightSmall", GOLD, 16, -378, 380, 24)
     local function drawProfile()
         selector.text:SetText(app.ProfileName() .. downArrow)
@@ -783,7 +783,7 @@ local function createProfileEditor(parent)
         end)
     end)
     tooltip:SetScript("OnClick", function(self) db.statTooltip = not not self:GetChecked() end)
-    local reset = button(f, "Standardwerte", 439, -378, 115, 24)
+    local reset = button(f, suite.L("Standardwerte"), 439, -378, 115, 24)
     reset:SetScript("OnClick", function()
         local choice = app.ActiveProfile()
         if not choice then return end
@@ -797,7 +797,7 @@ local function createProfileEditor(parent)
         if app.SaveProfileWeights(weights) then
             f:Hide()
         else
-            feedback:SetText("Bitte Gewichte von 0 bis 1.000.000 eingeben.")
+            feedback:SetText(suite.L("Bitte Gewichte von 0 bis 1.000.000 eingeben."))
         end
     end)
     f:SetScript("OnShow", drawProfile)
@@ -812,7 +812,7 @@ local function createExportDialog(parent)
     f:EnableMouse(true)
     style.Panel(f, style.background, style.accent)
     f:Hide()
-    label(f, "GameFontNormalLarge", GOLD, 16, -12, 664, 24):SetText("Upgrade-Export")
+    label(f, "GameFontNormalLarge", GOLD, 16, -12, 664, 24):SetText(suite.L("Upgrade-Export"))
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
     close:SetScript("OnClick", function() f:Hide() end)
@@ -844,7 +844,7 @@ local function createExportDialog(parent)
         end
     end)
     f:SetScript("OnHide", function() box:ClearFocus() end)
-    button(f, "Alles markieren", 16, -364, 142, 25):SetScript("OnClick", selectAll)
+    button(f, suite.L("Alles markieren"), 16, -364, 142, 25):SetScript("OnClick", selectAll)
     label(f, "GameFontHighlightSmall", TEXT, 170, -364, 530, 25)
         :SetText(suite.L("Strg+C kopiert den Text. In Excel oder Google Sheets ab A1 einfügen."))
 
@@ -856,7 +856,7 @@ local function createExportDialog(parent)
         box:SetCursorPosition(0)
         scroll:UpdateScrollChildRect()
         scroll:SetVerticalScroll(0)
-        summary:SetText(("%d %s · Aktuelle Filter und Sortierung · Tabulatorgetrennt (TSV)")
+        summary:SetText((suite.L("%d %s · Aktuelle Filter und Sortierung · Tabulatorgetrennt (TSV)"))
             :format(#display, #display == 1 and "Upgrade" or "Upgrades"))
         f:Show()
         selectAll()
@@ -1030,7 +1030,7 @@ local function createPage(parent)
     style.Portrait(titlebar, 42, 10, -7)
     label(titlebar, "GameFontNormalLarge", GOLD, 59, -5, 390, 30):SetText(suite.L("Paulchen Upgrades"))
     f.profile = label(titlebar, "GameFontHighlightSmall", MUTED, 59, -34, 260, 17)
-    f.profilesButton = button(titlebar, "Statprofile", 347, -12, 103, 27)
+    f.profilesButton = button(titlebar, suite.L("Statprofile"), 347, -12, 103, 27)
     f.profilesButton:SetScript("OnClick", function()
         profileEditor = profileEditor or createProfileEditor(f)
         profileEditor:SetShown(not profileEditor:IsShown())
@@ -1086,13 +1086,13 @@ local function createPage(parent)
         return choices
     end, "instanceSelection", 166, 218, instanceCaption)
     f.professionFilter = dropdown(f, app.professionChoices, "profession", 17, 210, nil, -103)
-    f.auctionScan = button(f, "AH scannen", 17, -103, 141, 27)
+    f.auctionScan = button(f, suite.L("AH scannen"), 17, -103, 141, 27)
     f.auctionScan:SetScript("OnClick", function() PaulchenAuktionsscan.Start() end)
     f.contentButton = button(f, suite.L("Spielinhalte") .. downArrow, 17, -103, 210, 27)
     f.contentButton:SetScript("OnClick", function(self)
         hideChoices()
         MenuUtil.CreateContextMenu(self, function(_, menu)
-            if menu.CreateTitle then menu:CreateTitle("Auf deinem Server freigeschaltet") end
+            if menu.CreateTitle then menu:CreateTitle(suite.L("Auf deinem Server freigeschaltet")) end
             for _, choice in ipairs(app.content.choices) do
                 local key, caption = choice[1], choice[2]
                 menu:CreateCheckbox(caption, function() return app.content.Snapshot()[key] end, function()
@@ -1134,14 +1134,14 @@ local function createPage(parent)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     local reload = button(f, suite.L("Aktualisieren"), 764, -69, 128, 27)
     reload:SetScript("OnClick", app.CheckUpgrades)
-    f.exportButton = button(f, "Exportieren", 350, -103, 118, 27)
+    f.exportButton = button(f, suite.L("Exportieren"), 350, -103, 118, 27)
     f.exportButton:SetEnabled(false)
     f.exportButton:SetScript("OnClick", function()
         if not exportReady() then return end
         exportDialog = exportDialog or createExportDialog(f)
         exportDialog.ShowResults()
     end)
-    f.columnsMenu = button(f, "Spalten" .. downArrow, 764, -103, 128, 27)
+    f.columnsMenu = button(f, suite.L("Spalten") .. downArrow, 764, -103, 128, 27)
     local columnChoices = {}
     for _, col in ipairs(columns) do
         if col.option then columnChoices[#columnChoices + 1] = {col.key, col.option} end
@@ -1190,7 +1190,7 @@ local function createPage(parent)
     f.headers.effort:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText(suite.L("Geschätzter Aufwand"), unpack(GOLD))
-        GameTooltip:AddLine("1 = schnell erreichbar, 10 = sehr aufwendig.", unpack(TEXT))
+        GameTooltip:AddLine(suite.L("1 = schnell erreichbar, 10 = sehr aufwendig."), unpack(TEXT))
         GameTooltip:AddLine(suite.L("Questfortschritt, Gruppenbedarf, Stufenabstand und bekannte Dropchancen zählen mit."), 0.64, 0.69, 0.75, true)
         GameTooltip:AddLine(suite.L("Bei BoEs dient die Seltenheit als Schätzung für den Handel."), 0.64, 0.69, 0.75, true)
         GameTooltip:Show()
@@ -1253,7 +1253,7 @@ local function toggle(msg)
     if msg and msg:match("^%s*diagnose%s*$") then
         local current = scan or finished
         local err = scanFailure or displayFailure or (current and current.firstError)
-        print("Paulchen Upgrades · " .. (err or "Kein Suchfehler aufgezeichnet."))
+        print("Paulchen Upgrades · " .. (err or suite.L("Kein Suchfehler aufgezeichnet.")))
         return
     end
     suite.ToggleDashboard("upgrades")
