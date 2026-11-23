@@ -169,7 +169,7 @@ local function startFlight(now)
         end
     end
     flying = flying or { started = now }
-    flying.name = flying.name or "Unterwegs auf der Flugroute"
+    flying.name = flying.name or app.L("Unterwegs auf der Flugroute")
     picked, boardingUntil = nil, nil
     db.activeFlight = {
         name = flying.name, key = flying.key, duration = flying.duration, estimate = flying.estimate,
