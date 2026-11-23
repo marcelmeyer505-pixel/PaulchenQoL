@@ -75,7 +75,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
     local function compare()
         local a, b = selected[1], selected[2]
         if not b then
-            return "", a and "Klicke eine zweite Runde für den Vergleich." or ""
+            return "", a and suite.L("Klicke eine zweite Runde für den Vergleich.") or ""
         end
         local summary = "B − A  ·  " .. signed(b.elapsed - a.elapsed, durationText)
         if a.partial or b.partial then
@@ -125,7 +125,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
     nameBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     nameBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     nameBox:SetScript("OnHide", function(self) self:ClearFocus() end)
-    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 175, -83):SetText("Item/Ziel")
+    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 175, -83):SetText(suite.L("Item/Ziel"))
     local itemBox = style.EditBox(panel)
     itemBox:SetPoint("TOPLEFT", 211, -77)
     itemBox:SetPoint("TOPRIGHT", -66, -77)
@@ -147,7 +147,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
     goalBox:SetScript("OnHide", function(self) self:ClearFocus() end)
     goalBox:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Stückziel für das ausgewählte Item", 1, 1, 1)
+        GameTooltip:SetText(suite.L("Stückziel für das ausgewählte Item"), 1, 1, 1)
         GameTooltip:Show()
     end)
     goalBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -170,7 +170,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
         button:SetText(text)
         return button
     end
-    local startButton = control("Start", -69)
+    local startButton = control(suite.L("Start"), -69)
     startButton:SetWidth(68)
     local stopButton = control("Stopp", -10)
 
@@ -210,12 +210,12 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
                 GameTooltip:AddLine(displayArea(run), 1, 1, 1)
             end
             GameTooltip:AddLine("Abgeschlossen am " .. date("%d.%m. um %H:%M", run.ended), 1, 1, 1)
-            if run.copper then GameTooltip:AddLine("Münzbeute · " .. moneyText(run.copper), 1, 1, 1) end
+            if run.copper then GameTooltip:AddLine(suite.L("Münzbeute · ") .. moneyText(run.copper), 1, 1, 1) end
             if run.item then GameTooltip:AddLine(("%d × %s"):format(run.itemCount or 0, ((run.itemLabel or run.item):gsub("|", "||"))), 1, 1, 1) end
             if run.goal then GameTooltip:AddLine(("Farmziel · %d/%d"):format(run.itemCount or 0, run.goal), 1, 1, 1) end
-            if not data.active then GameTooltip:AddLine("Klick markiert die Runde für den Vergleich.", 0.7, 0.75, 0.82) end
+            if not data.active then GameTooltip:AddLine(suite.L("Klick markiert die Runde für den Vergleich."), 0.7, 0.75, 0.82) end
             if run.mixed then
-                GameTooltip:AddLine("Diese Runde führte durch mehrere Gebiete.", 0.7, 0.75, 0.82)
+                GameTooltip:AddLine(suite.L("Diese Runde führte durch mehrere Gebiete."), 0.7, 0.75, 0.82)
             end
             GameTooltip:Show()
         end)
@@ -247,13 +247,13 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
     local function render()
         local run = data.active
         startButton:SetEnabled(ready == true)
-        startButton:SetText(run and (run.paused and "Fortsetzen" or "Pause") or "Start")
+        startButton:SetText(run and (run.paused and "Fortsetzen" or suite.L("Pause")) or suite.L("Start"))
         stopButton:SetEnabled(ready == true and run ~= nil)
         itemBox:SetEnabled(not run)
         goalBox:SetEnabled(not run)
         if run then
             local seconds = elapsed(run)
-            status:SetText((run.paused and "Pausiert · " or "Läuft · ") .. displayArea(run))
+            status:SetText((run.paused and "Pausiert · " or suite.L("Läuft · ")) .. displayArea(run))
             local experience = (run.partial and "≥ " or "") .. BreakUpLargeNumbers(run.xp)
             metrics:SetText(("%s  ·  %s EP  ·  %s EP/h"):format(durationText(seconds), experience, rateText(run, seconds)))
             local count = run.itemCount or 0
@@ -261,11 +261,11 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
             if run.goal then
                 local hint = ""
                 if count >= run.goal then
-                    hint = " · Ziel erreicht"
+                    hint = suite.L(" · Ziel erreicht")
                 elseif count > 0 and seconds > 0 then
                     hint = " · noch ca. " .. durationText(math.ceil((run.goal - count) * seconds / count))
                 end
-                item = (" · Ziel %d/%d%s"):format(count, run.goal, hint)
+                item = (suite.L(" · Ziel %d/%d%s")):format(count, run.goal, hint)
             end
             lootText:SetText(moneyText(run.copper or 0) .. item)
             local best = run.area and data.best[run.area]
@@ -287,7 +287,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
                 comparison:SetText(run.mixed and "Gebietswechsel · Vergleich pausiert" or "EP teilweise erfasst · Vergleich pausiert")
             end
         else
-            status:SetText("Bereit für eine Runde")
+            status:SetText(suite.L("Bereit für eine Runde"))
             comparison:SetTextColor(unpack(style.muted))
             lootText:SetText("")
             local summary, delta = compare()
@@ -413,7 +413,7 @@ function addon.CreateFarmPanel(panel, label, syncProgress, openArchive)
         Mini = function()
             local run = data.active
             if run and run.goal then
-                return ("Ziel %d/%d"):format(run.itemCount or 0, run.goal)
+                return (suite.L("Ziel %d/%d")):format(run.itemCount or 0, run.goal)
             end
             return run and (run.paused and "Farm pausiert" or "Farm " .. durationText(elapsed(run))) or "Farm bereit"
         end,
