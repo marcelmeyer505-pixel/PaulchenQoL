@@ -12,46 +12,46 @@ local GOLD, MUTED, TEXT, GREEN = style.gold, style.muted, style.cream, style.gre
 local downArrow = " |TInterface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up:12:12:0:0|t"
 local upArrow = " |TInterface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up:12:12:0:0|t"
 local columns = {
-    { key = "name", text = "Gegenstand", w = 214 },
+    { key = "name", text = suite.L("Gegenstand"), w = 214 },
     { key = "slot", text = "Slot", w = 100 },
-    { key = "source", text = "Quelle", w = 220 },
-    { key = "new", text = "Punkte", w = 75, numeric = true },
-    { key = "delta", text = "+ Punkte", w = 75, numeric = true },
+    { key = "source", text = suite.L("Quelle"), w = 220 },
+    { key = "new", text = suite.L("Punkte"), w = 75, numeric = true },
+    { key = "delta", text = suite.L("+ Punkte"), w = 75, numeric = true },
     { key = "pct", text = "+ %", w = 78, numeric = true },
-    { key = "effort", text = "Aufwand", w = 95, numeric = true },
-    { key = "itemLevel", text = "Itemlevel", option = "Gegenstandsstufe", w = 91 },
-    { key = "requiredLevel", text = "Ab Stufe", option = "Benötigte Charakterstufe", w = 88 },
-    { key = "str", text = "Stärke", option = "Stärke", w = 72 },
-    { key = "agi", text = "Bew.", option = "Beweglichkeit", w = 69 },
-    { key = "sta", text = "Ausd.", option = "Ausdauer", w = 69 },
-    { key = "int", text = "Int.", option = "Intelligenz", w = 65 },
-    { key = "spi", text = "Will.", option = "Willenskraft", w = 65 },
-    { key = "armor", text = "Rüstung", option = "Rüstung", w = 85 },
-    { key = "ap", text = "AP", option = "Angriffskraft", w = 65 },
-    { key = "dps", text = "Waffen-DPS", option = "Waffen-DPS", w = 105, places = 1 },
-    { key = "crit", text = "Krit %", option = "Kritische Trefferchance", w = 76, places = 2, percent = true },
-    { key = "hit", text = "Treffer %", option = "Trefferchance", w = 88, places = 2, percent = true },
-    { key = "hitRating", text = "Trefferw.", option = "Trefferwertung", w = 85 },
-    { key = "critRating", text = "Kritwert.", option = "Kritische Trefferwertung", w = 85 },
-    { key = "expertise", text = "Waffenk.", option = "Waffenkunde", w = 85 },
-    { key = "haste", text = "Tempo", option = "Tempowertung", w = 76 },
-    { key = "hastePercent", text = "Tempo %", option = "Angriffstempo (%)", w = 87, places = 2, percent = true },
-    { key = "armorPen", text = "Rüst.-DS", option = "Rüstungsdurchschlag", w = 85 },
-    { key = "defense", text = "Vert.", option = "Verteidigung", w = 68 },
-    { key = "dodge", text = "Ausw. %", option = "Ausweichchance", w = 85, places = 2, percent = true },
-    { key = "sp", text = "Zaubersch.", option = "Zauberschaden", w = 95 },
-    { key = "heal", text = "Heilbonus", option = "Heilbonus", w = 92 },
+    { key = "effort", text = suite.L("Aufwand"), w = 95, numeric = true },
+    { key = "itemLevel", text = suite.L("Itemlevel"), option = suite.L("Gegenstandsstufe"), w = 91 },
+    { key = "requiredLevel", text = suite.L("Ab Stufe"), option = suite.L("Benötigte Charakterstufe"), w = 88 },
+    { key = "str", text = suite.L("Stärke"), option = suite.L("Stärke"), w = 72 },
+    { key = "agi", text = "Bew.", option = suite.L("Beweglichkeit"), w = 69 },
+    { key = "sta", text = suite.L("Ausd."), option = suite.L("Ausdauer"), w = 69 },
+    { key = "int", text = "Int.", option = suite.L("Intelligenz"), w = 65 },
+    { key = "spi", text = suite.L("Will."), option = suite.L("Willenskraft"), w = 65 },
+    { key = "armor", text = suite.L("Rüstung"), option = suite.L("Rüstung"), w = 85 },
+    { key = "ap", text = "AP", option = suite.L("Angriffskraft"), w = 65 },
+    { key = "dps", text = suite.L("Waffen-DPS"), option = suite.L("Waffen-DPS"), w = 105, places = 1 },
+    { key = "crit", text = suite.L("Krit %"), option = suite.L("Kritische Trefferchance"), w = 76, places = 2, percent = true },
+    { key = "hit", text = suite.L("Treffer %"), option = suite.L("Trefferchance"), w = 88, places = 2, percent = true },
+    { key = "hitRating", text = suite.L("Trefferw."), option = suite.L("Trefferwertung"), w = 85 },
+    { key = "critRating", text = suite.L("Kritwert."), option = suite.L("Kritische Trefferwertung"), w = 85 },
+    { key = "expertise", text = suite.L("Waffenk."), option = suite.L("Waffenkunde"), w = 85 },
+    { key = "haste", text = suite.L("Tempo"), option = suite.L("Tempowertung"), w = 76 },
+    { key = "hastePercent", text = suite.L("Tempo %"), option = suite.L("Angriffstempo (%)"), w = 87, places = 2, percent = true },
+    { key = "armorPen", text = suite.L("Rüst.-DS"), option = suite.L("Rüstungsdurchschlag"), w = 85 },
+    { key = "defense", text = suite.L("Vert."), option = suite.L("Verteidigung"), w = 68 },
+    { key = "dodge", text = suite.L("Ausw. %"), option = suite.L("Ausweichchance"), w = 85, places = 2, percent = true },
+    { key = "sp", text = suite.L("Zaubersch."), option = suite.L("Zauberschaden"), w = 95 },
+    { key = "heal", text = suite.L("Heilbonus"), option = suite.L("Heilbonus"), w = 92 },
 }
 local sources = {
-    { "all", "Alle Quellen" }, { "bag", "Eigene Taschen" }, { "quest", "Quests" }, { "boe", "BoE / Handel" },
-    { "dungeon", "Instanzen" }, { "raid", "Raids" }, { "drop", "Sonstige Drops" }, { "vendor", "Händler" },
+    { "all", suite.L("Alle Quellen") }, { "bag", suite.L("Eigene Taschen") }, { "quest", suite.L("Quests") }, { "boe", suite.L("BoE / Handel") },
+    { "dungeon", suite.L("Instanzen") }, { "raid", suite.L("Raids") }, { "drop", suite.L("Sonstige Drops") }, { "vendor", suite.L("Händler") },
     { "undermine", app.sourceNames.undermine },
     { "pvp", app.sourceNames.pvp },
-    { "craft", "Herstellung" },
-    { "auction", "Auktionshaus" },
+    { "craft", suite.L("Herstellung") },
+    { "auction", suite.L("Auktionshaus") },
 }
 local qualities = { { 2, "Grün", { 0.38, 0.85, 0.38 } }, { 3, "Blau", { 0.34, 0.67, 1 } }, { 4, "Lila", { 0.77, 0.54, 1 } } }
-local slots = { { 0, "Alle Slots" } }
+local slots = { { 0, suite.L("Alle Slots") } }
 for _, slot in ipairs(app.slots) do slots[#slots + 1] = slot end
 local automatic = "auto"
 
@@ -85,9 +85,9 @@ end
 local function instanceCaption()
     if db.instanceSelection == automatic then
         local _, name = instanceSelection()
-        return name and ("Aktuell · " .. name) or "Automatisch · Alle"
+        return name and (suite.L("Aktuell · ") .. name) or suite.L("Automatisch · Alle")
     end
-    return db.instanceSelection ~= "" and db.instanceSelection or "Alle Instanzen & Raids"
+    return db.instanceSelection ~= "" and db.instanceSelection or suite.L("Alle Instanzen & Raids")
 end
 
 local function label(parent, font, color, x, y, w, h, justify)
@@ -124,11 +124,11 @@ local function exportNumber(value, places, percent)
 end
 
 local function exportResults()
-    local headers = { "Gegenstand", "Slot", "Quelle", "Ort / Details", "Preis (Kupfer)", "Dropchance",
-        "Punkte", "Zugewinn (Punkte)", "Zugewinn (%)", "Aufwand (1–10)" }
+    local headers = { suite.L("Gegenstand"), "Slot", suite.L("Quelle"), suite.L("Ort / Details"), suite.L("Preis (Kupfer)"), suite.L("Dropchance"),
+        suite.L("Punkte"), suite.L("Zugewinn (Punkte)"), suite.L("Zugewinn (%)"), suite.L("Aufwand (1–10)") }
     for _, col in ipairs(extraColumns) do headers[#headers + 1] = col.option end
-    headers[#headers + 1] = "Item-ID"
-    headers[#headers + 1] = "Item-Link"
+    headers[#headers + 1] = suite.L("Item-ID")
+    headers[#headers + 1] = suite.L("Item-Link")
     local lines = { table.concat(headers, "\t") }
     for _, entry in ipairs(display) do
         local item, source = entry.item, entry.source
@@ -161,8 +161,8 @@ end
 local function addPriceEstimate(source)
     local price = source.isEstimate and source.price or source.tsmPrice
     if not price then return end
-    GameTooltip:AddDoubleLine("[PREIS] TSM-Schätzpreis pro Stück", auctionPrice(price))
-    GameTooltip:AddLine("TSM DBMinBuyout · Verfügbarkeit im Auktionshaus prüfen.", unpack(MUTED))
+    GameTooltip:AddDoubleLine(suite.L("[PREIS] TSM-Schätzpreis pro Stück"), auctionPrice(price))
+    GameTooltip:AddLine(suite.L("TSM DBMinBuyout · Verfügbarkeit im Auktionshaus prüfen."), unpack(MUTED))
 end
 
 local function isAuction(source)
@@ -185,7 +185,7 @@ local function startQuestRoute(source)
     local compat = Polestar and Polestar.Compat
     local message
     if compat and compat.IsQuestCompleted(source.quest) then
-        message = "Diese Quest ist bereits abgeschlossen."
+        message = suite.L("Diese Quest ist bereits abgeschlossen.")
     elseif lookup and lookup.Guide then
         local ok, guide, reason = pcall(lookup.Guide, "quest", source.quest)
         if ok and guide then
@@ -194,9 +194,9 @@ local function startQuestRoute(source)
             return
         end
         if reason == "tabs" then
-            message = "Schließe einen Polestar-Reiter, um die Route zu öffnen."
+            message = suite.L("Schließe einen Polestar-Reiter, um die Route zu öffnen.")
         elseif reason == "disabled" then
-            message = "Aktiviere die Suche in den Polestar-Einstellungen."
+            message = suite.L("Aktiviere die Suche in den Polestar-Einstellungen.")
         end
     end
     if not message and C_QuestLog and C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(source.quest)
@@ -205,7 +205,7 @@ local function startQuestRoute(source)
         QuestMapFrame_OpenToQuestDetails(source.quest)
         return
     end
-    print("Paulchen Upgrades · " .. (message or ("Kein Wegpunkt für „" .. source.title .. "“ verfügbar.")))
+    print("Paulchen Upgrades · " .. (message or (suite.L("Kein Wegpunkt für „") .. source.title .. suite.L("“ verfügbar."))))
 end
 
 local function searchAuctionHouse(item)
@@ -244,21 +244,21 @@ local function tip(row)
     local gain = "+" .. number(item.delta, 2)
     if item.pct then gain = gain .. " Punkte · +" .. number(item.pct, 1) .. " %"
     else gain = gain .. " Punkte" end
-    local equipped = item.empty and "Freier Slot" or number(item.old, 2)
+    local equipped = item.empty and suite.L("Freier Slot") or number(item.old, 2)
     GameTooltip:AddDoubleLine(equipped .. " -> " .. number(item.new, 2) .. " Punkte", gain, 0.8, 0.83, 0.88, unpack(GREEN))
     if item.future then GameTooltip:AddLine("Tragbar ab Charakterstufe " .. item.requiredLevel, unpack(GOLD)) end
     local action, quest = rowAction(entry)
     if isAuction(source) then
         if source.kind == "auction" then
             if source.price and not source.isEstimate then
-                GameTooltip:AddDoubleLine(source.at and "Sofortkauf pro Stück" or "Preis in der AH-Übersicht", auctionPrice(source.price))
+                GameTooltip:AddDoubleLine(source.at and suite.L("Sofortkauf pro Stück") or suite.L("Preis in der AH-Übersicht"), auctionPrice(source.price))
             end
             if source.at then GameTooltip:AddLine("Erfasst am " .. date("%d.%m. um %H:%M", source.at), unpack(MUTED)) end
             addPriceEstimate(source)
         else
             GameTooltip:AddLine("BoE", unpack(MUTED))
         end
-        GameTooltip:AddLine("Rechtsklick · Im Auktionshaus suchen", unpack(GOLD))
+        GameTooltip:AddLine(suite.L("Rechtsklick · Im Auktionshaus suchen"), unpack(GOLD))
         GameTooltip:Show()
         return
     end
@@ -277,9 +277,9 @@ local function tip(row)
         if alternative ~= source then addSource(alternative) end
     end
     if action == "quest" then
-        GameTooltip:AddLine("Rechtsklick · Quest öffnen · " .. quest.title, unpack(GOLD))
+        GameTooltip:AddLine(suite.L("Rechtsklick · Quest öffnen · ") .. quest.title, unpack(GOLD))
     elseif action == "auction" then
-        GameTooltip:AddLine("Rechtsklick · Im Auktionshaus suchen", unpack(GOLD))
+        GameTooltip:AddLine(suite.L("Rechtsklick · Im Auktionshaus suchen"), unpack(GOLD))
     end
     GameTooltip:Show()
 end
@@ -335,14 +335,14 @@ local function updateAuctionScanButton()
 end
 
 local function scanStatus(current)
-    local status = ("Suche läuft · %d / %d Gegenstände geprüft"):format(math.min(current.cursor - 1, #current.ids), #current.ids)
+    local status = (suite.L("Suche läuft · %d / %d Gegenstände geprüft")):format(math.min(current.cursor - 1, #current.ids), #current.ids)
     local outstanding = current.count + #current.deferred - current.nextDeferred + 1
-    if outstanding > 0 then status = status .. (" · %d Itemdaten offen"):format(outstanding) end
-    if current.errors > 0 then status = status .. (" · %d Datenfehler"):format(current.errors) end
-    if current.limited then status = status .. " · Nachladen begrenzt" end
-    status = status .. (" · %d neu bewertet · %d übernommen"):format(current.compared or 0, current.reused or 0)
+    if outstanding > 0 then status = status .. (suite.L(" · %d Itemdaten offen")):format(outstanding) end
+    if current.errors > 0 then status = status .. (suite.L(" · %d Datenfehler")):format(current.errors) end
+    if current.limited then status = status .. suite.L(" · Nachladen begrenzt") end
+    status = status .. (suite.L(" · %d neu bewertet · %d übernommen")):format(current.compared or 0, current.reused or 0)
     if (current.skippedContent or 0) > 0 then
-        status = status .. (" · %d gesperrt übersprungen"):format(current.skippedContent)
+        status = status .. (suite.L(" · %d gesperrt übersprungen")):format(current.skippedContent)
     end
     return status
 end
@@ -380,35 +380,35 @@ local function render(reset)
     window.instancesTab.text:SetTextColor(unpack(instances and GOLD or MUTED))
     local alerts = app.LootAlertsEnabled()
     style.SetButtonState(window.lootToggle, alerts)
-    window.lootToggle.text:SetText(alerts and "Loot-Alarm: An" or "Loot-Alarm: Aus")
+    window.lootToggle.text:SetText(alerts and suite.L("Loot-Alarm: An") or suite.L("Loot-Alarm: Aus"))
     window.lootToggle.text:SetTextColor(unpack(alerts and GREEN or MUTED))
     local status
     if pausedAt then
-        status = "Suche pausiert im Kampf."
+        status = suite.L("Suche pausiert im Kampf.")
     elseif startAfterCombat then
-        status = "Angeforderte Suche startet nach dem Kampf."
+        status = suite.L("Angeforderte Suche startet nach dem Kampf.")
     elseif waitingForGear then
-        status = "Warte auf Ausrüstungsdaten."
+        status = suite.L("Warte auf Ausrüstungsdaten.")
     elseif scan then
         status = scanStatus(scan)
     elseif scanFailure then
-        status = "Suche abgebrochen · Details mit /pu diagnose"
+        status = suite.L("Suche abgebrochen · Details mit /pu diagnose")
     elseif resultsStale then
-        status = "Liste veraltet · Für aktuelle Ergebnisse auf Aktualisieren klicken."
+        status = suite.L("Liste veraltet · Für aktuelle Ergebnisse auf Aktualisieren klicken.")
     elseif finished then
-        status = instances and ("%d Instanz-Upgrades"):format(#display) or ("%d / %d Upgrades"):format(#display, #finished.rows)
+        status = instances and (suite.L("%d Instanz-Upgrades")):format(#display) or (suite.L("%d / %d Upgrades")):format(#display, #finished.rows)
         if instances and not finished.atlas.loaded and not finished.journal.loaded then
-            status = status .. " · Keine zusätzlichen Instanzdaten"
+            status = status .. suite.L(" · Keine zusätzlichen Instanzdaten")
         end
-        if finished.unavailable > 0 then status = status .. (" · %d ohne vollständige Itemdaten"):format(finished.unavailable) end
-        if finished.errors > 0 then status = status .. (" · %d Datenfehler"):format(finished.errors) end
-        if finished.limited then status = status .. " · Teilergebnis, mit Aktualisieren weiterladen" end
-        status = status .. (" · %d neu bewertet · %d übernommen"):format(finished.compared or 0, finished.reused or 0)
+        if finished.unavailable > 0 then status = status .. (suite.L(" · %d ohne vollständige Itemdaten")):format(finished.unavailable) end
+        if finished.errors > 0 then status = status .. (suite.L(" · %d Datenfehler")):format(finished.errors) end
+        if finished.limited then status = status .. suite.L(" · Teilergebnis, mit Aktualisieren weiterladen") end
+        status = status .. (suite.L(" · %d neu bewertet · %d übernommen")):format(finished.compared or 0, finished.reused or 0)
         if (finished.skippedContent or 0) > 0 then
-            status = status .. (" · %d gesperrt übersprungen"):format(finished.skippedContent)
+            status = status .. (suite.L(" · %d gesperrt übersprungen")):format(finished.skippedContent)
         end
     else
-        status = "Auf Aktualisieren klicken, um Upgrades zu suchen."
+        status = suite.L("Auf Aktualisieren klicken, um Upgrades zu suchen.")
     end
     if auctions and current and current.auctionAt then
         status = status .. " · AH-Stand " .. date("%d.%m. %H:%M", current.auctionAt)
@@ -417,30 +417,30 @@ local function render(reset)
     local canExport = exportReady()
     window.exportButton:SetEnabled(canExport)
     window.exportButton.text:SetTextColor(unpack(canExport and TEXT or MUTED))
-    window.profile:SetText("Profil · " .. (current and current.profile or app.ProfileName()) .. "   |")
+    window.profile:SetText(suite.L("Profil · ") .. (current and current.profile or app.ProfileName()) .. "   |")
     window.profile:SetWidth(math.min(260, window.profile:GetStringWidth() + 2))
     if not window.levelInput:HasFocus() then window.levelInput:SetText(tostring(searchLevel())) end
     window.autoLevel:SetShown(searchLevel() > gear.PlayerLevel())
     window.empty:SetShown(#display == 0 and finished ~= nil and not scan and not waitingForGear
         and not resultsStale and not scanFailure)
-    local empty = finished and #finished.rows > 0 and "Keine Treffer für diese Filter." or "Keine erreichbaren Upgrades in den geladenen Daten."
+    local empty = finished and #finished.rows > 0 and suite.L("Keine Treffer für diese Filter.") or suite.L("Keine erreichbaren Upgrades in den geladenen Daten.")
     if finished and #finished.rows == 0 and finished.unavailable > 0 then
-        empty = "Noch keine Upgrades gefunden. Itemdaten fehlen; mit Aktualisieren weiterladen."
+        empty = suite.L("Noch keine Upgrades gefunden. Itemdaten fehlen; mit Aktualisieren weiterladen.")
     end
     if instances and type(instance) == "table" and db.slot == 0 and search == "" then
-        empty = "Für die aktuelle Instanz sind keine erreichbaren Boss-Upgrades erfasst."
+        empty = suite.L("Für die aktuelle Instanz sind keine erreichbaren Boss-Upgrades erfasst.")
     elseif auctions then
-        empty = current and current.auctionAt and "Keine AH-Angebote oder TSM-Preise für diese Filter."
-            or "Keine AH-Angebote oder TSM-Preise gefunden. Lade Treffer im AH und klicke auf „Aktualisieren“."
+        empty = current and current.auctionAt and suite.L("Keine AH-Angebote oder TSM-Preise für diese Filter.")
+            or suite.L("Keine AH-Angebote oder TSM-Preise gefunden. Lade Treffer im AH und klicke auf „Aktualisieren“.")
     elseif not instances and db.source == "pvp" and not app.content.Snapshot().pvp then
-        empty = "Aktiviere „PvP-Händler“ unter Spielinhalte und klicke auf „Aktualisieren“."
+        empty = suite.L("Aktiviere „PvP-Händler“ unter Spielinhalte und klicke auf „Aktualisieren“.")
     end
     window.empty:SetText(empty)
     for _, col in ipairs(columns) do
         local key = auctions and col.key == "source" and "price" or col.key
         local arrow = key == sortKey and (db.ascending and upArrow or downArrow) or ""
-        local title = auctions and col.key == "source" and "AH-Preis"
-            or instances and col.key == "source" and "Boss / Instanz" or col.text
+        local title = auctions and col.key == "source" and suite.L("AH-Preis")
+            or instances and col.key == "source" and suite.L("Boss / Instanz") or col.text
         local header = window.headers[col.key]
         style.SetButtonState(header, key == sortKey)
         header.text:SetText(title .. arrow)
@@ -458,7 +458,7 @@ local function draw(reset)
         displayFailure = tostring(err)
         window.exportButton:SetEnabled(false)
         window.exportButton.text:SetTextColor(unpack(MUTED))
-        window.status:SetText("Anzeigefehler · Details mit /pu diagnose")
+        window.status:SetText(suite.L("Anzeigefehler · Details mit /pu diagnose"))
     end
 end
 
@@ -548,7 +548,7 @@ function app.CheckUpgrades()
         end
         local ok, ready, itemID = pcall(equipmentReady)
         if not ok then
-            waitingForGear, scanFailure = false, "Ausrüstungsdaten: " .. tostring(ready)
+            waitingForGear, scanFailure = false, suite.L("Ausrüstungsdaten: ") .. tostring(ready)
             wakeRequestedScan, waitingItemID = nil, nil
             draw()
             return
@@ -690,8 +690,8 @@ local function createChoicePanel()
         end)
         panel.buttons[index] = control
     end
-    panel.previous = button(panel, "Zurück", 8, 0, 68, 22)
-    panel.next = button(panel, "Weiter", 197, 0, 68, 22)
+    panel.previous = button(panel, suite.L("Zurück"), 8, 0, 68, 22)
+    panel.next = button(panel, suite.L("Weiter"), 197, 0, 68, 22)
     panel.pageText = label(panel, "GameFontHighlightSmall", MUTED, 90, 0, 93, 22, "CENTER")
     local function turnPage(delta)
         local perPage = choicesPerColumn * (panel.multiple and 2 or 1)
@@ -744,7 +744,7 @@ local function createProfileEditor(parent)
     close:SetScript("OnClick", function() f:Hide() end)
     local selector = button(f, "", 16, -45, 224, 26)
     local hint = label(f, "GameFontHighlightSmall", MUTED, 16, -76, 658, 19)
-    hint:SetText("Punkte pro Attribut. Bei %-Werten gilt das Gewicht pro Prozentpunkt.")
+    hint:SetText(suite.L("Punkte pro Attribut. Bei %-Werten gilt das Gewicht pro Prozentpunkt."))
     local boxes = {}
     for i, field in ipairs(app.weightFields) do
         local x = 16 + math.floor((i - 1) / 9) * 229
@@ -788,9 +788,9 @@ local function createProfileEditor(parent)
         local choice = app.ActiveProfile()
         if not choice then return end
         for key, box in pairs(boxes) do box:SetText((tostring(choice.weights[key] or 0):gsub("%.", ","))) end
-        feedback:SetText("Zum Übernehmen speichern.")
+        feedback:SetText(suite.L("Zum Übernehmen speichern."))
     end)
-    local save = button(f, "Speichern", 563, -378, 119, 24)
+    local save = button(f, suite.L("Speichern"), 563, -378, 119, 24)
     save:SetScript("OnClick", function()
         local weights = {}
         for key, box in pairs(boxes) do weights[key] = tonumber((box:GetText():gsub(",", "."))) end
@@ -846,7 +846,7 @@ local function createExportDialog(parent)
     f:SetScript("OnHide", function() box:ClearFocus() end)
     button(f, "Alles markieren", 16, -364, 142, 25):SetScript("OnClick", selectAll)
     label(f, "GameFontHighlightSmall", TEXT, 170, -364, 530, 25)
-        :SetText("Strg+C kopiert den Text. In Excel oder Google Sheets ab A1 einfügen.")
+        :SetText(suite.L("Strg+C kopiert den Text. In Excel oder Google Sheets ab A1 einfügen."))
 
     function f.ShowResults()
         text = exportResults()
@@ -881,7 +881,7 @@ local function dropdown(parent, options, key, x, w, currentLabel, y)
     b:SetScript("OnClick", function(self)
         local choices = type(options) == "function" and options() or options
         if #choices > 14 then
-            showChoices(self, "Auswahl", choices, selected, choose)
+            showChoices(self, suite.L("Auswahl"), choices, selected, choose)
             return
         end
         hideChoices()
@@ -1028,7 +1028,7 @@ local function createPage(parent)
     titlebar:SetHeight(57)
     style.Fill(titlebar, "BACKGROUND", unpack(style.header))
     style.Portrait(titlebar, 42, 10, -7)
-    label(titlebar, "GameFontNormalLarge", GOLD, 59, -5, 390, 30):SetText("Paulchen Upgrades")
+    label(titlebar, "GameFontNormalLarge", GOLD, 59, -5, 390, 30):SetText(suite.L("Paulchen Upgrades"))
     f.profile = label(titlebar, "GameFontHighlightSmall", MUTED, 59, -34, 260, 17)
     f.profilesButton = button(titlebar, "Statprofile", 347, -12, 103, 27)
     f.profilesButton:SetScript("OnClick", function()
@@ -1038,7 +1038,7 @@ local function createPage(parent)
     local levelControl = CreateFrame("Frame", nil, titlebar)
     levelControl:SetSize(120, 22)
     levelControl:SetPoint("LEFT", f.profile, "RIGHT", 6, 0)
-    label(levelControl, "GameFontHighlightSmall", MUTED, 0, 0, 32, 22):SetText("Stufe")
+    label(levelControl, "GameFontHighlightSmall", MUTED, 0, 0, 32, 22):SetText(suite.L("Stufe"))
     local levelInput = style.EditBox(levelControl)
     levelInput:SetPoint("LEFT", 33, 0)
     levelInput:SetSize(30, 21)
@@ -1058,8 +1058,8 @@ local function createPage(parent)
     end)
     levelInput:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Stufe für die Upgrade-Suche", unpack(GOLD))
-        GameTooltip:AddLine("Gib eine höhere Stufe ein, um zukünftige Upgrades zu sehen.", unpack(TEXT))
+        GameTooltip:SetText(suite.L("Stufe für die Upgrade-Suche"), unpack(GOLD))
+        GameTooltip:AddLine(suite.L("Gib eine höhere Stufe ein, um zukünftige Upgrades zu sehen."), unpack(TEXT))
         GameTooltip:Show()
     end)
     levelInput:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
@@ -1067,8 +1067,8 @@ local function createPage(parent)
     f.autoLevel = button(levelControl, "Auto", 68, -1, 46, 20)
     f.autoLevel:SetScript("OnClick", function() setSearchLevel(nil) end)
     f.autoLevel:Hide()
-    f.overviewTab = button(titlebar, "Übersicht", 463, -12, 106, 27)
-    f.instancesTab = button(titlebar, "Instanzen", 575, -12, 106, 27)
+    f.overviewTab = button(titlebar, suite.L("Übersicht"), 463, -12, 106, 27)
+    f.instancesTab = button(titlebar, suite.L("Instanzen"), 575, -12, 106, 27)
     f.overviewTab:SetScript("OnClick", function() hideChoices(); db.tab = "overview"; draw(true) end)
     f.instancesTab:SetScript("OnClick", function() hideChoices(); db.tab = "instances"; draw(true) end)
     f.lootToggle = button(titlebar, "", 699, -12, 146, 27)
@@ -1088,7 +1088,7 @@ local function createPage(parent)
     f.professionFilter = dropdown(f, app.professionChoices, "profession", 17, 210, nil, -103)
     f.auctionScan = button(f, "AH scannen", 17, -103, 141, 27)
     f.auctionScan:SetScript("OnClick", function() PaulchenAuktionsscan.Start() end)
-    f.contentButton = button(f, "Spielinhalte" .. downArrow, 17, -103, 210, 27)
+    f.contentButton = button(f, suite.L("Spielinhalte") .. downArrow, 17, -103, 210, 27)
     f.contentButton:SetScript("OnClick", function(self)
         hideChoices()
         MenuUtil.CreateContextMenu(self, function(_, menu)
@@ -1125,14 +1125,14 @@ local function createPage(parent)
     box:SetTextInsets(8, 8, 0, 0)
     box:SetMaxLetters(100)
     local placeholder = label(box, "GameFontHighlight", MUTED, 8, 0, 348, 27)
-    placeholder:SetText("Gegenstand, Boss oder Ort suchen")
+    placeholder:SetText(suite.L("Gegenstand, Boss oder Ort suchen"))
     box:SetScript("OnTextChanged", function(self)
         search = self:GetText()
         placeholder:SetShown(search == "")
         draw(true)
     end)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    local reload = button(f, "Aktualisieren", 764, -69, 128, 27)
+    local reload = button(f, suite.L("Aktualisieren"), 764, -69, 128, 27)
     reload:SetScript("OnClick", app.CheckUpgrades)
     f.exportButton = button(f, "Exportieren", 350, -103, 118, 27)
     f.exportButton:SetEnabled(false)
@@ -1189,10 +1189,10 @@ local function createPage(parent)
     end
     f.headers.effort:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Geschätzter Aufwand", unpack(GOLD))
+        GameTooltip:SetText(suite.L("Geschätzter Aufwand"), unpack(GOLD))
         GameTooltip:AddLine("1 = schnell erreichbar, 10 = sehr aufwendig.", unpack(TEXT))
-        GameTooltip:AddLine("Questfortschritt, Gruppenbedarf, Stufenabstand und bekannte Dropchancen zählen mit.", 0.64, 0.69, 0.75, true)
-        GameTooltip:AddLine("Bei BoEs dient die Seltenheit als Schätzung für den Handel.", 0.64, 0.69, 0.75, true)
+        GameTooltip:AddLine(suite.L("Questfortschritt, Gruppenbedarf, Stufenabstand und bekannte Dropchancen zählen mit."), 0.64, 0.69, 0.75, true)
+        GameTooltip:AddLine(suite.L("Bei BoEs dient die Seltenheit als Schätzung für den Handel."), 0.64, 0.69, 0.75, true)
         GameTooltip:Show()
     end)
     f.headers.effort:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
@@ -1228,7 +1228,7 @@ local function createPage(parent)
     f.empty = label(f, "GameFontHighlight", MUTED, 17, -240, 860, 40, "CENTER")
     f.status = label(f, "GameFontHighlightSmall", TEXT, 17, -583, 870, 17)
     f.hints = label(f, "GameFontHighlightSmall", MUTED, 17, -603, 870, 16)
-    f.hints:SetText("Aufwand · 1 leicht, 10 hoch    |    Rechtsklick · AH-Suche oder Quest-Route    |    Umschalt-Klick · Item verlinken")
+    f.hints:SetText(suite.L("Aufwand · 1 leicht, 10 hoch    |    Rechtsklick · AH-Suche oder Quest-Route    |    Umschalt-Klick · Item verlinken"))
     layoutColumns(f)
 
     f:SetScript("OnShow", function()
@@ -1270,15 +1270,15 @@ local function createMinimapButton(broker, icons)
     end
     local launcher = broker:NewDataObject("PaulchenUpgrades", {
         type = "launcher",
-        text = "Paulchen Upgrades",
+        text = suite.L("Paulchen Upgrades"),
         icon = "Interface\\Icons\\INV_Misc_Bag_10_Green",
         OnClick = function(_, mouseButton)
             if mouseButton == "LeftButton" then toggle() end
         end,
         OnTooltipShow = function(tooltip)
-            tooltip:AddLine("Paulchen Upgrades")
+            tooltip:AddLine(suite.L("Paulchen Upgrades"))
             tooltip:AddLine("Linksklick · Upgrade-Reiter öffnen oder schließen", 1, 1, 1)
-            tooltip:AddLine("Ziehen · Position ändern", 0.65, 0.70, 0.75)
+            tooltip:AddLine(suite.L("Ziehen · Position ändern"), 0.65, 0.70, 0.75)
         end,
     })
     icons:Register("PaulchenUpgrades", launcher, PaulchenQoLUpgradesDB.minimap)
