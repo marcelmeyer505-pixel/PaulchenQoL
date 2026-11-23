@@ -205,6 +205,10 @@ local function createWindow()
         if app.inventory then app.inventory.OpenPriceSettings() end
     end)
     button(f, "Position zurücksetzen", 18, -431, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
+    button(f, "Komfort", 18, -467, 180):SetScript("OnClick", function()
+        f:Hide()
+        app.comfort.Open()
+    end)
     button(f, "Testkommentar", 252, -484, 248):SetScript("OnClick", function() app.TestComment() end)
     label(f, "Links ziehen · Rechtsklick öffnet dieses Fenster", "GameFontHighlightSmall", 18, -525)
     table.insert(UISpecialFrames, f:GetName())
@@ -224,6 +228,9 @@ function app.CompanionCommand(message)
         value = value and value:lower() or nil
         local names = { de = "deDE", dede = "deDE", german = "deDE", deutsch = "deDE", en = "enUS", enus = "enUS", english = "enUS", englisch = "enUS", auto = "auto" }
         if value and names[value] then write("language", names[value]) else app.OpenConfig() end
+    elseif (cmd == "komfort" or cmd == "comfort") and app.comfort then
+        if window then window:Hide() end
+        app.comfort.Open()
     elseif cmd == "buffs" and app.buffCheck then
         app.buffCheck.Command((message or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "show" or cmd == "hide" then
@@ -238,7 +245,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, lang auto|de|en]")
     end
     refreshSettings()
 end

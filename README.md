@@ -156,6 +156,7 @@ Die Begleitoptionen und der Auktionscache sind accountweit. Merkliste, Flugzeite
 | `/pq show` | Begleiter einblenden |
 | `/pq hide` | Begleiter ausblenden |
 | `/pq reset` | Position unten rechts wiederherstellen |
+| `/pq comfort` oder `/pq komfort` | Komfort-Einstellungen öffnen |
 | `/pq test` | Einen zufälligen Testkommentar ausgeben |
 | `/pq debug` | Debugmeldungen ein- oder ausschalten |
 | `/pqol` | Paulchen-Hauptfenster öffnen oder schließen |
@@ -188,6 +189,14 @@ Die Unterbefehle von `/pq` funktionieren auch mit `/paulchen`. Falls Paulchen ge
 - **Reithandschuhe automatisch wechseln** legt beim Aufmounten die Handschuhe der Vorhut aus den Taschen an und stellt beim Abmounten die zuvor getragenen Handschuhe wieder her. Der Wechsel erfolgt außerhalb des Kampfes und deine vorherigen Handschuhe werden pro Charakter gespeichert. Wechselst du sie während des Reitens von Hand, übernimmt Paulchen erst beim nächsten Aufmounten wieder.
 
 Der automatische Wechsel der Reithandschuhe und das Zurückwechseln unterbrechen die Upgrade-Suche nicht. Für Itempunkte, Tooltip-Vergleich und die Upgrade-Suche gelten währenddessen die gemerkten normalen Handschuhe. Das gilt auch für den Login oder Reload im Sattel. Manuelle Ausrüstungswechsel fließen beim nächsten Suchlauf in die Liste ein.
+
+### Komfort
+
+Unter **Einstellungen → Komfort** findest du kategorisierte Optionen mit Suche. Grauverkauf und Quest-Automatik sind pro Charakter einschaltbar und laufen direkt über die Forever-Schnittstellen.
+
+- **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.
+- **Quests & Dialoge** bietet getrennte Schalter für normale, tägliche und wöchentliche Quests, Abgaben und einzelne NPC-Dialoge per Alt. Quests mit mehr als einer Belohnung zur Wahl, Kosten sowie normalen oder vorgemerkten Abgabeitems bleiben zur manuellen Prüfung offen.
+- Mit **Umschalt** beim Ansprechen kannst du die Automatik überspringen.
 
 ## Ereignisse
 

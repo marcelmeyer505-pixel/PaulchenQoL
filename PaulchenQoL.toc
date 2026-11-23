@@ -29,6 +29,9 @@ Window.lua
 Modules\Auction\Scanner.lua
 Modules\Auction\Prices.lua
 Inventory.lua
+Modules\Comfort\Window.lua
+Modules\Comfort\Vendor.lua
+Modules\Comfort\Quests.lua
 Overview.lua
 Modules\Upgrades\Catalog.lua
 Modules\Upgrades\Profiles.lua
