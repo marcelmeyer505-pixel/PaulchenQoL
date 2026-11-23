@@ -89,7 +89,7 @@ local function mapPoints(map, mapID)
             if validPoint(x, y) then
                 local title = app.Readable(info.title) or call(C_QuestLog.GetTitleForQuestID, id)
                 destinations[#destinations + 1] = {
-                    x = x, y = y, title = title or (app.L("Quest #") .. id), name = name, native = native[id] ~= nil,
+                    x = x, y = y, title = title or (app.L(app.L("Quest #")) .. id), name = name, native = native[id] ~= nil,
                 }
             end
         end
@@ -207,7 +207,7 @@ local function attach()
         -- Other providers can add the selected quest pin during the same map update.
         C_Timer.After(0, function()
             self.pending = nil
-            app.SecureCall(app.L("Questabgaben auf der Weltkarte"), draw, self)
+            app.SecureCall(app.L(app.L("Questabgaben auf der Weltkarte")), draw, self)
         end)
     end
     provider.OnHide = hidePins
