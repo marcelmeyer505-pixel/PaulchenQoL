@@ -157,6 +157,7 @@ Die Begleitoptionen und der Auktionscache sind accountweit. Merkliste, Flugzeite
 | `/pq hide` | Begleiter ausblenden |
 | `/pq reset` | Position unten rechts wiederherstellen |
 | `/pq comfort` oder `/pq komfort` | Komfort-Einstellungen öffnen |
+| `/pq map` oder `/pq karte` | Weltkarte öffnen oder schließen |
 | `/pq test` | Einen zufälligen Testkommentar ausgeben |
 | `/pq debug` | Debugmeldungen ein- oder ausschalten |
 | `/pqol` | Paulchen-Hauptfenster öffnen oder schließen |
@@ -185,7 +186,6 @@ Die Unterbefehle von `/pq` funktionieren auch mit `/paulchen`. Falls Paulchen ge
 - **Erinnerungen speichern** erfasst Tode, Stufen, Gebietsbesuche, zuletzt gesprochene Zeilen und erkannte Questabgaben pro Charakter. Das Abschalten pausiert persönliche Aufzeichnungen. Spielzeit, bereits ausgegebene Pausenhinweise und der Reparaturabstand bleiben als Sitzungsdaten für ein `/reload` erhalten.
 - **Debugmodus** zeigt verarbeitete Dialogkategorien und erkannte Modulfehler im eigenen Chatfenster.
 - **Separate Modul-Minimapknöpfe** blendet bei verfügbaren Minimap-Bibliotheken die zusätzlichen Knöpfe für Logbuch und Upgrades ein. Deren gespeicherte Positionen und Sichtbarkeit werden übernommen.
-- **Questabgaben auf der Weltkarte** schaltet die zusätzlichen Fragezeichen ein oder aus. Die Einstellung ist standardmäßig aktiv.
 - **Reithandschuhe automatisch wechseln** legt beim Aufmounten die Handschuhe der Vorhut aus den Taschen an und stellt beim Abmounten die zuvor getragenen Handschuhe wieder her. Der Wechsel erfolgt außerhalb des Kampfes und deine vorherigen Handschuhe werden pro Charakter gespeichert. Wechselst du sie während des Reitens von Hand, übernimmt Paulchen erst beim nächsten Aufmounten wieder.
 
 Der automatische Wechsel der Reithandschuhe und das Zurückwechseln unterbrechen die Upgrade-Suche nicht. Für Itempunkte, Tooltip-Vergleich und die Upgrade-Suche gelten währenddessen die gemerkten normalen Handschuhe. Das gilt auch für den Login oder Reload im Sattel. Manuelle Ausrüstungswechsel fließen beim nächsten Suchlauf in die Liste ein.
@@ -193,6 +193,10 @@ Der automatische Wechsel der Reithandschuhe und das Zurückwechseln unterbrechen
 ### Komfort
 
 Unter **Einstellungen → Komfort** findest du kategorisierte Optionen mit Suche. Grauverkauf und Quest-Automatik sind pro Charakter einschaltbar und laufen direkt über die Forever-Schnittstellen.
+
+Unter **Weltkarte & Erkundung** findest du den kompakten Kartenrahmen, Maus- und Spielerkoordinaten, das Gebietsmenü und die weiterhin standardmäßig aktiven Questabgaben. Flugpunkte, Portale und Übergänge verwenden die Forever-Kartendaten und bekannte Wegpunkte. Paulchen kann beim Laufen weitere Übergänge speichern. Boote, Zeppeline, Bahnen, Orte der anderen Fraktion, Instanzeingänge, Geistheiler, ungefähre Gebiets- und Angelstufen sowie erkundete und unerforschte Teilgebiete lassen sich separat einblenden.
+
+Über **Kartenoptionen** auf der Weltkarte kannst du Fenster- und Vollbildgröße getrennt setzen und die Schlachtfeldkarte anpassen. Wenn **Karte verschieben** aktiv ist, ziehst du die Paulchen-Leiste und speicherst beide Positionen getrennt. Unter **Tastenbelegung → Paulchen QoL** kannst du eine Taste für die Karte am eigenen Standort vergeben. Kartenrahmen, Navigation und Zusatzmarker laufen ohne Leatrix. Die Erkundungsansicht verwendet die Originaltexturen des installierten Forever-Clients anhand der [WorldMapOverlay-Daten für Build 1.60.1.70959](https://wago.tools/db2/WorldMapOverlay?build=1.60.1.70959).
 
 - **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.
 - **Quests & Dialoge** bietet getrennte Schalter für normale, tägliche und wöchentliche Quests, Abgaben und einzelne NPC-Dialoge per Alt. Quests mit mehr als einer Belohnung zur Wahl, Kosten sowie normalen oder vorgemerkten Abgabeitems bleiben zur manuellen Prüfung offen.

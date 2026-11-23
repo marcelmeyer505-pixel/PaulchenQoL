@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="PAULCHENQOLPLAYERMAP" header="PAULCHENQOLMAP" category="ADDONS">
+        PaulchenQoLOpenPlayerMap();
+    </Binding>
+</Bindings>

@@ -38,6 +38,9 @@ local function project(source, target, x, y)
     end
 end
 
+app.ProjectMapPoint = project
+app.ValidMapPoint = validPoint
+
 local function polestarLocation(id)
     local codex = Polestar and Polestar.Codex
     local lookup = Polestar and Polestar.Lookup

@@ -32,6 +32,11 @@ Inventory.lua
 Modules\Comfort\Window.lua
 Modules\Comfort\Vendor.lua
 Modules\Comfort\Quests.lua
+Modules\WorldMap\ExplorationData.lua
+Modules\WorldMap\Landmarks.lua
+Modules\WorldMap\Travel.lua
+Modules\WorldMap\Pins.lua
+Modules\WorldMap\Window.lua
 Overview.lua
 Modules\Upgrades\Catalog.lua
 Modules\Upgrades\Profiles.lua

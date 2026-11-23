@@ -2,6 +2,8 @@
 
 Run `python tests/test_comfort.py` to verify opt-in sales, item marks and variants, stale merchant visits, and quest flow with protected or ambiguous data.
 
+Run `python tests/test_world_map.py` to check the map options, native marker deduplication, quest turn-ins, map navigation, exploration overlays, and road crossing detection with Lua client fixtures.
+
 Run `python -m pip install lupa`, then `python tests/test_buff_watcher.py` from the repository. Lua 5.1 compiles and runs the addon code against `buff_watcher_fixture.lua`. No real game client, account, network, spell cast or chat send is used.
 
 See `../BUFFWATCHER_TESTS.md` for the executed cases, API references and remaining client checks. This directory is source-only and is not shipped in the installation archive.

@@ -168,10 +168,6 @@ local function createWindow()
         checkbox(f, "hideCombat", "Im Kampf ausblenden", -170),
         checkbox(f, "memory", "Erinnerungen speichern", -199),
         checkbox(f, "debug", "Debugmodus", -228),
-        checkbox(f, "moduleIcons", "Separate Modul-Minimapknöpfe", -257),
-        checkbox(f, "questTurnIns", "Questabgaben auf der Weltkarte", -286),
-        checkbox(f, "mountGloves", "Reithandschuhe automatisch wechseln", -315),
-        checkbox(f, "levelUpSound", "Eigener Level-up-Sound", -344),
         slider(f, "size", "Größe", -90, 64, 256, 1, 1, "px"),
         slider(f, "opacity", "Deckkraft", -137, 20, 100, 1, 100, "%"),
         choices(f, "frequency", "Häufigkeit", { "Selten", "Normal", "Gesprächig" }, -184),
@@ -201,11 +197,11 @@ local function createWindow()
     button(f, "Buffwächter einstellen", 252, -448, 248):SetScript("OnClick", function()
         if app.buffCheck then app.buffCheck.OpenConfig() end
     end)
-    button(f, "Taschen / Preise", 18, -395, 180):SetScript("OnClick", function()
+    button(f, "Taschen / Preise", 18, -304, 180):SetScript("OnClick", function()
         if app.inventory then app.inventory.OpenPriceSettings() end
     end)
-    button(f, "Position zurücksetzen", 18, -431, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
-    button(f, "Komfort", 18, -467, 180):SetScript("OnClick", function()
+    button(f, "Position zurücksetzen", 18, -342, 180):SetScript("OnClick", function() app.ResetCompanionPosition() end)
+    button(f, "Komfort", 18, -266, 180):SetScript("OnClick", function()
         f:Hide()
         app.comfort.Open()
     end)
@@ -228,6 +224,8 @@ function app.CompanionCommand(message)
         value = value and value:lower() or nil
         local names = { de = "deDE", dede = "deDE", german = "deDE", deutsch = "deDE", en = "enUS", enus = "enUS", english = "enUS", englisch = "enUS", auto = "auto" }
         if value and names[value] then write("language", names[value]) else app.OpenConfig() end
+    elseif (cmd == "karte" or cmd == "map") and ToggleWorldMap then
+        ToggleWorldMap()
     elseif (cmd == "komfort" or cmd == "comfort") and app.comfort then
         if window then window:Hide() end
         app.comfort.Open()
@@ -245,7 +243,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, lang auto|de|en]")
     end
     refreshSettings()
 end

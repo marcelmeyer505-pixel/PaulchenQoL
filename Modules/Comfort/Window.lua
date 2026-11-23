@@ -3,7 +3,12 @@ local style, L = app.style, app.L
 local comfort = {}
 app.comfort = comfort
 
-local defaults = { sellSummary = true }
+local defaults = {
+    sellSummary = true,
+    mapCompact = true, mapMouseCoords = true, mapPlayerCoords = true, mapZoneMenu = true,
+    mapCoordsBackground = true,
+    mapNoBlackout = true, mapNoFade = true, mapFlight = true, mapPortals = true, mapCrossings = true, mapLearnCrossings = true,
+}
 
 function comfort.Enabled(key)
     local settings = app.Settings().comfort
@@ -15,6 +20,7 @@ function comfort.SetEnabled(key, enabled)
     local settings = app.Settings()
     if type(settings.comfort) ~= "table" then settings.comfort = {} end
     settings.comfort[key] = enabled == true
+    if app.worldMap and key:sub(1, 3) == "map" then app.worldMap.SettingsChanged() end
 end
 
 -- Distinguish an empty slot or cursor from a protected value or a failed read.
@@ -57,7 +63,36 @@ local categories = {
         { "gossipAlt", "Einzelnen NPC-Dialog per Alt auswählen",
             "Halte Alt beim Ansprechen. Paulchen wählt einen einzelnen Dialogeintrag, wenn keine Quest zur Auswahl steht." },
     } },
-    { "Weltkarte & Erkundung", { { "questTurnIns", "Questabgaben auf der Weltkarte", nil, nil, true } } },
+    { "Weltkarte & Erkundung", {
+        { "mapCompact", "Kompakter Kartenrahmen" },
+        { "mapMouseCoords", "Mauskoordinaten anzeigen" },
+        { "mapPlayerCoords", "Spielerkoordinaten anzeigen" },
+        { "mapCoordsBackground", "Hintergrund der Kartenkoordinaten" },
+        { "mapZoneMenu", "Gebiets- und Kontinentmenü" },
+        { "mapMove", "Karte verschieben", "Ziehe die Paulchen-Leiste. Fenster- und Vollbildposition werden getrennt gespeichert." },
+        { "mapScale", "Karte skalieren", "Die Größe stellst du über Kartenoptionen auf der Weltkarte ein." },
+        { "mapNoBlackout", "Dunklen Kartenhintergrund ausblenden" },
+        { "mapNoFade", "Karte beim Laufen sichtbar lassen" },
+        { "mapHideCities", "Stadt- und Ortsmarker ausblenden" },
+        { "mapHideReset", "Filter-Reset der Karte ausblenden" },
+        { "questTurnIns", "Questabgaben auf der Weltkarte", nil, nil, true },
+        { "mapFlight", "Zusätzliche Flugpunkte anzeigen" },
+        { "mapPortals", "Portale anzeigen" },
+        { "mapCrossings", "Gebietsübergänge anzeigen" },
+        { "mapLearnCrossings", "Gelaufene Übergänge merken" },
+        { "mapTransport", "Boote, Zeppeline und Bahnen anzeigen" },
+        { "mapOtherFaction", "Verkehrspunkte der anderen Fraktion anzeigen" },
+        { "mapSpiritHealers", "Geistheiler auf der Karte anzeigen" },
+        { "mapDungeons", "Instanz- und Raideingänge anzeigen" },
+        { "mapZoneLevels", "Ungefähre Gebietsstufen anzeigen" },
+        { "mapFishing", "Ungefähre Angelfertigkeit anzeigen" },
+        { "mapReveal", "Unerforschte Karte aufdecken" },
+        { "mapRevealTint", "Unerforschte Flächen einfärben" },
+        { "mapDiscovery", "Unerforschte Teilgebiete markieren" },
+        { "mapShowDiscovered", "Erforschte Teilgebiete ebenfalls markieren", nil, "mapDiscovery" },
+        { "mapBattlefield", "Schlachtfeldkarte anpassen", "Größe, Deckkraft und Gruppensymbole stellst du über Kartenoptionen ein." },
+        { "mapMinimap", "Weltkarte im Minimap-Menü anbieten" },
+    } },
     { "Reisen & Flugmeister", { { "mountGloves", "Reithandschuhe automatisch wechseln", nil, nil, true } } },
     { "Gruppe & PvP", {} },
     { "Chat & Meldungen", {} },
@@ -207,12 +242,20 @@ local function createWindow()
         note:SetShown(found)
     end
     search:SetScript("OnTextChanged", function() refresh() end)
+    function f:Select(title)
+        for index, category in ipairs(categories) do
+            if category[1] == title then selected = index; break end
+        end
+        search:SetText("")
+        refresh()
+    end
     f:SetScript("OnShow", function() refresh(); search:ClearFocus() end)
     table.insert(UISpecialFrames, f:GetName())
     return f
 end
 
-function comfort.Open()
+function comfort.Open(category)
     window = window or createWindow()
+    if category then window:Select(category) end
     window:Show()
 end
