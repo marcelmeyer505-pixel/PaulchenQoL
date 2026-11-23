@@ -44,7 +44,7 @@ function style.Label(parent, value, x, y, width, height, font, color, justify)
     text:SetJustifyH(justify or "LEFT")
     text:SetWordWrap(false)
     text:SetTextColor(unpack(color or style.cream))
-    text:SetText(value)
+    text:SetText(app.L(value))
     return text
 end
 
