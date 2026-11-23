@@ -222,7 +222,7 @@ local function searchAuctionHouse(item)
         auction:SendBrowseQuery(name, 0, 0, {})
     end)
     if not ok then
-        print("Paulchen Upgrades · Die Suche im Auktionshaus konnte nicht gestartet werden.")
+        print(suite.L("Paulchen Upgrades · Die Suche im Auktionshaus konnte nicht gestartet werden."))
         return
     end
     suite.CloseDashboard("upgrades")
@@ -1277,7 +1277,7 @@ local function createMinimapButton(broker, icons)
         end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine(suite.L("Paulchen Upgrades"))
-            tooltip:AddLine("Linksklick · Upgrade-Reiter öffnen oder schließen", 1, 1, 1)
+            tooltip:AddLine(suite.L("Linksklick · Upgrade-Reiter öffnen oder schließen"), 1, 1, 1)
             tooltip:AddLine(suite.L("Ziehen · Position ändern"), 0.65, 0.70, 0.75)
         end,
     })
