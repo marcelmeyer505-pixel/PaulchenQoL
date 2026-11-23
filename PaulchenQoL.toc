@@ -8,10 +8,12 @@
 ## IconTexture: Interface\AddOns\PaulchenQoL\Textures\paulchen_idle.tga
 
 Core.lua
+Localization.lua
 Style.lua
 Modules.lua
 Memory.lua
 Dialogue.lua
+Dialogue_enUS.lua
 Personality.lua
 Flight.lua
 Config.lua
