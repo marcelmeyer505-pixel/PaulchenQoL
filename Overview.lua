@@ -62,10 +62,10 @@ function overview.Data()
     end } end
     if pouch then data.tasks[#data.tasks + 1] = { text = pouch, action = function() openBags("11020") end } end
     if travel.durability and travel.durability <= 30 then
-        data.tasks[#data.tasks + 1] = { text = "Reparieren · " .. math.floor(travel.durability) .. " % Haltbarkeit", action = function() openBags("Ausrüstung") end }
+        data.tasks[#data.tasks + 1] = { text = "Reparieren · " .. math.floor(travel.durability) .. " % Haltbarkeit", action = function() openBags(app.L("Ausrüstung")) end }
     end
     if travel.capacity > 0 and travel.free <= 4 then
-        data.tasks[#data.tasks + 1] = { text = "Taschen aufräumen · " .. travel.free .. " Plätze frei", action = function() openBags() end }
+        data.tasks[#data.tasks + 1] = { text = app.L("Taschen aufräumen · ") .. travel.free .. app.L(" Plätze frei"), action = function() openBags() end }
     end
     local timeline = app.timeline
     data.xp = timeline and timeline.OverviewExperience and timeline.OverviewExperience()
@@ -125,9 +125,9 @@ function app.CreateOverviewPanel(parent)
     local f = CreateFrame("Frame", nil, parent)
     f:SetPoint("TOPLEFT", 18, -166); f:SetSize(644, 378)
     panel = f
-    local needs = card(f, "Das steht gerade an", 0, 0, 644, 80)
+    local needs = card(f, app.L("Das steht gerade an"), 0, 0, 644, 80)
     needs.empty = text(needs, -28, 620, 30)
-    needs.empty:SetText("Alles bereit für die nächste Runde.")
+    needs.empty:SetText(app.L("Alles bereit für die nächste Runde."))
     needs.tasks = {}
     for i = 1, 4 do
         local index = i
@@ -139,8 +139,8 @@ function app.CreateOverviewPanel(parent)
     f.needs = needs
     f.session = card(f, "Deine Sitzung", 0, -90, 316, 96)
     f.session.body = text(f.session, -26, 296, 62)
-    control(f.session, "Logbuch", 237, -4, 69, openXP)
-    f.level = card(f, "Bis zum nächsten Level", 328, -90, 316, 96)
+    control(f.session, app.L("Logbuch"), 237, -4, 69, openXP)
+    f.level = card(f, app.L("Bis zum nächsten Level"), 328, -90, 316, 96)
     f.level.progress = progress(f.level, 10, -29, 296, {0.6, 0.35, 0.85})
     f.level.body = text(f.level, -46, 296, 45)
     f.farm = card(f, "Aktuelle Farmrunde", 0, -196, 644, 80)
@@ -156,7 +156,7 @@ function app.CreateOverviewPanel(parent)
         if farm then farm.Stop() end
         overview.Render()
     end)
-    control(f.farm, "Ziel / Details", 550, -3, 84, openFarm)
+    control(f.farm, app.L("Ziel / Details"), 550, -3, 84, openFarm)
     f.location = card(f, "Standort", 0, -286, 316, 92)
     f.location.body = text(f.location, -26, 296, 34)
     f.location.body:SetWordWrap(false)
@@ -165,11 +165,11 @@ function app.CreateOverviewPanel(parent)
     f.upgrade = card(f, "Bestes bekanntes Upgrade", 328, -286, 316, 92)
     f.upgrade.body = text(f.upgrade, -26, 296, 34)
     f.upgrade.body:SetWordWrap(false)
-    control(f.upgrade, "Anzeigen", 10, -64, 144, function()
+    control(f.upgrade, app.L("Anzeigen"), 10, -64, 144, function()
         if app.upgrades and app.upgrades.OpenOverviewUpgrade then app.upgrades.OpenOverviewUpgrade()
         else app.OpenModule("upgrades") end
     end)
-    control(f.upgrade, "Aktualisieren", 162, -64, 144, function()
+    control(f.upgrade, app.L("Aktualisieren"), 162, -64, 144, function()
         if app.upgrades and app.upgrades.CheckUpgrades then app.upgrades.CheckUpgrades() end
     end)
     f:SetScript("OnShow", function() overview.Render() end)
@@ -207,13 +207,13 @@ function overview.Render()
     f.farm.progress:SetValue(farm.goal and math.min(1, farm.itemCount / farm.goal) or 0)
     if farm.active then
         local target = farm.goal and (" · Ziel %d/%d"):format(farm.itemCount, farm.goal) or ""
-        f.farm.body:SetText(("%s · %s · %s\n%s EP%s"):format(farm.paused and "Pausiert" or "Läuft",
+        f.farm.body:SetText(("%s · %s · %s\n%s EP%s"):format(farm.paused and "Pausiert" or app.L("Läuft"),
             farm.area or "Unbekanntes Gebiet", duration(farm.elapsed), (farm.partial and "≥ " or "") .. count(farm.xp), target))
-    else f.farm.body:SetText("Keine aktive Runde.\nFarmziele unter Ziel / Details einstellen.") end
-    f.location.body:SetText(data.zone .. " · " .. (data.coordinates or "Koordinaten nicht verfügbar")
+    else f.farm.body:SetText(app.L("Keine aktive Runde.\nFarmziele unter Ziel / Details einstellen.")) end
+    f.location.body:SetText(data.zone .. " · " .. (data.coordinates or app.L("Koordinaten nicht verfügbar"))
         .. (data.subzone ~= "" and data.subzone ~= data.zone and ("\n" .. data.subzone) or ""))
     local upgrade = data.upgrade
-    local statuses = { waiting = "Warte auf Ausrüstungsdaten …", scanning = "Suche läuft …", combat = "Im Kampf pausiert",
+    local statuses = { waiting = app.L("Warte auf Ausrüstungsdaten …"), scanning = app.L("Suche läuft …"), combat = app.L("Im Kampf pausiert"),
         stale = "Liste veraltet · Aktualisieren",
         error = "Suchfehler · /pu diagnose", idle = "Noch kein Suchlauf", ready = "Keine bekannten Upgrades" }
     if upgrade and upgrade.best then
@@ -223,7 +223,7 @@ function overview.Render()
             .. (upgrade.state ~= "ready" and (" · " .. (statuses[upgrade.state] or "")) or upgrade.partial and " · Teilergebnis" or ""))
     else
         local status = upgrade and (upgrade.state == "ready" and upgrade.partial and "Teilergebnis · Itemdaten fehlen" or statuses[upgrade.state])
-        f.upgrade.body:SetText(upgrade and ((status or "") .. "\n" .. upgrade.profile) or "Bewertung nicht verfügbar")
+        f.upgrade.body:SetText(upgrade and ((status or "") .. "\n" .. upgrade.profile) or app.L("Bewertung nicht verfügbar"))
     end
 end
 
