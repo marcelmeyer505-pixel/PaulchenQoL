@@ -475,6 +475,7 @@ function guide.UpdateWorldOverlay(map)
     local entry, floor, candidates = guide.CurrentMap()
     local enabled = entry and map:IsVisible() and app.comfort.Enabled("mapInterior")
     if not enabled then
+        app.worldMap.SetEntranceLayerCovered(map, false)
         if worldView then
             worldView.panel:Hide()
             worldView.switch:Hide()
@@ -496,6 +497,7 @@ function guide.UpdateWorldOverlay(map)
     state.switch:SetText(L(state.outdoor and "Instanzkarte" or "Weltkarte"))
     state.switch:Show()
     state.panel:SetShown(not state.outdoor)
+    app.worldMap.SetEntranceLayerCovered(map, not state.outdoor)
     if state.outdoor then return end
     local width, height = state.host:GetSize()
     local fit = math.min((width - 16) / 3, (height - 72) / 2)

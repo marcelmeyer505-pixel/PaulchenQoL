@@ -2,6 +2,7 @@ local _, app = ...
 local world, options, style, L = app.worldMap, app.comfort, app.style, app.L
 local mapAPI, read, plain = C_Map, app.ReadGameValue, app.Readable
 local explorationAPI = C_MapExplorationInfo
+local entranceProviders = setmetatable({}, { __mode = "k" })
 
 local function rectKey(x, y, width, height)
     return x .. "/" .. y .. "/" .. width .. "/" .. height
@@ -41,7 +42,7 @@ local colors = {
     cross = { "Gebietsübergang", ">", 1.00, 0.77, 0.34 },
     transport = { "Verkehrsverbindung", "V", 0.36, 0.78, 0.70 },
     healer = { "Geistheiler", "+", 0.73, 0.87, 0.96 },
-    dungeon = { "Instanzeingang", "I", 0.93, 0.58, 0.34 },
+    dungeon = { "Instanzeingang", "I", 0.32, 0.74, 1.00 },
     travel = { "Reisepunkte", "", 0.73, 0.81, 0.94 },
     discovery = { "Unerforschtes Teilgebiet", "?", 1.00, 0.84, 0.38 },
     discovered = { "Erforschtes Teilgebiet", "+", 0.58, 0.86, 0.60 },
@@ -77,12 +78,17 @@ local function showTravelMenu(pin, map, members)
     end)
 end
 
-local function createPin(canvas, map)
-    local anchor = CreateFrame("Frame", nil, canvas)
-    anchor:SetSize(1, 1)
-    local pin = CreateFrame("Button", nil, anchor)
-    pin.positionAnchor = anchor
-    pin:SetPoint("CENTER", anchor, "CENTER")
+local function createPin(canvas, map, layer)
+    local anchor
+    if not layer then
+        anchor = CreateFrame("Frame", nil, canvas)
+        anchor:SetSize(1, 1)
+    end
+    local pin = CreateFrame("Button", nil, layer or anchor)
+    if anchor then
+        pin.positionAnchor = anchor
+        pin:SetPoint("CENTER", anchor, "CENTER")
+    end
     pin:RegisterForClicks("RightButtonUp")
     pin.badge = pin:CreateTexture(nil, "BACKGROUND")
     pin.badge:SetAllPoints()
@@ -168,11 +174,30 @@ local function configure(pin, point, overview, mapID)
     if pin.SetMouseMotionEnabled then pin:SetMouseMotionEnabled(true) end
 end
 
+local function placeEntrances(provider, canvas, scale)
+    local map, layer = provider:GetMap(), provider.layer
+    local viewport = map.ScrollContainer
+    local left = read(viewport.GetHorizontalScroll, viewport) or 0
+    local top = read(viewport.GetVerticalScroll, viewport) or 0
+    local width, height = canvas:GetSize()
+    local visibleWidth, visibleHeight = viewport:GetSize()
+    -- The scroll offsets are in canvas units. The entrance layer itself stays unscaled.
+    for i = 1, provider.used do
+        local pin = provider.pins[i]
+        local x = (pin.point.x * width - left) * scale
+        local y = (pin.point.y * height - top) * scale
+        pin:ClearAllPoints()
+        pin:SetPoint("CENTER", layer, "TOPLEFT", x, -y)
+        pin:SetShown(x >= 0 and x <= visibleWidth and y >= 0 and y <= visibleHeight)
+    end
+end
+
 local function placePins(provider)
     local map = provider:GetMap()
     local canvas = map:GetCanvas()
     local scale = read(map.GetCanvasScale, map) or canvas and read(canvas.GetScale, canvas)
     if not canvas or type(scale) ~= "number" or scale <= 0 then return end
+    if provider.layer then return placeEntrances(provider, canvas, scale) end
     local width, height = canvas:GetWidth(), canvas:GetHeight()
     for i = 1, provider.used do
         local pin = provider.pins[i]
@@ -184,23 +209,20 @@ local function placePins(provider)
     end
 end
 
-local nativeTemplates = { flight = "FlightPointPinTemplate", cross = "MapLinkPinTemplate", dungeon = "DungeonEntrancePinTemplate" }
-local function nativePositions(map, entrancesOnly)
+local nativeTemplates = { flight = "FlightPointPinTemplate", cross = "MapLinkPinTemplate" }
+local function nativePositions(map)
     local result = {}
     if not map.EnumeratePinsByTemplate then return result end
     for kind, template in pairs(nativeTemplates) do
-        if (kind == "dungeon") == entrancesOnly then
-            local positions = {}
-            result[kind] = positions
-            for pin in map:EnumeratePinsByTemplate(template) do
-                local x, y = read(pin.GetPosition, pin)
-                if app.ValidMapPoint(x, y) and pin:IsShown() then
-                    positions[#positions + 1] = { x, y, read(pin.GetFrameLevel, pin) }
-                end
+        local positions = {}
+        result[kind] = positions
+        for pin in map:EnumeratePinsByTemplate(template) do
+            local x, y = read(pin.GetPosition, pin)
+            if app.ValidMapPoint(x, y) and pin:IsShown() then
+                positions[#positions + 1] = { x, y }
             end
         end
     end
-    if entrancesOnly then return result end
     for _, template in ipairs({ "AreaPOIPinTemplate", "MapLinkPinTemplate" }) do
         for pin in map:EnumeratePinsByTemplate(template) do
             local poi = plain(pin.poiInfo)
@@ -221,7 +243,7 @@ end
 local function hasNative(point, positions)
     for _, location in ipairs(positions[point.kind] or {}) do
         if math.abs(point.x - location[1]) <= 0.008 and math.abs(point.y - location[2]) <= 0.008 then
-            return true, location[3]
+            return true
         end
     end
     return false
@@ -366,17 +388,20 @@ local function layoutPins(provider, map, canvas, scale)
     local entrancesOnly = provider.entrancesOnly
     local points = groupMarkers(provider.points, canvas, scale, provider.overview, entrancesOnly)
     local used = 0
+    local layer = provider.layer
+    if layer then
+        local strata = map:GetFrameStrata()
+        if strata ~= "FULLSCREEN" and strata ~= "FULLSCREEN_DIALOG" and strata ~= "TOOLTIP" then strata = "DIALOG" end
+        layer:SetFrameStrata(strata)
+        layer:SetFrameLevel(math.max(map:GetFrameLevel(), canvas:GetFrameLevel(),
+            (map.BorderFrame or map):GetFrameLevel()) + 60)
+    end
     for _, point in ipairs(points) do
-        local nativePin, nativeLevel = hasNative(point, provider.native)
-        if not nativePin or point.dungeons then
+        if entrancesOnly or not hasNative(point, provider.native) then
             used = used + 1
-            local pin = provider.pins[used] or createPin(canvas, map)
+            local pin = provider.pins[used] or createPin(canvas, map, layer)
             provider.pins[used] = pin
-            local level = canvas:GetFrameLevel() + (entrancesOnly and 30 or 18)
-            if entrancesOnly then
-                pin:SetFrameStrata(map:GetFrameStrata())
-            end
-            pin:SetFrameLevel(nativeLevel and math.max(level, nativeLevel + 1) or level)
+            pin:SetFrameLevel(layer and layer:GetFrameLevel() + 1 or canvas:GetFrameLevel() + 18)
             configure(pin, point, provider.overview, provider.drawingMap)
             pin:Show()
         end
@@ -409,10 +434,10 @@ local function draw(provider)
     local info = world.Info(mapID)
     local kind = info and plain(info.mapType)
     provider.overview = kind == world.types.World or kind == world.types.Continent
-    local native
-    app.SecureCall(L("Weltkarte"), function() native = nativePositions(map, entrancesOnly) end)
-    provider.native = native or {}
     if not entrancesOnly then
+        local native
+        app.SecureCall(L("Weltkarte"), function() native = nativePositions(map) end)
+        provider.native = native or {}
         explore(provider, canvas, mapID, points)
         if provider.showLevels then levelMarkers(mapID, points) end
     end
@@ -420,11 +445,24 @@ local function draw(provider)
     layoutPins(provider, map, canvas, scale)
 end
 
+function world.SetEntranceLayerCovered(map, covered)
+    local provider = entranceProviders[map]
+    if provider and provider.layer then provider.layer:SetShown(not covered) end
+end
+
 function world.AttachPins(map, showLevels, entrancesOnly)
     if not (map.AddDataProvider and map.GetCanvas and MapCanvasDataProviderMixin and CreateFromMixins and C_Timer) then return end
     local provider = CreateFromMixins(MapCanvasDataProviderMixin)
     provider.pins, provider.tiles, provider.used, provider.tileCount = {}, {}, 0, 0
     provider.showLevels, provider.entrancesOnly = showLevels, entrancesOnly == true
+    if entrancesOnly and map.ScrollContainer then
+        local layer = CreateFrame("Frame", nil, map)
+        layer:SetAllPoints(map.ScrollContainer)
+        layer:EnableMouse(false)
+        if layer.SetClipsChildren then layer:SetClipsChildren(true) end
+        provider.layer, entranceProviders[map] = layer, provider
+        provider.OnCanvasPanChanged = placePins
+    end
     provider.RefreshAllData = function(self)
         if self.pending or not self:GetMap():IsVisible() then return end
         self.pending = true

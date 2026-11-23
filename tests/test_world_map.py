@@ -68,8 +68,11 @@ local methods = {
     SetParent = function(self, parent) self.parent = parent end,
     GetWidth = function(self) return self.width end,
     GetHeight = function(self) return self.height end,
-    GetFrameLevel = function() return 1 end,
-    GetFrameStrata = function() return "HIGH" end,
+    GetFrameLevel = function(self) return self.level or 1 end,
+    SetFrameLevel = function(self, level) self.level = level end,
+    GetFrameStrata = function(self) return self.strata or (self.parent and self.parent:GetFrameStrata()) or "MEDIUM" end,
+    SetFrameStrata = function(self, strata) self.strata = strata end,
+    SetClipsChildren = function(self, enabled) self.clipsChildren = enabled end,
     GetScale = function(self) return self.scale or 1 end,
     SetScale = function(self, scale) self.scale = scale end,
     GetAlpha = function(self) return self.alpha or 1 end,
@@ -85,13 +88,14 @@ local methods = {
     SetTexture = function(self, id) self.textureID = id end,
 }
 for _, name in ipairs({
-    "SetAllPoints", "SetFrameLevel", "SetFrameStrata", "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor",
+    "SetAllPoints", "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor",
     "EnableMouse", "RegisterForDrag", "RegisterForClicks", "SetJustifyH", "SetWordWrap", "SetTextColor",
     "SetHighlightTexture", "SetColorTexture", "SetNormalFontObject", "SetHighlightFontObject",
-    "SetDisabledFontObject", "SetTexCoord", "SetVertexColor", "SetMouseMotionEnabled", "SetMouseClickEnabled",
+    "SetDisabledFontObject", "SetTexCoord", "SetMouseMotionEnabled", "SetMouseClickEnabled",
     "SetDrawLayer", "SetThickness", "SetColorTexture", "SetStartPoint", "SetEndPoint",
     "EnableMouseWheel", "SetEnabled",
 }) do methods[name] = function() end end
+methods.SetVertexColor = function(self, ...) self.tint = {...} end
 function CreateFrame(_, _, parent)
     local widget = setmetatable({ parent = parent, shown = true, children = {}, scripts = {}, events = {},
         width = 700, height = 500 }, { __index = methods })
@@ -112,9 +116,17 @@ GameTooltip = { IsOwned = function() return false end }
 WorldMapFrame = CreateFrame("Frame", nil, UIParent)
 local map = WorldMapFrame
 map.ScrollContainer = CreateFrame("Frame", nil, map)
+function map.ScrollContainer:GetHorizontalScroll()
+    return self.scrollX or self:GetWidth() * (1 - 1 / map:GetCanvasScale()) / 2
+end
+function map.ScrollContainer:GetVerticalScroll()
+    return self.scrollY or self:GetHeight() * (1 - 1 / map:GetCanvasScale()) / 2
+end
 map.TitleCanvasSpacerFrame = CreateFrame("Frame", nil, map)
 map.TitleCanvasSpacerFrame:SetPoint("BOTTOMRIGHT", map, "TOPRIGHT", -3, -67)
 map.BorderFrame = CreateFrame("Frame", nil, map)
+map.BorderFrame:SetFrameStrata("HIGH")
+map.BorderFrame:SetFrameLevel(70)
 map.BorderFrame.NineSlice = CreateFrame("Frame", nil, map.BorderFrame)
 map.BlackoutFrame = CreateFrame("Frame", nil, map)
 map.id, map.providers = 1411, {}
@@ -588,13 +600,25 @@ for index = 1, provider.used do
     if pin.point.dungeon and pin.point.dungeon.guideKey == "stratholme_living" then strath = pin end
 end
 assert(north and not north.point.members and strath, "Zone redraw restores individual flight points and dungeon entrances")
-local _, _, _, anchorX, anchorY = strath.positionAnchor:GetPoint()
+local layer = assert(provider.layer)
+assert(strath:GetParent() == layer and layer:GetParent() == map and layer.clipsChildren,
+    "Entrance buttons sit in a separate clipped viewport, outside the map artwork")
+assert(layer:GetFrameStrata() == "DIALOG" and strath:GetFrameLevel() > map.BorderFrame:GetFrameLevel())
+assert(strath.badge.tint[3] > strath.badge.tint[2] and strath.badge.tint[2] > strath.badge.tint[1])
+local _, _, _, anchorX, anchorY = strath:GetPoint()
 assert(anchorX == strath.point.x * 700 and anchorY == -strath.point.y * 500)
 map.canvasScale = 1.8
 provider:OnCanvasScaleChanged()
-local _, _, _, zoomedX, zoomedY = strath.positionAnchor:GetPoint()
-assert(zoomedX == anchorX and zoomedY == anchorY and strath:GetScale() == 1 / 1.8,
-    "Zoom preserves the world position and the visual size of the marker")
+canvas.scrollX, canvas.scrollY = 80, 30
+provider:OnCanvasPanChanged()
+local _, _, _, zoomedX, zoomedY = strath:GetPoint()
+assert(zoomedX == (anchorX - 80) * 1.8 and zoomedY == (anchorY + 30) * 1.8 and strath:GetScale() == 1,
+    "Elevated entrances follow viewport zoom and pan without changing icon size")
+assert(strath:IsVisible())
+canvas.scrollX = 300
+provider:OnCanvasPanChanged()
+assert(not strath:IsShown(), "An off-map entrance does not leak beyond the viewport or intercept clicks")
+canvas.scrollX, canvas.scrollY = nil, nil
 map.canvasScale, C_TaxiMap.GetTaxiNodesForMap = nil, getTaxiNodes
 
 local inDungeon, dungeonID, interiorFloor = false, nil, nil
@@ -617,6 +641,7 @@ local entry = guide.CurrentMap()
 assert(entry.key == "sm_cathedral", "The last portal identifies an otherwise ambiguous wing")
 flush()
 textWidget("Scharlachrotes Kloster: Kathedrale")
+assert(not layer:IsShown(), "Outdoor entrances do not show on the instance overlay")
 local function hasVisibleRoute()
     for _, frame in ipairs(frames) do
         if frame.isRouteLine and frame:IsVisible() then return true end
@@ -632,6 +657,7 @@ flush()
 assert(hasVisibleRoute())
 textWidget("Weltkarte").scripts.OnClick()
 assert(not hasVisibleRoute())
+assert(layer:IsShown())
 textWidget("Instanzkarte").scripts.OnClick()
 textWidget("Scharlachrotes Kloster: Kathedrale")
 textWidget("Flügel").scripts.OnClick(textWidget("Flügel"))
