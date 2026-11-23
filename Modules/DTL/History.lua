@@ -58,7 +58,7 @@ local function importDetailsHistory()
                 history[#history + 1] = {
                     id = number(combat.twinIdentifier),
                     detailsKey = text(combat.combatSessionId),
-                    name = text(combat:GetCombatName(true, true)) or "Kampf",
+                    name = text(combat:GetCombatName(true, true)) or suite.L("Kampf"),
                     duration = duration,
                     damage = damage,
                     dps = dps,
@@ -92,7 +92,7 @@ local function readFight(info, playerGUID)
         id = id,
         native = true,
         meterName = name,
-        name = name or ("Kampf #%d"):format(id),
+        name = name or (suite.L("Kampf #%d")):format(id),
         duration = duration,
     }
 
