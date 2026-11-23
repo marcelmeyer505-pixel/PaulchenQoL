@@ -91,7 +91,7 @@ local function retryPouchAt(readyAt)
     if readyAt then
         pouchTimer = C_Timer.NewTimer(math.max(0.05, readyAt - GetTime()), function()
             pouchTimer, pouchRetryAt = nil, nil
-            app.SecureCall("Immergrünbeutel", app.CheckEvergreenPouch)
+            app.SecureCall(app.L("Immergrünbeutel"), app.CheckEvergreenPouch)
         end)
     end
 end
@@ -117,7 +117,7 @@ function app.CheckEvergreenPouch()
     end
     retryPouchAt(nil)
     local usable = not C_Item.IsUsableItem or readable(C_Item.IsUsableItem(pouch)) == true
-    app.SetCompanionReminder("pouch", usable and "Immergrünbeutel bereit." or nil)
+    app.SetCompanionReminder("pouch", usable and app.L("Immergrünbeutel bereit.") or nil)
 end
 
 local function hasWildBuff()
@@ -158,7 +158,7 @@ local function checkWildBuff()
     end
     local active = hasWildBuff()
     if active ~= nil then
-        app.SetCompanionReminder("mark", not active and knowsWildBuff() and "Mal der Wildnis fehlt." or nil)
+        app.SetCompanionReminder("mark", not active and knowsWildBuff() and app.L("Mal der Wildnis fehlt.") or nil)
     end
 end
 
