@@ -89,11 +89,11 @@ local function equip(item, riding)
         end
         if riding then
             if mounted() and canChangeGear() and wornGloves() ~= ridingGloves then
-                tell("Die Handschuhe der Vorhut konnten nicht angelegt werden.")
+                tell(app.L("Die Handschuhe der Vorhut konnten nicht angelegt werden."))
             end
         elseif canChangeGear() and wornGloves() == ridingGloves then
             restoreFailed = true
-            tell("Deine bisherigen Handschuhe konnten nicht angelegt werden. Lege " .. item .. " aus der Tasche an.")
+            tell(app.L("Deine bisherigen Handschuhe konnten nicht angelegt werden. Lege ") .. item .. app.L(" aus der Tasche an."))
         end
         app.RefreshMountGloves()
     end)
@@ -137,7 +137,7 @@ local function update()
                     equip(original, false)
                 elseif not missingReported then
                     missingReported = true
-                    tell("Die bisherigen Handschuhe fehlen in deinen Taschen.")
+                    tell(app.L("Die bisherigen Handschuhe fehlen in deinen Taschen."))
                 end
             end
             return
