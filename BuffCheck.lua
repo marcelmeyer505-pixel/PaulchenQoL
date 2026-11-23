@@ -378,7 +378,7 @@ function buff.Report(data)
     data = data or buff.Snapshot()
     if data.checkedCount==0 then return app.L("[Paulchen] Buffcheck unvollständig: Keine Spieler vollständig überprüfbar.") end
     local incomplete=data.unknownCount>0 or data.unverifiableCount>0 or data.excluded
-    local prefix = "[Paulchen] Buffcheck" .. (incomplete and app.L(" unvollständig") or "") .. ": "
+    local prefix = app.L("[Paulchen] Buffcheck") .. (incomplete and app.L(" unvollständig") or "") .. ": "
     local parts = {}
     for _, family in ipairs(buff.families) do
         local names = {}
@@ -727,15 +727,15 @@ function buff.OpenConfig()
                 end)
         end
         button(f,app.L("Anforderungen pro Klasse"),378,-281,306,function(self) requirementMenu(self) end)
-        label(f,"Automatisch: nur mit passendem Buffgeber.\nIntelligenz/Wille nur für Manaklassen.\nPflicht/Aus und gewünschter Segen sind je Klasse wählbar.",378,-318,306,68,style.muted):SetWordWrap(true)
-        label(f,"Chat-Abstand (60–600 Sekunden)",18,-328,320,24,style.gold)
+        label(f,app.L("Automatisch: nur mit passendem Buffgeber.\nIntelligenz/Wille nur für Manaklassen.\nPflicht/Aus und gewünschter Segen sind je Klasse wählbar."),378,-318,306,68,style.muted):SetWordWrap(true)
+        label(f,app.L("Chat-Abstand (60–600 Sekunden)"),18,-328,320,24,style.gold)
         local cooldown=style.EditBox(f);cooldown:SetSize(90,28);cooldown:SetPoint("TOPLEFT",18,-358);cooldown:SetNumeric(true)
         cooldown:SetMaxLetters(3)
         cooldown:SetScript("OnEnterPressed",function(self) buff.SetOption("cooldown",self:GetText());self:ClearFocus();refreshOptions() end)
         cooldown:SetScript("OnEscapePressed",function(self) self:ClearFocus();refreshOptions() end)
         f.controls[#f.controls+1]=function() if not cooldown:HasFocus() then cooldown:SetText(tostring(buff.Settings().cooldown)) end end
-        label(f,"Mit Enter übernehmen. Mindestens 60 Sekunden; identische automatische Berichte werden unterdrückt.",18,-394,666,38,style.muted):SetWordWrap(true)
-        label(f,"Nicht lesbare, entfernte, tote oder ausgeloggte Spieler bleiben unbekannt. Schattenschutz und Wille starten ausgeschaltet; fremde Talente werden nicht geraten.",18,-448,666,52,style.muted):SetWordWrap(true)
+        label(f,app.L("Mit Enter übernehmen. Mindestens 60 Sekunden; identische automatische Berichte werden unterdrückt."),18,-394,666,38,style.muted):SetWordWrap(true)
+        label(f,app.L("Nicht lesbare, entfernte, tote oder ausgeloggte Spieler bleiben unbekannt. Schattenschutz und Wille starten ausgeschaltet; fremde Talente werden nicht geraten."),18,-448,666,52,style.muted):SetWordWrap(true)
         f:SetScript("OnShow",refreshOptions)
         UISpecialFrames[#UISpecialFrames+1]=f:GetName()
     end
@@ -752,8 +752,8 @@ function buff.Command(command)
         local data=buff.Scan()
         print(app.L("Paulchen Buffwächter · Diagnose ") .. (db.debug and "an" or "aus") .. " · " .. data.mode)
         print(app.L("Aura-API: ") .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
-            .. " · Chat-API: " .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
-            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. " · Versand abgelehnt: " .. tostring(buff.autoBlocked==true))
+            .. "app.L(" · Chat-API: ") .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
+            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. "app.L(" · Versand abgelehnt: ") .. tostring(buff.autoBlocked==true))
         for _,member in ipairs(data.members) do
             print(member.name .. " · " .. member.class .. app.L(" · fehlt ") .. #member.missing .. app.L(" · unbekannt ") .. #member.unknown .. " · " .. (member.reason or "lesbar"))
         end
