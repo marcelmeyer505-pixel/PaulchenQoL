@@ -3,15 +3,15 @@ local app = suite.upgrades
 if not app then return end
 
 app.weightFields = {
-    { "str", "Stärke" }, { "agi", "Beweglichkeit" }, { "sta", "Ausdauer" },
-    { "int", "Intelligenz" }, { "spi", "Willenskraft" }, { "armor", "Rüstung" },
-    { "ap", "Angriffskraft" }, { "rap", "Distanzangriffskraft" },
+    { "str", suite.L("Stärke") }, { "agi", suite.L("Beweglichkeit") }, { "sta", suite.L("Ausdauer") },
+    { "int", suite.L("Intelligenz") }, { "spi", suite.L("Willenskraft") }, { "armor", suite.L("Rüstung") },
+    { "ap", suite.L("Angriffskraft") }, { "rap", "Distanzangriffskraft" },
     { "dps", "Nahkampfwaffen-DPS" }, { "rdps", "Fernkampfwaffen-DPS" },
     { "hit", "Nahkampftreffer (%)" }, { "crit", "Nahkampfkrit (%)" },
-    { "hastePercent", "Angriffstempo (%)" }, { "expertise", "Waffenkundewertung" },
-    { "armorPen", "Rüstungsdurchschlag" }, { "defense", "Verteidigung" },
+    { "hastePercent", suite.L("Angriffstempo (%)") }, { "expertise", "Waffenkundewertung" },
+    { "armorPen", suite.L("Rüstungsdurchschlag") }, { "defense", suite.L("Verteidigung") },
     { "dodge", "Ausweichen (%)" }, { "parry", "Parieren (%)" }, { "block", "Blocken (%)" },
-    { "blockValue", "Blockwert" }, { "sp", "Zauberschaden" }, { "heal", "Heilbonus" },
+    { "blockValue", "Blockwert" }, { "sp", suite.L("Zauberschaden") }, { "heal", suite.L("Heilbonus") },
     { "spellHit", "Zaubertreffer (%)" }, { "spellCrit", "Zauberkrit (%)" },
     { "spellHaste", "Zaubertempo (%)" }, { "mp5", "Mana je 5 Sek." },
 }
@@ -49,12 +49,12 @@ local profiles = {
     HUNTER = {
         profile("beastmastery", "Tierherrschaft", ranged, { rdps = 6, hastePercent = 5 }),
         profile("marksmanship", "Treffsicherheit", ranged, { rap = 0.55, crit = 8 }),
-        profile("survival", "Überleben", ranged, { agi = 1.2, crit = 8 }),
+        profile("survival", suite.L("Überleben"), ranged, { agi = 1.2, crit = 8 }),
     },
     ROGUE = {
-        profile("combat", "Kampf", melee, { str = 0.5, agi = 1, hit = 12, dps = 6, hastePercent = 6 }),
+        profile("combat", suite.L("Kampf"), melee, { str = 0.5, agi = 1, hit = 12, dps = 6, hastePercent = 6 }),
         profile("assassination", "Meucheln", melee, { str = 0.5, agi = 1, crit = 9, ap = 0.55 }),
-        profile("subtlety", "Täuschung", melee, { str = 0.5, agi = 1.15, crit = 9, armorPen = 0.25 }),
+        profile("subtlety", suite.L("Täuschung"), melee, { str = 0.5, agi = 1.15, crit = 9, armorPen = 0.25 }),
     },
     PRIEST = {
         profile("shadow", "Schatten", caster, { spellCrit = 4, mp5 = 1 }, { spShadow = 1 }),
@@ -62,7 +62,7 @@ local profiles = {
         profile("holy", "Heilig", healer, { spi = 0.8, spellHaste = 6 }),
     },
     SHAMAN = {
-        profile("enhancement", "Verstärkung", melee, { int = 0.5, sp = 0.35, spellHit = 4, hastePercent = 6 }),
+        profile("enhancement", suite.L("Verstärkung"), melee, { int = 0.5, sp = 0.35, spellHit = 4, hastePercent = 6 }),
         profile("elemental", "Elementar", caster, { spellCrit = 10, mp5 = 1.1 }, { spNature = 0.8, spFire = 0.2 }),
         profile("restoration", "Wiederherstellung", healer, { mp5 = 2.4, spellCrit = 6 }),
     },
@@ -73,13 +73,13 @@ local profiles = {
     },
     WARLOCK = {
         profile("affliction", "Gebrechen", caster, { spellCrit = 4, spi = 0.35, sta = 0.3 }, { spShadow = 1 }),
-        profile("demonology", "Dämonologie", caster, { sta = 0.6, int = 0.6 }, { spShadow = 0.8, spFire = 0.2 }),
-        profile("destruction", "Zerstörung", caster, { spellCrit = 11 }, { spShadow = 0.5, spFire = 0.5 }),
+        profile("demonology", suite.L("Dämonologie"), caster, { sta = 0.6, int = 0.6 }, { spShadow = 0.8, spFire = 0.2 }),
+        profile("destruction", suite.L("Zerstörung"), caster, { spellCrit = 11 }, { spShadow = 0.5, spFire = 0.5 }),
     },
     DRUID = {
         profile("cat", "Feral Katze", {}, { agi = 1.90, str = 0.80, ap = 0.40, dps = 5.60,
             hit = 8.77, crit = 10.2, hastePercent = 4.78, expertise = 0.85, armorPen = 0.13 }),
-        profile("bear", "Feral Bär", tank, { armor = 0.13, agi = 1, parry = 0, block = 0, blockValue = 0 }),
+        profile("bear", suite.L("Feral Bär"), tank, { armor = 0.13, agi = 1, parry = 0, block = 0, blockValue = 0 }),
         profile("balance", "Gleichgewicht", caster, { spellCrit = 9, int = 0.7 }, { spArcane = 0.6, spNature = 0.4 }),
         profile("restoration", "Wiederherstellung", healer, { spi = 0.8, spellCrit = 2 }),
     },
