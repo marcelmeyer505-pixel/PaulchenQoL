@@ -752,8 +752,8 @@ function buff.Command(command)
         local data=buff.Scan()
         print(app.L("Paulchen Buffwächter · Diagnose ") .. (db.debug and "an" or "aus") .. " · " .. data.mode)
         print(app.L("Aura-API: ") .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
-            .. "app.L(" · Chat-API: ") .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
-            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. "app.L(" · Versand abgelehnt: ") .. tostring(buff.autoBlocked==true))
+            .. app.L(" · Chat-API: ") .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
+            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. app.L(" · Versand abgelehnt: ") .. tostring(buff.autoBlocked==true))
         for _,member in ipairs(data.members) do
             print(member.name .. " · " .. member.class .. app.L(" · fehlt ") .. #member.missing .. app.L(" · unbekannt ") .. #member.unknown .. " · " .. (member.reason or "lesbar"))
         end
