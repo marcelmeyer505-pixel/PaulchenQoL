@@ -13,9 +13,9 @@ local pvpVendors = {
     [14753] = true, [14754] = true, [15126] = true, [15127] = true, [263569] = true, [263570] = true,
 }
 local sourceNames = {
-    quest = "Quest", boe = "BoE", dungeon = "Instanz", raid = "Raid", drop = "Drop", vendor = "Händler",
-    craft = "Herstellung", auction = "Auktionshaus", bag = "Taschen", undermine = "Undermine Real",
-    pvp = "PvP-Händler",
+    quest = "Quest", boe = "BoE", dungeon = suite.L("Instanz"), raid = suite.L("Raid"), drop = suite.L("Drop"), vendor = suite.L("Händler"),
+    craft = suite.L("Herstellung"), auction = suite.L("Auktionshaus"), bag = suite.L("Taschen"), undermine = "Undermine Real",
+    pvp = suite.L("PvP-Händler"),
 }
 app.sourceNames = sourceNames
 
@@ -28,11 +28,11 @@ local professions = {
     { "Enchanting", "Verzauberkunst", 333 },
     { "Jewelcrafting", "Juwelierskunst", 755 },
 }
-app.professionChoices = { { "", "Alle Berufe" } }
+app.professionChoices = { { "", suite.L("Alle Berufe") } }
 local professionByName = {}
 for _, profession in ipairs(professions) do
     local name, label, line = unpack(profession)
-    app.professionChoices[#app.professionChoices + 1] = { name, label }
+    app.professionChoices[#app.professionChoices + 1] = { name, suite.L(label) }
     professionByName[name], professionByName[line] = profession, profession
 end
 
@@ -96,10 +96,10 @@ local function addCraft(scan, list, seen, profession, skill, spell)
     seen[info[1]] = true
     skill = type(skill) == "number" and skill > 0 and skill or nil
     local rank = scan.professionRanks[info[3]]
-    local detail = skill and ("Benötigt Skill " .. skill) or "Skill unbekannt"
-    if rank then detail = detail .. " · Dein Skill " .. rank end
+    local detail = skill and (suite.L("Benötigt Skill ") .. skill) or suite.L("Skill unbekannt")
+    if rank then detail = detail .. suite.L(" · Dein Skill ") .. rank end
     list[#list + 1] = {
-        kind = "craft", title = info[2], detail = detail,
+        kind = "craft", title = suite.L(info[2]), detail = detail,
         profession = info[1], skill = skill, spell = spell,
         effort = skill and math.min(9, 3 + math.floor((skill - 1) / 75)) or 4,
     }
@@ -562,7 +562,7 @@ local function addCodexSources(scan, id, list, quests, drops, crafts, restricted
                 addQuest(scan, list, quests, raw.quest)
             elseif route.type == "drop" or route.type == "world" then
                 local location = codexLocation(scan, raw, route.instance)
-                local title = (location and location.boss) or route.label or "Weltbeute"
+                local title = (location and location.boss) or route.label or suite.L("Weltbeute")
                 availability.NoteItem(id, location)
                 if not restricted or location and not availability.LocationGroup(location) then
                     addDrop(scan, list, drops, location, title, route.chance, route.zone)
@@ -613,7 +613,7 @@ function app.GetSources(scan, id, item)
         elseif source.kind == "drop" then
             local location = scan.atlas.npcs[source.npc] or scan.journal.npcs[source.npc] or scan.atlas.zones[source.zone]
             availability.NoteItem(id, location)
-            local title = (location and location.boss) or source.npcName or source.zoneName or "Fundort unbekannt"
+            local title = (location and location.boss) or source.npcName or source.zoneName or suite.L("Fundort unbekannt")
             if released or location and not availability.LocationGroup(location) then
                 addDrop(scan, list, drops, location, title, source.pct, source.zoneName)
             end
@@ -625,7 +625,7 @@ function app.GetSources(scan, id, item)
     addCodexSources(scan, id, list, quests, drops, crafts, not released)
     local key = item and (app.VariantKey(item.link) or id) or id
     if scan.bagItems and scan.bagItems[key] then
-        list[#list + 1] = { kind = "bag", title = "In deinen Taschen", effort = 1 }
+        list[#list + 1] = { kind = "bag", title = suite.L("In deinen Taschen"), effort = 1 }
     end
     local offers = item and scan.auctions and scan.auctions[id]
     local offer = offers and offers[key]
@@ -637,20 +637,20 @@ function app.GetSources(scan, id, item)
     end
     if offer then
         list[#list + 1] = {
-            kind = "auction", title = "Sofortkauf", price = offer.price, at = offer.at, tsmPrice = estimate, effort = 2,
+            kind = "auction", title = suite.L("Sofortkauf"), price = offer.price, at = offer.at, tsmPrice = estimate, effort = 2,
         }
     elseif browse then
         list[#list + 1] = {
-            kind = "auction", title = "AH-Übersicht", price = browse.price or estimate,
+            kind = "auction", title = suite.L("AH-Übersicht"), price = browse.price or estimate,
             isEstimate = not browse.price and estimate ~= nil, tsmPrice = browse.price and estimate, effort = 2,
         }
     end
     if tradeable then
         local effort = item.quality >= 4 and 7 or item.quality >= 3 and 5 or 3
         if estimate and not offer and not browse then
-            list[#list + 1] = { kind = "auction", title = "TSM-Schätzpreis", price = estimate, isEstimate = true, effort = effort }
+            list[#list + 1] = { kind = "auction", title = suite.L("TSM-Schätzpreis"), price = estimate, isEstimate = true, effort = effort }
         end
-        list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = "Bestand und Preis unbekannt", effort = effort }
+        list[#list + 1] = { kind = "boe", title = suite.L("Auktionshaus / Handel"), detail = suite.L("Bestand und Preis unbekannt"), effort = effort }
     end
     table.sort(list, function(a, b)
         if a.effort ~= b.effort then return a.effort < b.effort end

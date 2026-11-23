@@ -130,7 +130,7 @@ local function flightInfo()
         seconds = remaining
     end
     local clock = clockText(seconds)
-    if not flying.duration then return flying.name, "Flugzeit · " .. clock end
+    if not flying.duration then return flying.name, app.L("Flugzeit · ") .. clock end
     return flying.name, "Restzeit · " .. (flying.estimate and "ca. " or "") .. clock
 end
 app.FlightInfo = flightInfo
@@ -169,7 +169,7 @@ local function startFlight(now)
         end
     end
     flying = flying or { started = now }
-    flying.name = flying.name or "Unterwegs auf der Flugroute"
+    flying.name = flying.name or app.L("Unterwegs auf der Flugroute")
     picked, boardingUntil = nil, nil
     db.activeFlight = {
         name = flying.name, key = flying.key, duration = flying.duration, estimate = flying.estimate,
@@ -202,12 +202,12 @@ driver:SetScript("OnUpdate", function(_, delta)
     tick = tick + delta
     if tick < 0.2 then return end
     tick = 0
-    if not app.SecureCall("Flugtimer", updateFlight) then driver:Hide() end
+    if not app.SecureCall(app.L("Flugtimer"), updateFlight) then driver:Hide() end
 end)
 
 local function watch()
     driver:Show()
-    if not app.SecureCall("Flugtimer", updateFlight) then driver:Hide() end
+    if not app.SecureCall(app.L("Flugtimer"), updateFlight) then driver:Hide() end
 end
 
 local function onTake(slot)
@@ -230,7 +230,7 @@ local function addFlightTooltip(owner, slot)
     if not destination then return end
     local duration, estimated = routeTiming(slot, destination, routeKey(origin, destination))
     local display = duration and ((estimated and "ca. " or "") .. clockText(duration) .. " min") or "unbekannt"
-    GameTooltip:AddLine("Flugzeit · " .. display, 0.98, 0.74, 0.40)
+    GameTooltip:AddLine(app.L("Flugzeit · ") .. display, 0.98, 0.74, 0.40)
     GameTooltip:Show()
 end
 

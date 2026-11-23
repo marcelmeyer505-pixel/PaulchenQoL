@@ -15,6 +15,7 @@ repairable, groupSize, instance = false, 3, "party"
 quality, bind, auctionPrice, priceSource = 1, 2, nil, nil
 secret = {}
 function issecretvalue(value) return value == secret end
+function GetLocale() return "deDE" end
 function GetTime() return now end
 function GetServerTime() return server + math.floor(now) end
 function GetRealZoneText() return zone end
@@ -121,7 +122,7 @@ def runtime(previous=None, elapsed=2, life=True):
         for key in ("PaulchenQoLDB", "PaulchenQoLSettings"):
             lua.globals()[key] = copy(previous.globals()[key], lua)
         lua.globals().now = previous.globals().now + elapsed
-    files = ["Core.lua", "Memory.lua", "Dialogue.lua", "Personality.lua", "Config.lua"]
+    files = ["Localization.lua", "Core.lua", "Memory.lua", "Dialogue.lua", "Dialogue_enUS.lua", "Personality.lua", "Config.lua"]
     if life:
         files += ["CompanionLife.lua", "Events.lua"]
     load = lua.eval('function(code, name) assert(loadstring(code, "@" .. name))("PaulchenQoL", app) end')
@@ -163,6 +164,36 @@ for _, category in ipairs({"buffMissing", "buffReady", "login", "level", "death"
 end
 assert(#app.Memory().recent == 40)
 print("Every line in the 12 legacy pools is reachable. Legacy settings and bounded history verified.")
+''')
+
+
+bilingual = runtime(life=False)
+bilingual.execute(r'''
+local reloads = 0
+function ReloadUI() reloads = reloads + 1 end
+app.CompanionCommand("lang en")
+assert(reloads == 1 and PaulchenQoLSettings.language == "enUS")
+assert(app.GetLanguage() == "enUS" and app.L("Einstellungen") == "Settings")
+assert(app.LocalizeDecimal("1.5") == "1.5")
+app.SetProfile("pauseHints", true)
+app.React("sessionBreak", { hours = 4 })
+local first = assert(spoken[1])
+local index = tonumber(first.key:match(":(%d+)$"))
+assert(index == 7 or index == 8, "Four-hour dialogue must retain its original condition")
+assert(first.text == app.DialogueEnglish.sessionBreak[index])
+
+advance(300)
+app.React("sessionBreak", { hours = 5, extended = true })
+local second = assert(spoken[2])
+local index = tonumber(second.key:match(":(%d+)$"))
+assert(index == 9 or index == 10)
+local expected = app.DialogueEnglish.sessionBreak[index]:gsub("{hours}", "5")
+assert(second.text == expected, "Use the English line with its context inserted")
+combat = true
+app.CompanionCommand("lang de")
+assert(PaulchenQoLSettings.language == "deDE" and reloads == 1)
+assert(app.L("Einstellungen") == "Einstellungen" and app.LocalizeDecimal("1.5") == "1,5")
+print("Language override and combat-safe reload, localized dialogue and shared context gates verified.")
 ''')
 
 journey = runtime()

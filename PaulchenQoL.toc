@@ -1,17 +1,21 @@
 ## Interface: 16001
 ## Title: Paulchen QoL
-## Notes: Begleiter, Logbuch, Upgrades, Auktionsscan und Questabgaben
+## Notes: Companion, logbook, upgrades, auction scans and quest turn-ins
+## Notes-deDE: Begleiter, Logbuch, Upgrades, Auktionsscan und Questabgaben
 ## Version: 0.12.0
+## LoadSavedVariablesFirst: 1
 ## SavedVariables: PaulchenQoLSettings, PaulchenQoLAuctionDB
 ## SavedVariablesPerCharacter: PaulchenQoLDB, PaulchenQoLTimelineDB, PaulchenQoLUpgradesDB
 ## OptionalDeps: Details, Polestar, AtlasLootClassic, ForeverDungeonJournal, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan, Bagnon, BagBrother, TradeSkillMaster
 ## IconTexture: Interface\AddOns\PaulchenQoL\Textures\paulchen_idle.tga
 
+Localization.lua
 Core.lua
 Style.lua
 Modules.lua
 Memory.lua
 Dialogue.lua
+Dialogue_enUS.lua
 Personality.lua
 CompanionLife.lua
 Flight.lua

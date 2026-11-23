@@ -39,7 +39,7 @@ local function createCard()
     card.icon:SetPoint("LEFT", 13, 0)
     card.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     local heading = cardText(card, "GameFontNormalSmall", 67, -11, 318)
-    heading:SetText("UPGRADE GEDROPPT")
+    heading:SetText(suite.L("UPGRADE GEDROPPT"))
     heading:SetTextColor(0.98, 0.81, 0.46)
     card.nameText = cardText(card, "GameFontHighlightLarge", 67, -28, 318)
     card.gainText = cardText(card, "GameFontHighlightSmall", 67, -54, 318)
@@ -57,10 +57,10 @@ end
 local function announce(link, id, result, now)
     local slot = app.slotNames[result.slot] or (result.slot == 12 and app.slotNames[11])
         or (result.slot == 14 and app.slotNames[13])
-    local gain = result.pct and ("+%.1f %%"):format(result.pct) or ("+%.2f Punkte"):format(result.delta)
+    local gain = result.pct and ("+%.1f %%"):format(result.pct) or suite.LF("+%.2f Punkte", result.delta)
     if result.pct and result.pct < 0.05 then gain = "+<0.1 %" end
-    gain = gain:gsub("%.", ",")
-    if result.empty then gain = gain .. " · Freier Slot" end
+    gain = suite.LocalizeDecimal(gain)
+    if result.empty then gain = gain .. suite.L(" · Freier Slot") end
     local detail = slot and (gain .. " · " .. slot) or gain
     if DEFAULT_CHAT_FRAME then
         DEFAULT_CHAT_FRAME:AddMessage("|cfffad176Paulchen Upgrades|r · " .. link .. " · |cff87eaae" .. detail .. "|r")

@@ -87,11 +87,16 @@ local function choice(category, context, now, force)
     local options = type(category) == "string" and { { category, 1 } } or category
     local keys, texts, lastText, lastAmbient = history()
     local fresh, total, oldest = {}, 0, nil
-    local function consider(name, id, entry, weight)
+    local english = app.GetLanguage() == "enUS"
+    local translations = english and app.DialogueEnglish
+    local function consider(name, id, entry, translated, weight)
         local data = type(entry) == "table" and entry or { text = entry }
         if data.needs and not context[data.needs] or data.hour and data.hour ~= context.hours then return end
         if data.cooldown and (lineAt[id] or -math.huge) + data.cooldown > now then return end
-        local text = data.text:gsub("{(%a+)}", function(key) return tostring(context[key] or "?") end)
+        local text = (translated or data.text):gsub("{(%a+)}", function(key)
+            local value = context[key]
+            return tostring((key == "buff" and app.LocalizeContext(value) or value) or "?")
+        end)
         if text == lastText or texts[text] == 1 then return end
         local candidate = { text = text, key = id, category = name, mood = data.mood, weight = weight * (data.weight or 1) }
         local age = math.min(keys[id] or math.huge, texts[text] or math.huge)
@@ -107,13 +112,18 @@ local function choice(category, context, now, force)
         local rule, lines = rules[name], app.Dialogue[name]
         if rule and lines and (force or willing(rule) and readyAt(name, rule) <= now) then
             local special = context.special
-            if special and app.ContextLines[special] and not keys[special] and not texts[app.ContextLines[special]]
+            local specialText = special and ((english and app.ContextLinesEnglish and app.ContextLinesEnglish[special])
+                or app.ContextLines[special])
+            if specialText and not keys[special] and not texts[specialText]
                 and (special == "longPause" or math.random() < 0.25) then
-                return { text = app.ContextLines[special], key = special, category = name }
+                return { text = specialText, key = special, category = name }
             end
             local weight = option[2] / #lines
             if name == lastAmbient then weight = weight * 0.45 end
-            for index, entry in ipairs(lines) do consider(name, name .. ":" .. index, entry, weight) end
+            local englishLines = translations and translations[name]
+            for index, entry in ipairs(lines) do
+                consider(name, name .. ":" .. index, entry, englishLines and englishLines[index], weight)
+            end
         end
     end
     if total == 0 then return oldest end
@@ -159,7 +169,7 @@ local function start(line, now, preview)
     if not rule.ambient then app.DelayCompanionAmbient(rule.priority >= 7 and 75 or 45) end
     lineAt[line.key] = now
     app.RememberComment(line.key, line.text, line.category, rule.ambient)
-    app.Debug("Dialog · " .. line.category)
+    app.Debug(app.L("Dialog · ") .. line.category)
 end
 
 local function valid(event, now)

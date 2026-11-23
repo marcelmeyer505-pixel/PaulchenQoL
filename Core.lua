@@ -8,11 +8,11 @@ app.artPath = "Interface\\AddOns\\" .. addonName .. "\\Textures\\paulchen_"
 app.avatar = app.artPath .. "idle.tga"
 app.markOrder = { "keep", "cat", "bear", "auction", "vendor" }
 app.marks = {
-    keep = { "Behalten", { 0.61, 0.85, 0.63 } },
-    cat = { "DPS-Ausrüstung", { 0.95, 0.72, 0.37 } },
-    bear = { "Tank-Ausrüstung", { 0.95, 0.72, 0.37 } },
+    keep = { app.L("Behalten"), { 0.61, 0.85, 0.63 } },
+    cat = { app.L("DPS-Ausrüstung"), { 0.95, 0.72, 0.37 } },
+    bear = { app.L("Tank-Ausrüstung"), { 0.95, 0.72, 0.37 } },
     auction = { "AH", { 0.65, 0.79, 1 } },
-    vendor = { "Händler", { 1, 0.57, 0.43 } },
+    vendor = { app.L("Händler"), { 1, 0.57, 0.43 } },
 }
 
 local function readable(value)
@@ -119,15 +119,16 @@ end
 
 function app.TravelWarning(travel)
     if travel.bagSpaceKnown ~= false and travel.capacity > 0 and travel.free == 0 then
-        return "full", "Mein Gepäck platzt aus allen Nähten. Deine Taschen sind voll!"
+        return "full", app.L("Mein Gepäck platzt aus allen Nähten. Deine Taschen sind voll!")
     end
     if travel.durability and travel.durability <= 30 then
-        return "repair", ("Psst, Zeit für den Schmied. Dein am stärksten abgenutztes Teil hat noch %d %% Haltbarkeit.")
+        return "repair", (app.L("Psst, Zeit für den Schmied. Dein am stärksten abgenutztes Teil hat noch %d %% Haltbarkeit."))
             :format(math.floor(travel.durability))
     end
     if travel.bagSpaceKnown ~= false and travel.capacity > 0 and travel.free <= 4 then
-        local space = travel.free == 1 and "1 Platz ist" or travel.free .. " Plätze sind"
-        return "space", "Nur noch " .. space .. " frei. Soll ich schon mal nach einem Händler Ausschau halten?"
+        local text = travel.free == 1 and "Nur noch %d Platz frei. Soll ich nach einem Händler Ausschau halten?"
+            or "Nur noch %d Plätze frei. Soll ich nach einem Händler Ausschau halten?"
+        return "space", app.LF(text, travel.free)
     end
 end
 
@@ -208,7 +209,7 @@ function app.ReadBags(marks)
     end
     for _, item in ipairs(items) do
         local name, _, quality, _, _, _, _, _, _, icon, price, class = getItemInfo(item.link)
-        item.name = item.name or readable(name) or ("Gegenstand " .. item.id)
+        item.name = item.name or readable(name) or (app.L("Gegenstand ") .. item.id)
         item.quality = item.quality or readable(quality)
         item.icon = item.icon or readable(icon) or 134400
         item.vendorPrice = readable(price)
@@ -233,7 +234,7 @@ end
 -- Event registration is optional for features whose client events differ.
 function app.RegisterSupported(frame, event)
     if pcall(frame.RegisterEvent, frame, event) then return true end
-    if app.Debug then app.Debug("Ereignis fehlt: " .. event) end
+    if app.Debug then app.Debug(app.L("Ereignis fehlt: ") .. event) end
 end
 
 function app.SecureCall(label, callback, ...)

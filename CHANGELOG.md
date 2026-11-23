@@ -2,6 +2,7 @@
 
 ## 0.12.0 — 2026-11-23
 
+- Add German and English for the interface and Paulchen’s dialogue. Follow the game client language or choose a language in settings.
 - Rework Paulchen's personality around shared dialogue pools, remembered situations and recent lines. Remove sarcasm levels while retaining the existing German dialogue and art.
 - Add spontaneous chatter for travel, resting areas and quiet time, plus confirmed loot, group, encounter and bank reactions.
 - Add separate chatter, situational comment, repair and opt-in break settings. Preserve played time and reminder thresholds across UI reloads.

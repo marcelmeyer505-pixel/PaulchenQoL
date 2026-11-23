@@ -10,18 +10,18 @@ local priceSettings, pricesPending, queuePriceRefresh
 local rowHeight, rowCount = 32, 14
 local windowWidth, windowHeight, windowGap, screenMargin = 718, 678, 14, 12
 local builtinMarkCount = #app.markOrder
-local clearMarkLabel = "Ohne Markierung"
+local clearMarkLabel = app.L("Ohne Markierung")
 local itemCategories = {
-    { "equipment", "Ausrüstung" }, { "consumables", "Verbrauchbares" },
-    { "materials", "Handwerksmaterial" }, { "recipes", "Rezepte" },
-    { "bags", "Taschen" }, { "keys", "Schlüssel" },
-    { "quests", "Questgegenstände" }, { "junk", "Plunder" }, { "other", "Sonstiges" },
+    { "equipment", app.L("Ausrüstung") }, { "consumables", app.L("Verbrauchbares") },
+    { "materials", app.L("Handwerksmaterial") }, { "recipes", app.L("Rezepte") },
+    { "bags", app.L("Taschen") }, { "keys", app.L("Schlüssel") },
+    { "quests", app.L("Questgegenstände") }, { "junk", app.L("Plunder") }, { "other", app.L("Sonstiges") },
 }
 local categories, categoryNames = {}, {}
 local columns = {
-    { "name", "Gegenstand", 52, 248 }, { "count", "Anzahl", 302, 57 },
-    { "value", "Händler", 361, 110 }, { "market", "Marktwert", 473, 120 },
-    { "difference", "Differenz", 595, 91 },
+    { "name", app.L("Gegenstand"), 52, 248 }, { "count", app.L("Anzahl"), 302, 57 },
+    { "value", app.L("Händler"), 361, 110 }, { "market", app.L("Marktwert"), 473, 120 },
+    { "difference", app.L("Differenz"), 595, 91 },
 }
 local priceColumn = columns[4]
 local negativePriceColor = { 1, 0.38, 0.39 }
@@ -48,14 +48,14 @@ local function bankContainers()
         for _, tab in ipairs(tabs) do
             local bag = readable(tab.ID)
             if type(bag) == "number" and bag > lastBag() and not names[bag] then
-                bags[#bags + 1], names[bag] = bag, readable(tab.name) or "Bankfach " .. (#bags + 1)
+                bags[#bags + 1], names[bag] = bag, readable(tab.name) or app.L("Bankfach ") .. (#bags + 1)
             end
         end
     end
     if #bags == 0 and legacy and (readable(C.GetContainerNumSlots(legacy)) or 0) > 0 then
-        bags[1], names[legacy] = legacy, "Bank"
+        bags[1], names[legacy] = legacy, app.L("Bank")
         for bag = lastBag() + 1, lastBag() + (NUM_BANKBAGSLOTS or 0) do
-            bags[#bags + 1], names[bag] = bag, "Banktasche " .. (bag - lastBag())
+            bags[#bags + 1], names[bag] = bag, app.L("Banktasche ") .. (bag - lastBag())
         end
     end
     return bags, names
@@ -193,8 +193,7 @@ local function marketMoney(value)
 end
 local function differenceText(value)
     if not value then return "–" end
-    if math.abs(value) < 0.05 then return "0,0 %" end
-    return ("%+.1f %%"):format(value):gsub("%.", ",")
+    return app.LocalizeDecimal(math.abs(value) < 0.05 and "0.0 %" or ("%+.1f %%"):format(value))
 end
 local function showPriceTooltip(row)
     local item = row.item
@@ -204,19 +203,19 @@ local function showPriceTooltip(row)
     GameTooltip:SetOwner(row.marketCell, "ANCHOR_RIGHT")
     GameTooltip:AddLine(item.name, unpack(style.gold))
     local source = tsm and "TradeSkillMaster (DBMarket)"
-        or scanner and "Paulchens Scanner (Sofortkauf)" or "Kein AH-Preis verfügbar"
-    GameTooltip:AddLine("Preisquelle: " .. source, unpack(style.cream))
+        or scanner and app.L("Paulchens Scanner (Sofortkauf)") or app.L("Kein AH-Preis verfügbar")
+    GameTooltip:AddLine(app.L("Preisquelle: ") .. source, unpack(style.cream))
     local at = item.marketInfo and item.marketInfo.at
     if scanner and at and date then
         local ok, stamp = pcall(date, "%d.%m.%Y %H:%M", at)
-        if ok then GameTooltip:AddLine("Scan vom " .. stamp, unpack(style.muted)) end
+        if ok then GameTooltip:AddLine(app.L("Scan vom ") .. stamp, unpack(style.muted)) end
     end
-    GameTooltip:AddDoubleLine(tsm and "TSM-Marktwert pro Stück" or "AH-Wert pro Stück", marketMoney(item.marketUnit))
-    GameTooltip:AddDoubleLine(("AH-Wert gesamt (%d Stück)"):format(item.count), marketMoney(item.market))
-    GameTooltip:AddDoubleLine("Händlerwert pro Stück", money(item.vendorUnit))
-    GameTooltip:AddDoubleLine("Händlerwert gesamt", money(item.value))
-    GameTooltip:AddDoubleLine("Differenz zum Händler", differenceText(item.difference))
-    GameTooltip:AddLine("Geschätzter Verkaufserlös vor Auktionsgebühren. Der tatsächliche Erlös kann abweichen.",
+    GameTooltip:AddDoubleLine(tsm and app.L("TSM-Marktwert pro Stück") or app.L("AH-Wert pro Stück"), marketMoney(item.marketUnit))
+    GameTooltip:AddDoubleLine((app.L("AH-Wert gesamt (%d Stück)")):format(item.count), marketMoney(item.market))
+    GameTooltip:AddDoubleLine(app.L("Händlerwert pro Stück"), money(item.vendorUnit))
+    GameTooltip:AddDoubleLine(app.L("Händlerwert gesamt"), money(item.value))
+    GameTooltip:AddDoubleLine(app.L("Differenz zum Händler"), differenceText(item.difference))
+    GameTooltip:AddLine(app.L("Geschätzter Verkaufserlös vor Auktionsgebühren. Der tatsächliche Erlös kann abweichen."),
         style.muted[1], style.muted[2], style.muted[3], true)
     GameTooltip:Show()
 end
@@ -232,15 +231,15 @@ local function groupKey(id, link)
 end
 local function slotText(row)
     local names = row.view.containerNames
-    return ((names and names[row.bag]) or (row.bag == 0 and "Rucksack" or tostring(row.bag))) .. ":" .. row.slot
+    return ((names and names[row.bag]) or (row.bag == 0 and app.L("Rucksack") or tostring(row.bag))) .. ":" .. row.slot
 end
 local function groupTooltip(row)
     local mark = row.item and app.marks[row.item.mark]
-    if mark then GameTooltip:AddLine("Vormerkung: " .. mark[1], unpack(mark[2])) end
+    if mark then GameTooltip:AddLine(app.L("Vormerkung: ") .. mark[1], unpack(mark[2])) end
     local group = row.group
     if not group or #group.members < 2 then return end
-    GameTooltip:AddLine(("Gesamt: %d · %d Stapel"):format(row.item.count, #group.members), 1, 0.82, 0.45)
-    GameTooltip:AddLine(("Aktionen betreffen diesen Stapel: %d Stück (%s)")
+    GameTooltip:AddLine((app.L("Gesamt: %d · %d Stapel")):format(row.item.count, #group.members), 1, 0.82, 0.45)
+    GameTooltip:AddLine((app.L("Aktionen betreffen diesen Stapel: %d Stück (%s)"))
         :format(group.stackCount, slotText(row)), 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
@@ -331,7 +330,7 @@ local function transferGrip(header, view, key)
     grip:SetPoint("TOPLEFT", 526, -4)
     grip:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(view.isBank and "Kategorie in die Taschen ziehen" or "Kategorie in die Bank ziehen")
+        GameTooltip:SetText(view.isBank and app.L("Kategorie in die Taschen ziehen") or app.L("Kategorie in die Bank ziehen"))
         GameTooltip:Show()
     end)
     grip:SetScript("OnLeave", function(self)
@@ -528,7 +527,7 @@ local function createCategoryEditor()
     editor:SetPoint("CENTER")
     editor:SetSize(534, 328)
     style.Panel(editor, style.background, style.accent)
-    style.Label(editor, "Taschenkategorien", 14, -5, 430, 28, "GameFontNormalLarge", style.gold)
+    style.Label(editor, app.L("Taschenkategorien"), 14, -5, 430, 28, "GameFontNormalLarge", style.gold)
     local close = CreateFrame("Button", nil, editor, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
     close:SetScript("OnClick", function() editor:Hide() end)
@@ -539,7 +538,7 @@ local function createCategoryEditor()
     editor.nameBox:SetPoint("TOPLEFT", 246, -96)
     editor.nameBox:SetSize(270, 26)
     editor.nameBox:SetMaxLetters(32)
-    style.Label(editor, "Farbe", 246, -134, 270, 18, "GameFontHighlightSmall", style.muted)
+    style.Label(editor, app.L("Farbe"), 246, -134, 270, 18, "GameFontHighlightSmall", style.muted)
     editor.hexBox = style.EditBox(editor)
     editor.hexBox:SetPoint("TOPLEFT", 422, -155)
     editor.hexBox:SetSize(94, 24)
@@ -555,7 +554,7 @@ local function createCategoryEditor()
         editor.key, editor.colorSession = key or false, false
         local definition = app.marks[key]
         local removable = customCategoryIndex(key) ~= nil
-        editor.heading:SetText(definition and "Kategorie bearbeiten" or "Neue Kategorie")
+        editor.heading:SetText(definition and app.L("Kategorie bearbeiten") or app.L("Neue Kategorie"))
         editor.nameBox:SetText(definition and definition[1] or "")
         editor.hexBox:SetText(colorHex(unpack(definition and definition[2] or style.gold)))
         editor.status:SetText("")
@@ -566,13 +565,13 @@ local function createCategoryEditor()
     end
     editor.list = createMarkList(editor, 210, 8, function(key) edit(key) end, false, true)
     editor.list:SetPoint("TOPLEFT", 14, -76)
-    style.Label(editor, "Eigene Kategorien am Griff ziehen", 14, -310, 210, 15, "GameFontHighlightSmall", style.muted)
-    editor.newCategory = categoryButton(editor, "+ Neue Kategorie", 14, -42, 210, function()
+    style.Label(editor, app.L("Eigene Kategorien am Griff ziehen"), 14, -310, 210, 15, "GameFontHighlightSmall", style.muted)
+    editor.newCategory = categoryButton(editor, app.L("+ Neue Kategorie"), 14, -42, 210, function()
         edit(nil, true)
         editor.nameBox:SetFocus()
     end)
 
-    editor.colorButton = categoryButton(editor, "Farbe wählen", 246, -155, 163, function()
+    editor.colorButton = categoryButton(editor, app.L("Farbe wählen"), 246, -155, 163, function()
         local picker = ColorPickerFrame
         if not (picker and picker.SetupColorPickerAndShow and picker.GetColorRGB) then
             editor.hexBox:SetFocus()
@@ -603,30 +602,30 @@ local function createCategoryEditor()
         if color then swatch:SetColorTexture(unpack(color)) end
     end)
 
-    editor.saveCategory = categoryButton(editor, "Speichern", 246, -198, 270, function()
+    editor.saveCategory = categoryButton(editor, app.L("Speichern"), 246, -198, 270, function()
         local name = editor.nameBox:GetText():match("^%s*(.-)%s*$")
         if name == "" or name:find("[|%c]") then
-            editor.status:SetText("Gib einen gültigen Kategorienamen ein.")
+            editor.status:SetText(app.L("Gib einen gültigen Kategorienamen ein."))
             return
         end
         local color = readColor(editor.hexBox:GetText())
         if not color then
-            editor.status:SetText("Wähle eine Farbe oder gib einen Hex-Code ein, z. B. #4DA6FF.")
+            editor.status:SetText(app.L("Wähle eine Farbe oder gib einen Hex-Code ein, z. B. #4DA6FF."))
             return
         end
         local normalized = lower(name)
         if normalized == lower(clearMarkLabel) then
-            editor.status:SetText("Dieser Name ist bereits vergeben.")
+            editor.status:SetText(app.L("Dieser Name ist bereits vergeben."))
             return
         end
         for _, key in ipairs(app.markOrder) do
             if key ~= editor.key and lower(app.marks[key][1]) == normalized then
-                editor.status:SetText("Dieser Name ist bereits vergeben.")
+                editor.status:SetText(app.L("Dieser Name ist bereits vergeben."))
                 return
             end
         end
         edit(saveMarkCategory(editor.key, name, color), true)
-        editor.status:SetText("Gespeichert")
+        editor.status:SetText(app.L("Gespeichert"))
         editor.nameBox:ClearFocus()
         editor.hexBox:ClearFocus()
     end)
@@ -637,16 +636,16 @@ local function createCategoryEditor()
     editor.deletePrompt = deletePrompt
     local deleteText = style.Label(deletePrompt, "", 0, 0, 270, 38, "GameFontHighlightSmall", style.cream)
     deleteText:SetWordWrap(true)
-    editor.confirmDelete = categoryButton(deletePrompt, "Löschen bestätigen", 0, -43, 170, function()
+    editor.confirmDelete = categoryButton(deletePrompt, app.L("Löschen bestätigen"), 0, -43, 170, function()
         if not deletePrompt:IsVisible() then return end
         deleteMarkCategory(editor.key)
         edit(nil, true)
-        editor.status:SetText("Kategorie gelöscht")
+        editor.status:SetText(app.L("Kategorie gelöscht"))
     end)
-    editor.cancelDelete = categoryButton(deletePrompt, "Abbrechen", 178, -43, 92, function() deletePrompt:Hide() end)
-    editor.deleteCategory = categoryButton(editor, "Löschen", 426, -198, 90, function()
+    editor.cancelDelete = categoryButton(deletePrompt, app.L("Abbrechen"), 178, -43, 92, function() deletePrompt:Hide() end)
+    editor.deleteCategory = categoryButton(editor, app.L("Löschen"), 426, -198, 90, function()
         editor.status:SetText("")
-        deleteText:SetText(("„%s“ löschen? Die Gegenstände werden automatisch einsortiert."):format(app.marks[editor.key][1]))
+        deleteText:SetText((app.L("„%s“ löschen? Die Gegenstände werden automatisch einsortiert.")):format(app.marks[editor.key][1]))
         deletePrompt:Show()
     end)
     editor:SetScript("OnShow", function() edit(nil, true) end)
@@ -760,7 +759,7 @@ local function readSlot(row, marks)
     local count = id and (readable(info.stackCount) or 1) or 0
     local markKey = app.BagItemKey(id, link)
     row.item = {
-        id = id, name = name or (id and "Gegenstand " .. id or "Freier Platz"), count = count,
+        id = id, name = name or (id and app.L("Gegenstand ") .. id or app.L("Freier Platz")), count = count,
         quality = quality or (info and readable(info.quality)) or 0,
         value = price and price * count, vendorUnit = price,
         category = category or "", subcategory = subcategory or "", classID = classID,
@@ -866,7 +865,7 @@ layout = function(view)
     window.slider:SetValue(view.offset)
     window.slider:SetShown(maxOffset > 0)
     window.noItems:SetShown(#(view.filtered or {}) == 0)
-    window.status:SetText(("%d Treffer · %d / %d Plätze frei"):format(#(view.filtered or {}), view.free, view.capacity))
+    window.status:SetText((app.L("%d Treffer · %d / %d Plätze frei")):format(#(view.filtered or {}), view.free, view.capacity))
     for _, col in ipairs(columns) do
         local arrow = settings.sort == col[1] and (settings.ascending and " ^" or " v") or ""
         window.headers[col[1]]:SetText(col[2] .. arrow)
@@ -899,7 +898,7 @@ local function categorize(view, rows)
                     categorize(view, view.filtered)
                     layout(view)
                 end)
-                header.transferButton = categoryButton(header, view.isBank and "Auslagern" or "Einlagern", 552, -4, 110,
+                header.transferButton = categoryButton(header, view.isBank and app.L("Auslagern") or app.L("Einlagern"), 552, -4, 110,
                     function() transferCategory(view, key) end)
                 header.transferGrip = transferGrip(header, view, key)
                 categoryHeaders[key] = header
@@ -1020,8 +1019,8 @@ function inventory.OpenPriceSettings()
         frame:SetClampedToScreen(true)
         frame:EnableMouse(true)
         style.Panel(frame, style.background)
-        style.Label(frame, "Taschen / Preise", 18, -9, 300, 30, "GameFontNormalLarge", style.gold)
-        style.Label(frame, "Preisquelle", 18, -44, 324, 21, "GameFontNormal", style.cream)
+        style.Label(frame, app.L("Taschen / Preise"), 18, -9, 300, 30, "GameFontNormalLarge", style.gold)
+        style.Label(frame, app.L("Preisquelle"), 18, -44, 324, 21, "GameFontNormal", style.cream)
         local buttons = {}
         for index, entry in ipairs(app.AuctionPriceModes) do
             local mode, label = entry[1], entry[2]
@@ -1039,7 +1038,7 @@ function inventory.OpenPriceSettings()
             tsmStatus:SetText(tsm)
             scanStatus:SetText(scanner)
         end
-        categoryButton(frame, "Preise neu abfragen", 18, -204, 324, app.RefreshAuctionPrices)
+        categoryButton(frame, app.L("Preise neu abfragen"), 18, -204, 324, app.RefreshAuctionPrices)
         local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
         close:SetPoint("TOPRIGHT", -3, -3)
         table.insert(UISpecialFrames, frame:GetName())
@@ -1100,15 +1099,15 @@ local function transferMessage(text)
     end
 end
 local function showTransferProgress(state)
-    transferMessage(("%s … %d / %d Stück"):format(state.action, state.moved, state.total))
+    transferMessage((app.L("%s … %d / %d Stück")):format(state.action, state.moved, state.total))
 end
 local function finishTransfer(state, reason)
     if transfer ~= state then return end
     transfer = nil
     local remaining = state.total - state.moved
-    local text = ("%d Stück %s"):format(state.moved, state.fromBank and "ausgelagert" or "eingelagert")
+    local text = (app.L("%d Stück %s")):format(state.moved, state.fromBank and app.L("ausgelagert") or app.L("eingelagert"))
     if remaining > 0 then
-        text = text .. (" · %d übrig %s"):format(remaining, state.fromBank and "in der Bank" or "in den Taschen")
+        text = text .. (app.L(" · %d übrig %s")):format(remaining, state.fromBank and app.L("in der Bank") or app.L("in den Taschen"))
     end
     if reason then text = text .. " · " .. reason end
     bank.transferMessage = text
@@ -1120,7 +1119,7 @@ end
 local stepTransfer
 local function confirmMove(state, entry, target, tries)
     if transfer ~= state then return end
-    if not canBank() then finishTransfer(state, "Bank geschlossen"); return end
+    if not canBank() then finishTransfer(state, app.L("Bank geschlossen")); return end
     local sourceNow = physicalStack(entry.bag, entry.slot)
     local targetNow = physicalStack(target.bag, target.slot)
     local remainder = sourceNow and sourceNow.key == entry.key and sourceNow.count or 0
@@ -1143,8 +1142,8 @@ local function confirmMove(state, entry, target, tries)
 end
 stepTransfer = function(state)
     if transfer ~= state then return end
-    if not canBank() then finishTransfer(state, "Bank geschlossen"); return end
-    if combat() or GetCursorInfo() then finishTransfer(state, state.action .. " unterbrochen"); return end
+    if not canBank() then finishTransfer(state, app.L("Bank geschlossen")); return end
+    if combat() or GetCursorInfo() then finishTransfer(state, state.action .. app.L(" unterbrochen")); return end
     local last = math.min(#state.entries, state.index + 7)
     while state.index <= last do
         local entry = state.entries[state.index]
@@ -1179,11 +1178,11 @@ stepTransfer = function(state)
 end
 transferCategory = function(view, key)
     if transfer or not canTransfer() or not view.window:IsShown() or combat() then return end
-    if GetCursorInfo() then transferMessage("Leere zuerst den Mauszeiger."); return end
+    if GetCursorInfo() then transferMessage(app.L("Leere zuerst den Mauszeiger.")); return end
     refreshView(view)
     local state = {
         entries = {}, index = 1, total = 0, moved = 0, fromBank = view.isBank,
-        action = view.isBank and "Auslagern" or "Einlagern",
+        action = view.isBank and app.L("Auslagern") or app.L("Einlagern"),
         destinationBags = containersFor(view.isBank and inventory or bank),
     }
     for _, bag in ipairs(containersFor(view)) do
@@ -1301,7 +1300,7 @@ local function createWindow(view)
         end
         moving = nil
     end)
-    style.Label(title, isBank and "Paulchens Bank" or "Paulchens Taschen", 18, -9, 390, 28, "GameFontNormalLarge", style.gold)
+    style.Label(title, isBank and app.L("Paulchens Bank") or app.L("Paulchens Taschen"), 18, -9, 390, 28, "GameFontNormalLarge", style.gold)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
     close:SetScript("OnClick", function()
@@ -1313,22 +1312,22 @@ local function createWindow(view)
     end)
     local original = style.TextButton(f)
     original:SetSize(130, 25); original:SetPoint("TOPRIGHT", -42, -9)
-    original:SetText(isBank and "Standardbank" or "Standardtaschen")
+    original:SetText(isBank and app.L("Standardbank") or app.L("Standardtaschen"))
     original:SetScript("OnClick", function()
         if isBank then f:Hide(); return end
         settings.enabled = false; pendingAction = nil; f:Hide()
         if OpenAllBags then OpenAllBags() end
-        print("Paulchen: Standardtaschen aktiv. /ptaschen aktiviert die Liste wieder.")
+        print(app.L("Paulchen: Standardtaschen aktiv. /ptaschen aktiviert die Liste wieder."))
     end)
     if isBank then
-        f.bagTab = categoryButton(f, "Taschen", 430, -9, 108, function() inventory.Show() end)
+        f.bagTab = categoryButton(f, app.L("Taschen"), 430, -9, 108, function() inventory.Show() end)
     else
-        f.bankTab = categoryButton(f, "Bank", 430, -9, 108, function() openBank() end)
+        f.bankTab = categoryButton(f, app.L("Bank"), 430, -9, 108, function() openBank() end)
         f.bankTab:Hide()
     end
     local search = style.EditBox(f)
     search:SetPoint("TOPLEFT", 18, -48); search:SetSize(420, 28)
-    local prompt = style.Label(search, "Name, Gegenstandsart oder ID suchen", 8, 0, 400, 28, "GameFontHighlightSmall", style.muted)
+    local prompt = style.Label(search, app.L("Name, Gegenstandsart oder ID suchen"), 8, 0, 400, 28, "GameFontHighlightSmall", style.muted)
     search:SetScript("OnTextChanged", function(self)
         view.query, view.offset = self:GetText(), 0
         view.searchCollapsed = {}
@@ -1345,7 +1344,7 @@ local function createWindow(view)
     hideQuest:SetPoint("TOPLEFT", 18, -80)
     hideQuest:SetSize(24, 24)
     hideQuest:SetChecked(settings.hideQuestItems)
-    style.Label(hideQuest, "Questitems ausblenden", 28, 0, 250, 24, "GameFontHighlightSmall", style.cream)
+    style.Label(hideQuest, app.L("Questitems ausblenden"), 28, 0, 250, 24, "GameFontHighlightSmall", style.cream)
     hideQuest:SetScript("OnClick", function(self)
         settings.hideQuestItems, view.offset = not not self:GetChecked(), 0
         refreshView(view)
@@ -1353,7 +1352,7 @@ local function createWindow(view)
     f.hideQuestItems = hideQuest
     categoryButton(f, "Preise", 440, -82, 100, inventory.OpenPriceSettings)
     if not isBank then
-        f.categories = categoryButton(f, "Kategorien", 550, -82, 136, function()
+        f.categories = categoryButton(f, app.L("Kategorien"), 550, -82, 136, function()
             if markMenu then markMenu:Hide() end
             categoryEditor = categoryEditor or createCategoryEditor()
             categoryEditor:SetShown(not categoryEditor:IsShown())
@@ -1384,19 +1383,19 @@ local function createWindow(view)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta) view.offset = view.offset - delta * 3; layout(view) end)
     f.status = style.Label(f, "", 18, -608, 650, 20, "GameFontHighlightSmall", style.gold)
-    local actions = isBank and "Rechtsklick aufs Symbol: Stapel auslagern · Ziehen: Stapel verschieben"
-        or "Aktionen am Symbol betreffen einen Stapel: benutzen / verkaufen / verschieben"
+    local actions = isBank and app.L("Rechtsklick aufs Symbol: Stapel auslagern · Ziehen: Stapel verschieben")
+        or app.L("Aktionen am Symbol betreffen einen Stapel: benutzen / verkaufen / verschieben")
     f.transferStatus = style.Label(f, actions, 18, -632, 680, 18, "GameFontHighlightSmall", style.muted)
     f.defaultActions = actions
     if bank.transferMessage then f.transferStatus:SetText(bank.transferMessage) end
-    style.Label(f, "Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen", 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
-    f.noItems = style.Label(f, "Keine passenden Gegenstände.", 18, -183, 660, 30, "GameFontHighlight", style.muted)
+    style.Label(f, app.L("Zeile rechtsklicken: vormerken · Shift-Klick am Symbol: verlinken / Stapel teilen"), 18, -652, 680, 18, "GameFontHighlightSmall", style.muted)
+    f.noItems = style.Label(f, app.L("Keine passenden Gegenstände."), 18, -183, 660, 30, "GameFontHighlight", style.muted)
     f.dropOverlay = CreateFrame("Frame", nil, f, "BackdropTemplate")
     f.dropOverlay:SetAllPoints(f)
     f.dropOverlay:SetFrameLevel(f:GetFrameLevel() + 30)
     f.dropOverlay:EnableMouse(false)
     style.Panel(f.dropOverlay, { 0.50, 0.28, 0.08, 0.20 }, style.gold)
-    local dropText = style.Label(f.dropOverlay, isBank and "Zum Einlagern hier ablegen" or "Zum Auslagern hier ablegen",
+    local dropText = style.Label(f.dropOverlay, isBank and app.L("Zum Einlagern hier ablegen") or app.L("Zum Auslagern hier ablegen"),
         14, -5, windowWidth - 28, 34, "GameFontNormalLarge", style.gold, "CENTER")
     dropText:ClearAllPoints()
     dropText:SetPoint("CENTER")
@@ -1530,7 +1529,7 @@ events:SetScript("OnEvent", function(_, event)
         return
     elseif event == "BANKFRAME_CLOSED" then
         bank.atBank = false
-        if transfer then finishTransfer(transfer, "Bank geschlossen") end
+        if transfer then finishTransfer(transfer, app.L("Bank geschlossen")) end
         if bank.window then bank.window:Hide() end
         if bank.paired then
             bank.paired = false

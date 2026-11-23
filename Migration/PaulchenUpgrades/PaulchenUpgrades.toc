@@ -1,6 +1,8 @@
 ## Interface: 16001
-## Title: Paulchen QoL · Upgrades-Datenübernahme
-## Notes: Stellt vorhandene Upgrade-Einstellungen für Paulchen QoL bereit.
+## Title: Paulchen QoL · Upgrades Data Migration
+## Title-deDE: Paulchen QoL · Upgrades-Datenübernahme
+## Notes: Provides existing upgrade settings to Paulchen QoL.
+## Notes-deDE: Stellt vorhandene Upgrade-Einstellungen für Paulchen QoL bereit.
 ## SavedVariablesPerCharacter: PaulchenUpgradesDB
 ## X-Paulchen-Datenbruecke: 1
 

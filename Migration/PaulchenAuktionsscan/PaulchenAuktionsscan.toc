@@ -1,6 +1,8 @@
 ## Interface: 16001
-## Title: Paulchen QoL · AH-Datenübernahme
-## Notes: Stellt vorhandene Auktionshausdaten für Paulchen QoL bereit.
+## Title: Paulchen QoL · Auction Data Migration
+## Title-deDE: Paulchen QoL · AH-Datenübernahme
+## Notes: Provides existing auction data to Paulchen QoL.
+## Notes-deDE: Stellt vorhandene Auktionshausdaten für Paulchen QoL bereit.
 ## SavedVariables: PaulchenAuktionsscanDB
 ## X-Paulchen-Datenbruecke: 1
 

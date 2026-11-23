@@ -1,6 +1,8 @@
 ## Interface: 16001
-## Title: Paulchen QoL · DTL-Datenübernahme
-## Notes: Stellt vorhandene DTL-Speicherdaten für Paulchen QoL bereit.
+## Title: Paulchen QoL · Logbook Data Migration
+## Title-deDE: Paulchen QoL · DTL-Datenübernahme
+## Notes: Provides existing combat timeline data to Paulchen QoL.
+## Notes-deDE: Stellt vorhandene DTL-Speicherdaten für Paulchen QoL bereit.
 ## SavedVariablesPerCharacter: DetailsCombatTimelineDB
 ## X-Paulchen-Datenbruecke: 1
 

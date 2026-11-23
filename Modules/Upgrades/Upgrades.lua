@@ -171,10 +171,10 @@ local function cachedScores(id, record)
 end
 
 app.slots = {
-    { 1, "Kopf" }, { 2, "Hals" }, { 3, "Schultern" }, { 15, "Rücken" },
-    { 5, "Brust" }, { 9, "Handgelenke" }, { 10, "Hände" }, { 6, "Taille" },
-    { 7, "Beine" }, { 8, "Füße" }, { 11, "Finger" }, { 13, "Schmuck" },
-    { 16, "Waffenhand" }, { 17, "Nebenhand" }, { 18, "Fernwaffe / Relikt" },
+    { 1, suite.L("Kopf") }, { 2, suite.L("Hals") }, { 3, suite.L("Schultern") }, { 15, suite.L("Rücken") },
+    { 5, suite.L("Brust") }, { 9, suite.L("Handgelenke") }, { 10, suite.L("Hände") }, { 6, suite.L("Taille") },
+    { 7, suite.L("Beine") }, { 8, suite.L("Füße") }, { 11, suite.L("Finger") }, { 13, suite.L("Schmuck") },
+    { 16, suite.L("Waffenhand") }, { 17, suite.L("Nebenhand") }, { 18, suite.L("Fernwaffe / Relikt") },
 }
 local slots = { [12] = 11, [14] = 13 }
 app.slotNames = {}
@@ -758,7 +758,7 @@ function app.InstanceChoices(rows)
         choices[#choices + 1] = { name, ("%s (%d)"):format(name, count) }
     end
     table.sort(choices, function(a, b) return lower(a[1]) < lower(b[1]) end)
-    table.insert(choices, 1, { "", "Alle Instanzen & Raids" })
+    table.insert(choices, 1, { "", suite.L("Alle Instanzen & Raids") })
     return choices
 end
 

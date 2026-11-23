@@ -20,10 +20,7 @@ local function compare(row, level)
     if result and result.usable and (result.minLevel or 0) <= level then return result end
 end
 
-local function decimal(text)
-    if GetLocale() == "deDE" then return (text:gsub("%.", ",")) end
-    return text
-end
+local decimal = suite.LocalizeDecimal
 
 PaulchenQoLAuctionValueCellMixin = {}
 -- TableBuilder forwards row hover events to every cell, unconditionally.
@@ -56,7 +53,7 @@ function PaulchenQoLAuctionValueCellMixin:Populate(row)
         self.Text:SetText(decimal(amount))
         self.Text:SetTextColor(1, 0.82, 0.42)
     else
-        self.Text:SetText(self.kind == "pct" and metrics.empty and "Freier Platz" or "—")
+        self.Text:SetText(self.kind == "pct" and metrics.empty and suite.L("Freier Platz") or "—")
         self.Text:SetTextColor(0.68, 0.65, 0.60)
     end
 end
@@ -194,7 +191,7 @@ local function attach(search, browse)
             headers = {}
             if type(builder.AddUnsortableFixedWidthColumn) ~= "function" then return end
             addColumn(builder, "pct", "Upgrade %", 82)
-            addColumn(builder, "gold", "Gold pro %", 87)
+            addColumn(builder, "gold", suite.L("Gold pro %"), 87)
             updateHeaders()
         end
         list:SetTableBuilderLayout(extendedLayout)
@@ -248,9 +245,9 @@ Menu.ModifyMenu("MENU_AUCTION_HOUSE_SEARCH_FILTER", function(owner, menu)
     local browse = auction.BrowseResultsFrame
     install()
     if not toggle then return end
-    menu:CreateCheckbox("Nur Upgrades", function() return enabled end, toggle)
+    menu:CreateCheckbox(suite.L("Nur Upgrades"), function() return enabled end, toggle)
     if (enabled or isSorted()) and browse.searchStarted and #browse.browseResults > 0 and not ah.HasFullBrowseResults() then
-        menu:CreateButton("Weitere Angebote laden", function()
+        menu:CreateButton(suite.L("Weitere Angebote laden"), function()
             if not ah.HasFullBrowseResults() and ah.IsThrottledMessageSystemReady() then ah.RequestMoreBrowseResults() end
         end)
     end

@@ -369,11 +369,11 @@ content.quests[9270] = "aq40"
 content.quests[9271] = "aq40"
 
 content.choices = {
-    { "pvp", "PvP-Händler" },
-    { "mc", "Geschmolzener Kern" }, { "onyxia", "Onyxias Hort" },
-    { "bwl", "Pechschwingenhort" }, { "zg", "Zul'Gurub / Stamm der Zandalar" },
-    { "aq20", "Ruinen von Ahn'Qiraj (20)" }, { "aq40", "Tempel von Ahn'Qiraj / Brut Nozdormus" },
-    { "naxx", "Naxxramas" }, { "world", "Klassische Weltbosse" }, { "other", "Weitere Raids" },
+    { "pvp", suite.L("PvP-Händler") },
+    { "mc", suite.L("Geschmolzener Kern") }, { "onyxia", suite.L("Onyxias Hort") },
+    { "bwl", suite.L("Pechschwingenhort") }, { "zg", suite.L("Zul'Gurub / Stamm der Zandalar") },
+    { "aq20", suite.L("Ruinen von Ahn'Qiraj (20)") }, { "aq40", suite.L("Tempel von Ahn'Qiraj / Brut Nozdormus") },
+    { "naxx", "Naxxramas" }, { "world", suite.L("Klassische Weltbosse") }, { "other", suite.L("Weitere Raids") },
 }
 local valid = {}
 for _, choice in ipairs(content.choices) do valid[choice[1]] = true end

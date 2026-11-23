@@ -10,6 +10,7 @@ lua = LuaRuntime()
 lua.execute(r'''
 profile, scans, tsPrices, calls, minPrices, minCalls = {}, {}, {}, {}, {}, {}
 clock, installed, loaded = 0, true, true
+function GetLocale() return "deDE" end
 function GetTime() return clock end
 function GetServerTime() return 1000 + clock end
 C_AddOns = {
@@ -62,8 +63,13 @@ full = { at = 980, items = { [42] = {
 tsPrices["i:42"], tsPrices["i:42:-7"] = 1100, 1750
 freshAPI()
 ''')
-load = lua.eval('function(code) assert(loadstring(code))("PaulchenQoL", newApp()) end')
-load(source)
+localization = (Path(__file__).resolve().parents[1] / "Localization.lua").read_text(encoding="utf-8")
+load = lua.eval('''function(code, locale)
+    local addon = newApp()
+    assert(loadstring(locale))("PaulchenQoL", addon)
+    assert(loadstring(code))("PaulchenQoL", addon)
+end''')
+load(source, localization)
 lua.execute(r'''
 event(nil, "PLAYER_LOGIN")
 assert(app.GetAuctionPriceMode() == "auto")
@@ -152,7 +158,7 @@ clock = 65
 assertPrice(base, 42, nil, "NONE")
 app.SetAuctionPriceMode("scanner")
 ''')
-load(source)
+load(source, localization)
 lua.execute(r'''
 event(nil, "PLAYER_LOGIN")
 assert(app.GetAuctionPriceMode() == "scanner")
@@ -161,7 +167,7 @@ app.SetAuctionPriceMode("auto")
 assertPrice(suffix, 42, 1750, "TSM_DBMarket")
 installed, loaded, TSM_API = false, false, nil
 ''')
-load(source)
+load(source, localization)
 lua.execute(r'''
 event(nil, "PLAYER_LOGIN")
 assertPrice(suffix, 42, nil, "NONE")

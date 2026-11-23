@@ -3,17 +3,17 @@ local app = suite.upgrades
 if not app then return end
 
 app.weightFields = {
-    { "str", "Stärke" }, { "agi", "Beweglichkeit" }, { "sta", "Ausdauer" },
-    { "int", "Intelligenz" }, { "spi", "Willenskraft" }, { "armor", "Rüstung" },
-    { "ap", "Angriffskraft" }, { "rap", "Distanzangriffskraft" },
-    { "dps", "Nahkampfwaffen-DPS" }, { "rdps", "Fernkampfwaffen-DPS" },
-    { "hit", "Nahkampftreffer (%)" }, { "crit", "Nahkampfkrit (%)" },
-    { "hastePercent", "Angriffstempo (%)" }, { "expertise", "Waffenkundewertung" },
-    { "armorPen", "Rüstungsdurchschlag" }, { "defense", "Verteidigung" },
-    { "dodge", "Ausweichen (%)" }, { "parry", "Parieren (%)" }, { "block", "Blocken (%)" },
-    { "blockValue", "Blockwert" }, { "sp", "Zauberschaden" }, { "heal", "Heilbonus" },
-    { "spellHit", "Zaubertreffer (%)" }, { "spellCrit", "Zauberkrit (%)" },
-    { "spellHaste", "Zaubertempo (%)" }, { "mp5", "Mana je 5 Sek." },
+    { "str", suite.L("Stärke") }, { "agi", suite.L("Beweglichkeit") }, { "sta", suite.L("Ausdauer") },
+    { "int", suite.L("Intelligenz") }, { "spi", suite.L("Willenskraft") }, { "armor", suite.L("Rüstung") },
+    { "ap", suite.L("Angriffskraft") }, { "rap", suite.L("Distanzangriffskraft") },
+    { "dps", suite.L("Nahkampfwaffen-DPS") }, { "rdps", suite.L("Fernkampfwaffen-DPS") },
+    { "hit", suite.L("Nahkampftreffer (%)") }, { "crit", suite.L("Nahkampfkrit (%)") },
+    { "hastePercent", suite.L("Angriffstempo (%)") }, { "expertise", suite.L("Waffenkundewertung") },
+    { "armorPen", suite.L("Rüstungsdurchschlag") }, { "defense", suite.L("Verteidigung") },
+    { "dodge", suite.L("Ausweichen (%)") }, { "parry", suite.L("Parieren (%)") }, { "block", suite.L("Blocken (%)") },
+    { "blockValue", suite.L("Blockwert") }, { "sp", suite.L("Zauberschaden") }, { "heal", suite.L("Heilbonus") },
+    { "spellHit", suite.L("Zaubertreffer (%)") }, { "spellCrit", suite.L("Zauberkrit (%)") },
+    { "spellHaste", suite.L("Zaubertempo (%)") }, { "mp5", suite.L("Mana je 5 Sek.") },
 }
 
 local melee = { str = 1, agi = 0.7, sta = 0.15, ap = 0.5, dps = 5,
@@ -31,7 +31,7 @@ local function profile(key, name, base, changes, schools)
     local weights = {}
     for stat, value in pairs(base) do weights[stat] = value end
     for stat, value in pairs(changes or {}) do weights[stat] = value end
-    return { key = key, name = name, weights = weights, schools = schools }
+    return { key = key, name = key == "combat" and suite.GetLanguage() == "enUS" and "Combat" or suite.L(name), weights = weights, schools = schools }
 end
 
 -- Editable starting values for Forever. Each spec owns its own defaults.

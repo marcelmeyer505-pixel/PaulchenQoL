@@ -34,17 +34,17 @@ local function addComparison(tooltip, data)
     local result = gear.CompareToEquipped(link)
     if not result then return end
 
-    local status = "Nicht tragbar"
+    local status = suite.L("Nicht tragbar")
     local r, g, b = 0.79, 0.71, 0.64
     if result.usable then
         if result.minLevel > gear.PlayerLevel() then
-            status = ("Ab Stufe %d"):format(result.minLevel)
+            status = suite.LF("Ab Stufe %d", result.minLevel)
         elseif result.equipped then
-            status = "Angelegt"
+            status = suite.L("Angelegt")
         else
-            status = result.pct and ("%+.1f %%"):format(result.pct) or ("%+.2f Punkte"):format(result.delta)
-            status = status:gsub("%.", ",")
-            if result.empty then status = status .. " · Freier Platz" end
+            status = result.pct and ("%+.1f %%"):format(result.pct) or suite.LF("%+.2f Punkte", result.delta)
+            status = suite.LocalizeDecimal(status)
+            if result.empty then status = status .. suite.L(" · Freier Platz") end
             if result.delta > 0 then r, g, b = 0.54, 0.88, 0.60
             elseif result.delta < 0 then r, g, b = 0.94, 0.50, 0.45 end
         end

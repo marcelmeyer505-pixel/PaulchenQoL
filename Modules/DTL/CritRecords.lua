@@ -116,16 +116,16 @@ end
 function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
     local records = getRecords()
     local heading = label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34)
-    heading:SetText("Crit-Rekorde")
+    heading:SetText(suite.L("Crit-Rekorde"))
     local sync = label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -38)
-    sync:SetText("Warte auf Abgleich")
+    sync:SetText(suite.L("Warte auf Abgleich"))
     local description = label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -55)
     description:SetTextColor(unpack(style.muted))
-    description:SetText("Höchster kritischer Einzeltreffer pro Fähigkeit")
+    description:SetText(suite.L("Höchster kritischer Einzeltreffer pro Fähigkeit"))
 
     local empty = label(panel, "GameFontHighlight", "TOP", "TOP", 0, -109)
     empty:SetWidth(width - 40)
-    empty:SetText("Noch keine Crits geladen.\n\nStarte die Crit-Erfassung und aktiviere /combatlog.")
+    empty:SetText(suite.L("Noch keine Crits geladen.\n\nStarte die Crit-Erfassung und aktiviere /combatlog."))
 
     local rows = {}
     for index = 1, visibleRows do
@@ -162,7 +162,7 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
         pages = math.ceil(#records / visibleRows)
         page = math.max(1, math.min(pages, page))
         empty:SetShown(#records == 0)
-        footer:SetText(#records > 0 and ("%d Fähigkeiten · Seite %d/%d"):format(#records, page, pages) or "")
+        footer:SetText(#records > 0 and (suite.L("%d Fähigkeiten · Seite %d/%d")):format(#records, page, pages) or "")
         back:SetShown(pages > 1)
         forward:SetShown(pages > 1)
         back:SetEnabled(page > 1)
@@ -218,7 +218,7 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
         finished = epoch
         if signature then
             received[signature] = true
-            sync:SetText("Abgleich " .. date("%H:%M:%S"))
+            sync:SetText(suite.L("Abgleich ") .. date("%H:%M:%S"))
         end
         if not hits then
             return
@@ -227,7 +227,7 @@ function addon.CreateCritPanel(panel, width, rowHeight, visibleRows, label)
         local saved = PaulchenQoLTimelineDB.critRecords
         for id, damage in pairs(hits) do
             if damage > 0 and (not saved[id] or damage > saved[id].damage) then
-                local name = id == 0 and "Nahkampfangriff" or C_Spell.GetSpellName(id) or ("Fähigkeit #%d"):format(id)
+                local name = id == 0 and "Nahkampfangriff" or C_Spell.GetSpellName(id) or (suite.L("Fähigkeit #%d")):format(id)
                 saved[id] = { damage = damage, name = name }
                 changed = true
             end

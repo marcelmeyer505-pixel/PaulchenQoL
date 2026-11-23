@@ -6,6 +6,7 @@ from lupa.lua51 import LuaRuntime
 root=Path(__file__).resolve().parents[1]
 fixture=(root/'tests/buff_watcher_fixture.lua').read_text(encoding='utf-8')
 setup=r'''
+function GetLocale() return "deDE" end
 units={player={name="Chef",class="DRUID",guid="self",level=60,auras={}}}
 groupMode="SOLO"; partyCount=0; raidCount=0
 knownSpells={[1126]=true}; auraCalls={}; sent={}; reactions={}; reminders={}; canceled={}
@@ -58,7 +59,7 @@ lua=LuaRuntime()
 lua.execute(fixture)
 lua.execute(setup)
 load=lua.eval('function(code,name) assert(loadstring(code,name))("PaulchenQoL",app) end')
-for name in ('Core.lua','Style.lua','Config.lua'):
+for name in ('Localization.lua','Core.lua','Style.lua','Config.lua'):
     load((root/name).read_text(encoding='utf-8'),name)
 lua.execute('''
 app.React=function(key,context) reactions[#reactions+1]={key,context} end
@@ -239,7 +240,7 @@ reload_lua.execute(fixture)
 reload_lua.execute(setup)
 reload_lua.execute('PaulchenQoLSettings='+settings_saved+';PaulchenQoLDB='+character_saved+';now='+str(lua.globals().now))
 reload_load=reload_lua.eval('function(code,name) assert(loadstring(code,name))("PaulchenQoL",app) end')
-for name in ('Core.lua','Style.lua','Config.lua'):
+for name in ('Localization.lua','Core.lua','Style.lua','Config.lua'):
     reload_load((root/name).read_text(encoding='utf-8'),name)
 reload_lua.execute('''
 app.React=function() end;app.CancelReaction=function() end

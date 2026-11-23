@@ -211,15 +211,15 @@ local function providerStates(members)
     return result
 end
 local function checkable(member)
-    if restricted(4) then return false, "Aura-Daten im Kampf oder durch den Client geschützt" end
+    if restricted(4) then return false, app.L("Aura-Daten im Kampf oder durch den Client geschützt") end
     local exists=call(UnitExists,member.unit)
-    if exists==false or type(UnitExists)=="function" and exists~=true then return false, "Nicht erreichbar / Existenz unbekannt" end
-    if call(UnitIsDeadOrGhost,member.unit) ~= false then return false, "Tot, Geist oder Lebensstatus unbekannt" end
+    if exists==false or type(UnitExists)=="function" and exists~=true then return false, app.L("Nicht erreichbar / Existenz unbekannt") end
+    if call(UnitIsDeadOrGhost,member.unit) ~= false then return false, app.L("Tot, Geist oder Lebensstatus unbekannt") end
     if not member.isSelf then
-        if call(UnitIsConnected,member.unit) ~= true then return false, "Offline oder Verbindung unbekannt" end
-        if call(UnitIsVisible,member.unit) ~= true then return false, "Nicht sichtbar / außerhalb der überprüfbaren Reichweite" end
+        if call(UnitIsConnected,member.unit) ~= true then return false, app.L("Offline oder Verbindung unbekannt") end
+        if call(UnitIsVisible,member.unit) ~= true then return false, app.L("Nicht sichtbar / außerhalb der überprüfbaren Reichweite") end
         local inRange, checked = call(UnitInRange,member.unit)
-        if inRange ~= true or checked == false then return false, "Außerhalb der überprüfbaren Reichweite" end
+        if inRange ~= true or checked == false then return false, app.L("Außerhalb der überprüfbaren Reichweite") end
     end
     return true
 end
@@ -227,14 +227,14 @@ local function readAuras(member)
     local found, ok, reason = {}, checkable(member)
     if not ok then return found, false, reason end
     local api = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
-    if not api then return found, false, "Aura-API nicht verfügbar" end
+    if not api then return found, false, app.L("Aura-API nicht verfügbar") end
     local complete = true
     for index=1,255 do
         local success, aura = pcall(api,member.unit,index,"HELPFUL")
-        if not success or secret(aura) then return found, false, "Aura-Daten geschützt oder nicht lesbar" end
+        if not success or secret(aura) then return found, false, app.L("Aura-Daten geschützt oder nicht lesbar") end
         if aura == nil then
             if complete then return found,true end
-            return found,false,"Einzelne Aura-Daten nicht lesbar"
+            return found,false,app.L("Einzelne Aura-Daten nicht lesbar")
         end
         local id, name = field(aura,"spellId"), field(aura,"name")
         local entry = type(id) == "number" and familyByID[id] or type(name) == "string" and familyByName[name]
@@ -246,24 +246,24 @@ local function readAuras(member)
         -- An unidentifiable aura could be any missing family: fail closed.
         if type(id) ~= "number" then complete = false end
     end
-    return found, false, "Aura-Liste nicht vollständig lesbar"
+    return found, false, app.L("Aura-Liste nicht vollständig lesbar")
 end
 local function requirement(member, family, providers)
     local settings = buff.Settings()
-    if not settings.families[family.key] then return false, "Bufffamilie deaktiviert" end
+    if not settings.families[family.key] then return false, app.L("Bufffamilie deaktiviert") end
     local custom = settings.requirements[member.class]
     local value = type(custom)=="table" and custom[family.key] or "auto"
-    if value == "off" then return false, "Für diese Klasse deaktiviert" end
+    if value == "off" then return false, app.L("Für diese Klasse deaktiviert") end
     if value == "on" then return true end
-    if family.mana and member.class=="UNKNOWN" then return true,"Klasseninformation nicht lesbar" end
-    if family.mana and not mana[member.class] then return false, "Für diese Klasse nicht erforderlich" end
+    if family.mana and member.class=="UNKNOWN" then return true,app.L("Klasseninformation nicht lesbar") end
+    if family.mana and not mana[member.class] then return false, app.L("Für diese Klasse nicht erforderlich") end
     local provider = providers[family.key]
     if family.key=="blessing" then
         local variant=settings.blessings[member.class]
         if variant and variant~="any" then provider=providers["blessing:" .. variant] end
     end
-    if provider == "UNAVAILABLE" then return false, "Kein verfügbarer Buffgeber / Zauber nicht erlernt" end
-    if provider ~= "AVAILABLE" then return true, "Fähigkeit des Buffgebers nicht überprüfbar" end
+    if provider == "UNAVAILABLE" then return false, app.L("Kein verfügbarer Buffgeber / Zauber nicht erlernt") end
+    if provider ~= "AVAILABLE" then return true, app.L("Fähigkeit des Buffgebers nicht überprüfbar") end
     return true
 end
 local function inspect(member, providers)
@@ -273,7 +273,7 @@ local function inspect(member, providers)
         and (member.groupStatus ~= "RAID" or settings.raid)
     local found, complete, reason
     if member.checked then found,complete,reason = readAuras(member)
-    else found,complete,reason = {},false,"Prüfung ausgeschaltet" end
+    else found,complete,reason = {},false,app.L("Prüfung ausgeschaltet") end
     member.reason,member.verifiable = reason,member.checked and complete
     for _, family in ipairs(buff.families) do
         local required, why = requirement(member,family,providers)
@@ -324,7 +324,7 @@ local function publish(data)
     local own
     for _, member in ipairs(data.members) do if member.isSelf then own=member;break end end
     local wild = own and own.class == "DRUID" and own.checked and own.buffs.wild
-    app.SetCompanionReminder("mark",wild and wild.required and wild.state==buff.MISSING and "Mal der Wildnis fehlt." or nil)
+    app.SetCompanionReminder("mark",wild and wild.required and wild.state==buff.MISSING and app.L("Mal der Wildnis fehlt.") or nil)
     if buff.Render then buff.Render() end
     if data.signature ~= lastComment then
         lastComment = data.signature
@@ -376,9 +376,9 @@ local function utf8limit(value, maximum)
 end
 function buff.Report(data)
     data = data or buff.Snapshot()
-    if data.checkedCount==0 then return "[Paulchen] Buffcheck unvollständig: Keine Spieler vollständig überprüfbar." end
+    if data.checkedCount==0 then return app.L("[Paulchen] Buffcheck unvollständig: Keine Spieler vollständig überprüfbar.") end
     local incomplete=data.unknownCount>0 or data.unverifiableCount>0 or data.excluded
-    local prefix = "[Paulchen] Buffcheck" .. (incomplete and " unvollständig" or "") .. ": "
+    local prefix = app.L("[Paulchen] Buffcheck") .. (incomplete and app.L(" unvollständig") or "") .. ": "
     local parts = {}
     for _, family in ipairs(buff.families) do
         local names = {}
@@ -386,19 +386,19 @@ function buff.Report(data)
             if member.checked and member.buffs[family.key].required and member.buffs[family.key].state==buff.MISSING then names[#names+1]=member.name end
         end
         if #names>0 then
-            local who = #names<=2 and table.concat(names,", ") or names[1] .. " und " .. (#names-1) .. " weitere"
-            parts[#parts+1] = family.label .. " fehlt " .. who
+            local who = #names<=2 and table.concat(names,", ") or names[1] .. app.L(" und ") .. (#names-1) .. app.L(" weitere")
+            parts[#parts+1] = app.L(family.label) .. app.L(" fehlt ") .. who
         end
     end
     if #parts==0 then
-        parts[1] = (data.unknownCount>0 or data.unverifiableCount>0) and "Keine sicher fehlenden Buffs; Status teilweise unbekannt."
-            or data.excluded and "Geprüfte Buffs vorhanden; Prüfung nicht vollständig."
-            or data.requiredCount==0 and "Keine Buffanforderungen für diese Gruppe."
-            or "Alle Gruppenbuffs vorhanden! So gefällt mir das!"
+        parts[1] = (data.unknownCount>0 or data.unverifiableCount>0) and app.L("Keine sicher fehlenden Buffs; Status teilweise unbekannt.")
+            or data.excluded and app.L("Geprüfte Buffs vorhanden; Prüfung nicht vollständig.")
+            or data.requiredCount==0 and app.L("Keine Buffanforderungen für diese Gruppe.")
+            or app.L("Alle Gruppenbuffs vorhanden! So gefällt mir das!")
     end
-    if data.unknownCount>0 and data.missingCount>0 then parts[#parts+1]=data.unknownCount .. " Buffstatus unbekannt" end
+    if data.unknownCount>0 and data.missingCount>0 then parts[#parts+1]=data.unknownCount .. app.L(" Buffstatus unbekannt") end
     local result = prefix .. table.concat(parts," | ")
-    if #result>250 then result=prefix .. data.missingCount .. " Buffs fehlen; " .. data.unknownCount .. " Status unbekannt. Details in Paulchens Buffwächter." end
+    if #result>250 then result=prefix .. data.missingCount .. app.L(" Buffs fehlen; ") .. data.unknownCount .. app.L(" Status unbekannt. Details in Paulchens Buffwächter.") end
     return utf8limit(result,250)
 end
 local function chatChannel(currentMode)
@@ -420,20 +420,20 @@ local function history()
 end
 function buff.Say(automatic)
     local settings=buff.Settings()
-    if not settings.enabled then buff.notice="Buffwächter ausgeschaltet.";return false end
+    if not settings.enabled then buff.notice=app.L("Buffwächter ausgeschaltet.");return false end
     local data=buff.Scan()
     local channel=chatChannel(data.mode)
-    if not channel then buff.notice="Solospiel: kein Gruppenchatbericht.";return false end
+    if not channel then buff.notice=app.L("Solospiel: kein Gruppenchatbericht.");return false end
     if automatic and (data.requiredCount == 0 or not settings.autoChat or not settings.group
         or data.mode=="RAID" and (not settings.raid or not settings.autoRaid)) then return false end
     local previous,now=history(),serverTime()
     if automatic and (previous.signature==data.signature or type(previous.at)=="number" and now-previous.at<settings.cooldown) then return false end
-    if not automatic and manualAt and clock()-manualAt<5 then buff.notice="Bitte kurz warten.";return false end
+    if not automatic and manualAt and clock()-manualAt<5 then buff.notice=app.L("Bitte kurz warten.");return false end
     local message=buff.Report(data)
     if automatic and previous.message==message and previous.group==data.groupSignature then return false end
     local api=C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage
     if buff.autoBlocked or chatRestricted() or not api then
-        buff.notice="Chat eingeschränkt. Bericht über 'Bericht übernehmen' manuell ausgeben."
+        buff.notice=app.L("Chat eingeschränkt. Bericht über 'Bericht übernehmen' manuell ausgeben.")
         if not automatic then buff.ManualReport(message,channel) end
         if buff.Render then buff.Render() end
         return false
@@ -443,14 +443,14 @@ function buff.Say(automatic)
     sending=false
     if not ok or secret(result) or result==false or blockedDuringSend then
         buff.autoBlocked=true
-        buff.notice="Chatversand vom Client abgelehnt; manueller Bericht verfügbar."
+        buff.notice=app.L("Chatversand vom Client abgelehnt; manueller Bericht verfügbar.")
         if not automatic then buff.ManualReport(message,channel) end
         if buff.Render then buff.Render() end
         return false
     end
     previous.at,previous.signature,previous.message,previous.group=now,data.signature,message,data.groupSignature
     if not automatic then manualAt=clock() end
-    buff.notice="Buffbericht gesendet · " .. channel
+    buff.notice=app.L("Buffbericht gesendet · ") .. channel
     if buff.Render then buff.Render() end
     return true
 end
@@ -504,7 +504,7 @@ for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","GROUP_ROSTER_UPDA
     "UNIT_IN_RANGE_UPDATE","ZONE_CHANGED_NEW_AREA","ADDON_RESTRICTION_STATE_CHANGED",
     "ADDON_ACTION_BLOCKED","ADDON_ACTION_FORBIDDEN"}) do app.RegisterSupported(events,event) end
 events:SetScript("OnEvent",function(_,event,unit,_,spellID)
-    app.SecureCall("Buffwächter",function()
+    app.SecureCall(app.L("Buffwächter"),function()
         if event=="ADDON_ACTION_BLOCKED" or event=="ADDON_ACTION_FORBIDDEN" then
             if sending then blockedDuringSend=true end
         elseif event=="UNIT_SPELLCAST_SUCCEEDED" then buff.CastSucceeded(unit,spellID)
@@ -522,7 +522,7 @@ end)
 buff.RefreshSpellNames()
 
 local stateColors = { PRESENT={0.35,0.90,0.45}, MISSING={1,0.33,0.28}, UNKNOWN={0.62,0.64,0.67} }
-local stateLabels = { PRESENT="Vorhanden", MISSING="Fehlt", UNKNOWN="Unbekannt" }
+local stateLabels = { PRESENT=app.L("Vorhanden"), MISSING=app.L("Fehlt"), UNKNOWN=app.L("Unbekannt") }
 local function label(parent,value,x,y,w,h,color,font)
     return style.Label(parent,value,x,y,w,h,font or "GameFontHighlightSmall",color or style.cream)
 end
@@ -540,15 +540,15 @@ local function tooltip(icon)
     if not member then return end
     local entry=member.buffs[family.key]
     GameTooltip:SetOwner(icon,"ANCHOR_RIGHT")
-    GameTooltip:AddLine(family.label,unpack(style.gold))
+    GameTooltip:AddLine(app.L(family.label),unpack(style.gold))
     GameTooltip:AddLine(member.name .. " · " .. stateLabels[entry.state],unpack(stateColors[entry.state]))
-    if not entry.required then GameTooltip:AddLine("Nicht angefordert",unpack(style.muted)) end
+    if not entry.required then GameTooltip:AddLine(app.L("Nicht angefordert"),unpack(style.muted)) end
     if entry.variant~="any" then
         for _, variant in ipairs(family.variants or {}) do
-            if variant.key==entry.variant then GameTooltip:AddLine("Gewünschter Segen: " .. variant.label,unpack(style.cream)) end
+            if variant.key==entry.variant then GameTooltip:AddLine(app.L("Gewünschter Segen: ") .. app.L(variant.label),unpack(style.cream)) end
         end
     end
-    if entry.reason then GameTooltip:AddLine(entry.reason,0.72,0.72,0.72,true) end
+    if entry.reason then GameTooltip:AddLine(app.L(entry.reason),0.72,0.72,0.72,true) end
     if entry.auras then
         for _, aura in pairs(entry.auras) do GameTooltip:AddLine(aura.name,0.5,0.9,0.6) end
     end
@@ -560,10 +560,10 @@ function buff.Render()
     local maximum=math.max(0,#data.members-12)
     page.offset=math.max(0,math.min(maximum,page.offset or 0))
     page.slider:SetMinMaxValues(0,maximum);page.slider:SetValue(page.offset);page.slider:SetShown(maximum>0)
-    page.summary:SetText(("%s · %d Spieler · %d geprüft · %d Buffs fehlen · %d unbekannt")
-        :format(data.mode=="RAID" and "Raid" or data.mode=="PARTY" and "Gruppe" or "Solo",#data.members,data.checkedCount,data.missingCount,data.unknownCount)
-        .. ((data.excluded or data.unverifiableCount>0) and " · unvollständig" or ""))
-    page.notice:SetText(not buff.Settings().enabled and "Buffwächter ausgeschaltet." or buff.notice or "Nur sicher lesbare Daten werden als fehlend bewertet.")
+    page.summary:SetText(app.L("%s · %d Spieler · %d geprüft · %d Buffs fehlen · %d unbekannt")
+        :format(data.mode=="RAID" and app.L("Raid") or data.mode=="PARTY" and app.L("Gruppe") or "Solo",#data.members,data.checkedCount,data.missingCount,data.unknownCount)
+        .. ((data.excluded or data.unverifiableCount>0) and app.L(" · unvollständig") or ""))
+    page.notice:SetText(not buff.Settings().enabled and app.L("Buffwächter ausgeschaltet.") or buff.notice or app.L("Nur sicher lesbare Daten werden als fehlend bewertet."))
     for index,row in ipairs(page.rows) do
         local member=data.members[index+page.offset]
         row:SetShown(member~=nil)
@@ -572,11 +572,11 @@ function buff.Render()
             local classColor=RAID_CLASS_COLORS and RAID_CLASS_COLORS[member.class]
             row.name:SetTextColor(classColor and classColor.r or 0.9,classColor and classColor.g or 0.86,classColor and classColor.b or 0.75)
             local missing={}
-            for _,key in ipairs(member.missing) do missing[#missing+1]=byKey[key].label end
-            local status=#missing>0 and table.concat(missing,", ") or not member.checked and "Prüfung ausgeschaltet"
-                or (#member.unknown>0 or not member.verifiable) and (member.reason or "Buffstatus teilweise unbekannt")
-                or #member.present>0 and "Alles vorhanden" or "Keine Buffanforderungen"
-            if #missing>0 and #member.unknown>0 then status=status .. " · weitere unbekannt" end
+            for _,key in ipairs(member.missing) do missing[#missing+1]=app.L(byKey[key].label) end
+            local status=#missing>0 and table.concat(missing,", ") or not member.checked and app.L("Prüfung ausgeschaltet")
+                or (#member.unknown>0 or not member.verifiable) and (member.reason or app.L("Buffstatus teilweise unbekannt"))
+                or #member.present>0 and app.L("Alles vorhanden") or app.L("Keine Buffanforderungen")
+            if #missing>0 and #member.unknown>0 then status=status .. app.L(" · weitere unbekannt") end
             row.status:SetText(status)
             local state=#missing>0 and buff.MISSING or (#member.unknown>0 or not member.checked or not member.verifiable) and buff.UNKNOWN or buff.PRESENT
             row.status:SetTextColor(unpack(stateColors[state]))
@@ -594,16 +594,16 @@ function buff.GetPage(parent)
     if page then return page end
     local f=CreateFrame("Frame",nil,parent)
     page=f;f:Hide();f:SetSize(860,610);f.offset=0;f.rows={}
-    label(f,"Paulchens Buffwächter",18,-12,640,28,style.gold,"GameFontNormalLarge")
-    label(f,"Wildnis · Seelenstärke · Intelligenz · Wille · Schattenschutz · Segen",18,-44,820,21,style.muted)
-    button(f,"Aktualisieren",18,-76,130,function() buff.Scan() end)
-    button(f,"Im Gruppenchat",156,-76,160,function() buff.Say(false) end)
-    button(f,"Bericht übernehmen",324,-76,180,function() buff.ManualReport(buff.Report(buff.Scan()),chatChannel(mode())) end)
-    button(f,"Einstellungen",674,-76,168,function() buff.OpenConfig() end)
+    label(f,app.L("Paulchens Buffwächter"),18,-12,640,28,style.gold,"GameFontNormalLarge")
+    label(f,app.L("Wildnis · Seelenstärke · Intelligenz · Wille · Schattenschutz · Segen"),18,-44,820,21,style.muted)
+    button(f,app.L("Aktualisieren"),18,-76,130,function() buff.Scan() end)
+    button(f,app.L("Im Gruppenchat"),156,-76,160,function() buff.Say(false) end)
+    button(f,app.L("Bericht übernehmen"),324,-76,180,function() buff.ManualReport(buff.Report(buff.Scan()),chatChannel(mode())) end)
+    button(f,app.L("Einstellungen"),674,-76,168,function() buff.OpenConfig() end)
     f.summary=label(f,"",18,-112,824,24,style.gold)
-    label(f,"Spieler",18,-145,170,24,style.muted)
-    label(f,"Buffstatus",195,-145,210,24,style.muted)
-    label(f,"Fehlende Buffs / Prüfbarkeit",420,-145,390,24,style.muted)
+    label(f,app.L("Spieler"),18,-145,170,24,style.muted)
+    label(f,app.L("Buffstatus"),195,-145,210,24,style.muted)
+    label(f,app.L("Fehlende Buffs / Prüfbarkeit"),420,-145,390,24,style.muted)
     for index=1,12 do
         local row=CreateFrame("Frame",nil,f)
         row:SetPoint("TOPLEFT",18,-173-(index-1)*30);row:SetSize(806,29);style.Row(row,index)
@@ -634,7 +634,7 @@ function buff.GetPage(parent)
     f.slider=slider
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel",function(_,delta) f.offset=f.offset-delta*3;buff.Render() end)
-    label(f,"|cff59e673Vorhanden|r · |cffff5447Fehlt|r · |cff9ea3abUnbekannt / nicht angefordert|r",18,-545,824,22)
+    label(f,app.L("|cff59e673Vorhanden|r · |cffff5447Fehlt|r · |cff9ea3abUnbekannt / nicht angefordert|r"),18,-545,824,22)
     f.notice=label(f,"",18,-572,824,32,style.muted);f.notice:SetWordWrap(true)
     f:SetScript("OnShow",function() buff.Scan() end)
     local elapsed=0
@@ -654,8 +654,8 @@ function buff.ManualReport(message,channel)
     if not manualWindow then
         local f=CreateFrame("Frame","PaulchenBuffReport",UIParent,"BackdropTemplate")
         manualWindow=f;f:SetSize(700,190);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");style.Panel(f,style.background)
-        label(f,"Buffbericht · Strg+C zum Kopieren",18,-12,630,26,style.gold,"GameFontNormalLarge")
-        label(f,"Manuell in den Gruppenchat einfügen und mit Enter senden.",18,-45,664,24,style.muted)
+        label(f,app.L("Buffbericht · Strg+C zum Kopieren"),18,-12,630,26,style.gold,"GameFontNormalLarge")
+        label(f,app.L("Manuell in den Gruppenchat einfügen und mit Enter senden."),18,-45,664,24,style.muted)
         f.box=style.EditBox(f);f.box:SetPoint("TOPLEFT",18,-78);f.box:SetSize(664,60);f.box:SetMultiLine(true)
         f.box:SetMaxLetters(300);f.box:SetScript("OnEscapePressed",function() f:Hide() end)
         local close=CreateFrame("Button",nil,f,"UIPanelCloseButton");close:SetPoint("TOPRIGHT");close:SetScript("OnClick",function() f:Hide() end)
@@ -671,12 +671,12 @@ end
 local function requirementMenu(owner)
     if not MenuUtil or not MenuUtil.CreateContextMenu then return end
     MenuUtil.CreateContextMenu(owner,function(_,root)
-        root:CreateTitle("Anforderungen pro Zielklasse")
+        root:CreateTitle(app.L("Anforderungen pro Zielklasse"))
         for _,class in ipairs(classes) do
             local branch=root:CreateButton(className(class))
             for _,family in ipairs(buff.families) do
-                local choices=branch:CreateButton(family.label)
-                for _,choice in ipairs({{"auto","Automatisch"},{"on","Pflicht"},{"off","Aus"}}) do
+                local choices=branch:CreateButton(app.L(family.label))
+                for _,choice in ipairs({{"auto",app.L("Automatisch")},{"on",app.L("Pflicht")},{"off",app.L("Aus")}}) do
                     local key,value=family.key,choice[1]
                     choices:CreateRadio(choice[2],function()
                         local custom=buff.Settings().requirements[class]
@@ -684,12 +684,12 @@ local function requirementMenu(owner)
                     end,function() buff.SetRequirement(class,key,value) end)
                 end
             end
-            local blessings=branch:CreateButton("Gewünschter Segen")
-            local choices={{key="any",label="Beliebiger Segen"}}
+            local blessings=branch:CreateButton(app.L("Gewünschter Segen"))
+            local choices={{key="any",label=app.L("Beliebiger Segen")}}
             for _,variant in ipairs(byKey.blessing.variants) do choices[#choices+1]=variant end
             for _,variant in ipairs(choices) do
                 local key=variant.key
-                blessings:CreateRadio(variant.label,function() return (buff.Settings().blessings[class] or "any")==key end,function()
+                blessings:CreateRadio(app.L(variant.label),function() return (buff.Settings().blessings[class] or "any")==key end,function()
                     buff.Settings().blessings[class]=key;buff.Request(nil,true)
                 end)
             end
@@ -701,13 +701,13 @@ function buff.OpenConfig()
         local f=CreateFrame("Frame","PaulchenBuffConfig",UIParent,"BackdropTemplate")
         options=f;f:Hide();f:SetSize(720,530);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");style.Panel(f,style.background)
         f:SetScale(math.min(1,(UIParent:GetWidth()-20)/720,(UIParent:GetHeight()-20)/530))
-        label(f,"Paulchen · Buffwächter",18,-12,650,28,style.gold,"GameFontNormalLarge")
+        label(f,app.L("Paulchen · Buffwächter"),18,-12,650,28,style.gold,"GameFontNormalLarge")
         local close=CreateFrame("Button",nil,f,"UIPanelCloseButton");close:SetPoint("TOPRIGHT");close:SetScript("OnClick",function() f:Hide() end)
         f.controls={}
         local function check(caption,x,y,get,set)
             local control=CreateFrame("CheckButton",nil,f,"UICheckButtonTemplate")
             control:SetSize(24,24);control:SetPoint("TOPLEFT",x,y)
-            label(control,caption,28,0,306,24)
+            label(control,app.L(caption),28,0,306,24)
             control:SetScript("OnClick",function(self) set(not not self:GetChecked());refreshOptions() end)
             f.controls[#f.controls+1]=function() control:SetChecked(get()) end
         end
@@ -721,21 +721,21 @@ function buff.OpenConfig()
         label(f,"Bufffamilien",378,-48,310,24,style.gold)
         for index,family in ipairs(buff.families) do
             local key=family.key
-            check(family.label .. (family.optional and " (optional)" or ""),378,-79-(index-1)*31,
+            check(app.L(family.label) .. (family.optional and app.L(" (optional)") or ""),378,-79-(index-1)*31,
                 function() return buff.Settings().families[key] end,function(value)
                     buff.Settings().families[key]=value;buff.Request(nil,true)
                 end)
         end
-        button(f,"Anforderungen pro Klasse",378,-281,306,function(self) requirementMenu(self) end)
-        label(f,"Automatisch: nur mit passendem Buffgeber.\nIntelligenz/Wille nur für Manaklassen.\nPflicht/Aus und gewünschter Segen sind je Klasse wählbar.",378,-318,306,68,style.muted):SetWordWrap(true)
-        label(f,"Chat-Abstand (60–600 Sekunden)",18,-328,320,24,style.gold)
+        button(f,app.L("Anforderungen pro Klasse"),378,-281,306,function(self) requirementMenu(self) end)
+        label(f,app.L("Automatisch: nur mit passendem Buffgeber.\nIntelligenz/Wille nur für Manaklassen.\nPflicht/Aus und gewünschter Segen sind je Klasse wählbar."),378,-318,306,68,style.muted):SetWordWrap(true)
+        label(f,app.L("Chat-Abstand (60–600 Sekunden)"),18,-328,320,24,style.gold)
         local cooldown=style.EditBox(f);cooldown:SetSize(90,28);cooldown:SetPoint("TOPLEFT",18,-358);cooldown:SetNumeric(true)
         cooldown:SetMaxLetters(3)
         cooldown:SetScript("OnEnterPressed",function(self) buff.SetOption("cooldown",self:GetText());self:ClearFocus();refreshOptions() end)
         cooldown:SetScript("OnEscapePressed",function(self) self:ClearFocus();refreshOptions() end)
         f.controls[#f.controls+1]=function() if not cooldown:HasFocus() then cooldown:SetText(tostring(buff.Settings().cooldown)) end end
-        label(f,"Mit Enter übernehmen. Mindestens 60 Sekunden; identische automatische Berichte werden unterdrückt.",18,-394,666,38,style.muted):SetWordWrap(true)
-        label(f,"Nicht lesbare, entfernte, tote oder ausgeloggte Spieler bleiben unbekannt. Schattenschutz und Wille starten ausgeschaltet; fremde Talente werden nicht geraten.",18,-448,666,52,style.muted):SetWordWrap(true)
+        label(f,app.L("Mit Enter übernehmen. Mindestens 60 Sekunden; identische automatische Berichte werden unterdrückt."),18,-394,666,38,style.muted):SetWordWrap(true)
+        label(f,app.L("Nicht lesbare, entfernte, tote oder ausgeloggte Spieler bleiben unbekannt. Schattenschutz und Wille starten ausgeschaltet; fremde Talente werden nicht geraten."),18,-448,666,52,style.muted):SetWordWrap(true)
         f:SetScript("OnShow",refreshOptions)
         UISpecialFrames[#UISpecialFrames+1]=f:GetName()
     end
@@ -750,12 +750,12 @@ function buff.Command(command)
     elseif command=="debug" then
         local db=buff.Settings();db.debug=not db.debug
         local data=buff.Scan()
-        print("Paulchen Buffwächter · Diagnose " .. (db.debug and "an" or "aus") .. " · " .. data.mode)
-        print("Aura-API: " .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
-            .. " · Chat-API: " .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
-            .. " · Chat eingeschränkt: " .. tostring(chatRestricted()) .. " · Versand abgelehnt: " .. tostring(buff.autoBlocked==true))
+        print(app.L("Paulchen Buffwächter · Diagnose") .. (db.debug and app.L(" an") or app.L(" aus")) .. " · " .. data.mode)
+        print(app.L("Aura-API: ") .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
+            .. app.L(" · Chat-API: ") .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
+            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. app.L(" · Versand abgelehnt: ") .. tostring(buff.autoBlocked==true))
         for _,member in ipairs(data.members) do
-            print(member.name .. " · " .. member.class .. " · fehlt " .. #member.missing .. " · unbekannt " .. #member.unknown .. " · " .. (member.reason or "lesbar"))
+            print(member.name .. " · " .. member.class .. app.L(" · fehlt ") .. #member.missing .. app.L(" · unbekannt ") .. #member.unknown .. " · " .. (member.reason or app.L("lesbar")))
         end
     else
         buff.SetOption("showWindow",true);app.OpenDashboard("buffs")

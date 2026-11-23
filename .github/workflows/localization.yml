@@ -1,0 +1,22 @@
+name: Paulchen localization checks
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/bilingual-de-en-localization
+jobs:
+  syntax-and-locales:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - name: Verify all Lua source files compile
+        shell: bash
+        run: |
+          find . -name '*.lua' -type f -print0 | while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            luac5.1 -p "$file"
+          done
+      - name: Verify language selection and translated dialogues
+        run: lua5.1 tests/localization_fixture.lua

@@ -6,9 +6,9 @@ local cleanAt, scannerIndex = 0, nil
 local tsmAPI, tsmLoaded
 local onChanged
 local sources = {
-    { "auto", "Automatisch" },
-    { "tsm", "TradeSkillMaster bevorzugen" },
-    { "scanner", "Nur Paulchens Scanner" },
+    { "auto", app.L("Automatisch") },
+    { "tsm", app.L("TradeSkillMaster bevorzugen") },
+    { "scanner", app.L("Nur Paulchens Scanner") },
 }
 app.AuctionPriceModes = sources
 
@@ -210,16 +210,16 @@ function app.GetAuctionPriceStatus()
     local now = call(GetTime) or 0
     local status
     if not installed then
-        status = "TSM nicht installiert"
+        status = app.L("TSM nicht installiert")
     elseif app.GetAuctionPriceMode() == "scanner" then
-        status = "TSM in Paulchen deaktiviert"
+        status = app.L("TSM in Paulchen deaktiviert")
     elseif (observed.TSM_DBMarket or 0) > now then
-        status = "TSM aktiv · DBMarket"
+        status = app.L("TSM aktiv · DBMarket")
     else
-        status = "TSM installiert · Preisdaten nicht verfügbar"
+        status = app.L("TSM installiert · Preisdaten nicht verfügbar")
     end
     return status, (observed.PAULCHEN_SCAN or 0) > now
-        and "Paulchens Scanner aktiv" or "Scanner · keine Preise in der aktuellen Abfrage"
+        and app.L("Paulchens Scanner aktiv") or app.L("Scanner · keine Preise in der aktuellen Abfrage")
 end
 
 local scanner = app.auction or PaulchenAuktionsscan

@@ -7,10 +7,10 @@ local enemySampleSize = 10
 local rollingSeconds = 15 * 60
 local blockSeconds, trendSize = 5 * 60, 12
 local sources = {
-    { "quest", "Quests", 0.85, 0.63, 0.29 },
-    { "enemy", "Gegner", 0.62, 0.43, 0.89 },
-    { "explore", "Erkundung", 0.31, 0.68, 0.80 },
-    { "other", "Sonstiges", 0.47, 0.52, 0.60 },
+    { "quest", suite.L("Quests"), 0.85, 0.63, 0.29 },
+    { "enemy", suite.L("Gegner"), 0.62, 0.43, 0.89 },
+    { "explore", suite.L("Erkundung"), 0.31, 0.68, 0.80 },
+    { "other", suite.L("Sonstiges"), 0.47, 0.52, 0.60 },
 }
 
 local function readableNumber(value)
@@ -111,7 +111,7 @@ local function recordProgress(session, current)
 
     local zone = GetRealZoneText()
     if issecretvalue(zone) or not zone or zone == "" then
-        zone = "EP-Gewinn"
+        zone = suite.L("EP-Gewinn")
     end
     table.insert(session.recent, 1, { gain = gain, at = time(), zone = zone, level = levels > 0 and current.level or nil })
     if #session.recent > historySize then
@@ -207,7 +207,7 @@ local function enemyPatterns()
 end
 
 local function createAnalysis(panel, label, barTexture)
-    label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34):SetText("EP-Quellen")
+    label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34):SetText(suite.L("EP-Quellen"))
     local sourceRows = {}
     for index, source in ipairs(sources) do
         local row = CreateFrame("Frame", nil, panel)
@@ -226,10 +226,10 @@ local function createAnalysis(panel, label, barTexture)
         sourceRows[index] = row
     end
 
-    label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 12, -150):SetText("EP PRO 5 MINUTEN")
+    label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 12, -150):SetText(suite.L("EP PRO 5 MINUTEN"))
     local peakText = label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -150)
-    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -280):SetText("Älter")
-    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -280):SetText("Aktueller Block")
+    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -280):SetText(suite.L("Älter"))
+    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -280):SetText(suite.L("Aktueller Block"))
     local bars = {}
     for index = 1, trendSize do
         local bar = CreateFrame("StatusBar", nil, panel)
@@ -249,13 +249,13 @@ local function createAnalysis(panel, label, barTexture)
                 return
             end
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            local title = index == trendSize and "Aktueller Block" or "Abgeschlossener Block"
+            local title = index == trendSize and suite.L("Aktueller Block") or "Abgeschlossener Block"
             GameTooltip:SetText(title, 1, 0.82, 0)
-            GameTooltip:AddLine(numberText(self.amount) .. " EP", 1, 1, 1)
+            GameTooltip:AddLine(numberText(self.amount) .. suite.L(" EP"), 1, 1, 1)
             if index ~= trendSize then
-                GameTooltip:AddLine(numberText(self.amount * 3600 / blockSeconds) .. " EP/h", 1, 1, 1)
+                GameTooltip:AddLine(numberText(self.amount * 3600 / blockSeconds) .. suite.L(" EP/h"), 1, 1, 1)
             end
-            GameTooltip:AddLine(("%s bis %s seit Sitzungsstart"):format(durationText(self.from), durationText(self.from + blockSeconds)), 0.7, 0.75, 0.82)
+            GameTooltip:AddLine(suite.LF("%s bis %s seit Sitzungsstart", durationText(self.from), durationText(self.from + blockSeconds)), 0.7, 0.75, 0.82)
             GameTooltip:Show()
         end)
         bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -267,8 +267,8 @@ local function createAnalysis(panel, label, barTexture)
         for index, row in ipairs(sourceRows) do
             local amount = session and session.sources[sources[index][1]] or 0
             local share = total > 0 and amount / total or 0
-            local percent = ("%.1f"):format(100 * share):gsub("%.", ",")
-            row.amount:SetText(("%s EP · %s %%"):format(numberText(amount), percent))
+            local percent = suite.LocalizeDecimal(("%.1f"):format(100 * share))
+            row.amount:SetText(suite.LF("%s EP · %s %%", numberText(amount), percent))
             row.bar:SetValue(share)
         end
         local block = session and trendBlock(session, GetTime()) or -1
@@ -280,7 +280,7 @@ local function createAnalysis(panel, label, barTexture)
             bar.amount = session and session.trend[bar.block] or 0
             peak = math.max(peak, bar.amount)
         end
-        peakText:SetText(("Höchster Block: %s EP"):format(numberText(peak)))
+        peakText:SetText((suite.L("Höchster Block: %s EP")):format(numberText(peak)))
         for _, bar in ipairs(bars) do
             bar:SetMinMaxValues(0, math.max(peak, 1))
             bar:SetValue(bar.amount)
@@ -328,13 +328,13 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
     enemyText:SetPoint("RIGHT", panel, "RIGHT", -108, 0)
     enemyText:SetJustifyH("LEFT")
     enemyText:SetWordWrap(false)
-    enemyText:SetText("Letzter erfasster Gegner · –")
+    enemyText:SetText(suite.L("Letzter erfasster Gegner · –"))
     local mobsText = label(panel, "GameFontNormalSmall", "TOPRIGHT", "TOPRIGHT", -12, -94)
-    mobsText:SetText("Ø: Noch – Mobs")
+    mobsText:SetText(suite.L("Ø: Noch – Mobs"))
     local sessionText = label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 12, -108)
-    sessionText:SetText("SITZUNG")
+    sessionText:SetText(suite.L("SITZUNG"))
 
-    local labels = { "EP gesamt", "EP pro Stunde", "Letzte 15 Min.", "Aufstieg in", "Größter Gewinn", "Ø je Gewinn", "EP-Gewinne", "Stufenaufstiege" }
+    local labels = { suite.L("EP gesamt"), suite.L("EP pro Stunde"), suite.L("Letzte 15 Min."), suite.L("Aufstieg in"), suite.L("Größter Gewinn"), suite.L("Ø je Gewinn"), suite.L("EP-Gewinne"), suite.L("Stufenaufstiege") }
     local values = {}
     for index, name in ipairs(labels) do
         local column = (index - 1) % 2
@@ -345,9 +345,9 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
     end
 
     local history = label(panel, "GameFontNormalSmall", "TOPLEFT", "TOPLEFT", 12, -209)
-    history:SetText("LETZTE EP-GEWINNE")
+    history:SetText(suite.L("LETZTE EP-GEWINNE"))
     local empty = label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -232)
-    empty:SetText("Warte auf den ersten EP-Gewinn dieser Sitzung …")
+    empty:SetText(suite.L("Warte auf den ersten EP-Gewinn dieser Sitzung …"))
     local rows = {}
     for index = 1, historySize do
         local row = CreateFrame("Frame", nil, panel)
@@ -412,18 +412,18 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
         end
         local current = session and session.last
         if not current then
-            levelText:SetText("Erfahrung")
+            levelText:SetText(suite.L("Erfahrung"))
             return
         end
 
-        levelText:SetText(("Stufe %d"):format(current.level))
+        levelText:SetText((suite.L("Stufe %d")):format(current.level))
         local capped = current.maximum == 0
         local xpPaused = xpIsPaused()
         local remaining = math.max(0, current.maximum - current.xp)
         local rested = GetXPExhaustion()
         rested = readableNumber(rested) and rested or 0
         if capped then
-            progressText:SetText("Maximalstufe")
+            progressText:SetText(suite.L("Maximalstufe"))
             remainingText:SetText("")
             restedText:SetText("")
             bar:SetMinMaxValues(0, 1)
@@ -431,10 +431,10 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
             bar:SetValue(0)
             xpBar:SetValue(0)
         else
-            local percent = ("%.1f"):format(100 * current.xp / current.maximum):gsub("%.", ",")
-            progressText:SetText(("%s / %s EP · %s %%"):format(numberText(current.xp), numberText(current.maximum), percent))
-            remainingText:SetText(xpPaused and "EP-Stopp aktiv" or ("Noch %s EP"):format(numberText(remaining)))
-            restedText:SetText(("Erholt: %s EP"):format(numberText(rested)))
+            local percent = suite.LocalizeDecimal(("%.1f"):format(100 * current.xp / current.maximum))
+            progressText:SetText((suite.L("%s / %s EP · %s %%")):format(numberText(current.xp), numberText(current.maximum), percent))
+            remainingText:SetText(xpPaused and suite.L("EP-Stopp aktiv") or (suite.L("Noch %s EP")):format(numberText(remaining)))
+            restedText:SetText((suite.L("Erholt: %s EP")):format(numberText(rested)))
             bar:SetMinMaxValues(0, current.maximum)
             xpBar:SetMinMaxValues(0, current.maximum)
             bar:SetValue(math.min(current.maximum, current.xp + rested))
@@ -442,28 +442,28 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
         end
 
         local enemy = session.lastEnemy
-        local enemyValue = enemy and (numberText(enemy.xp) .. " EP") or "–"
+        local enemyValue = enemy and (numberText(enemy.xp) .. suite.L(" EP")) or "–"
         if enemy and enemy.maximum and enemy.maximum > 0 then
             local share = 100 * enemy.xp / enemy.maximum
-            local percent = share < 0.005 and "< 0,01" or ("%.2f"):format(share):gsub("%.", ",")
+            local percent = suite.LocalizeDecimal(share < 0.005 and "< 0.01" or ("%.2f"):format(share))
             enemyValue = enemyValue .. " · " .. percent .. " %"
         end
-        enemyText:SetText("Letzter erfasster Gegner · " .. enemyValue)
+        enemyText:SetText(suite.L("Letzter erfasster Gegner · ") .. enemyValue)
         local mobs = not capped and not xpPaused and enemyEstimate(session, remaining)
-        mobsText:SetText(("Ø: Noch %s Mobs"):format(mobs and numberText(mobs) or "–"))
+        mobsText:SetText((suite.L("Ø: Noch %s Mobs")):format(mobs and numberText(mobs) or "–"))
 
         local now = GetTime()
         local elapsed = math.max(0, now - session.started)
         local rate = sessionRate(session, elapsed)
         local eta = rate and rate > 0 and not (session.partial or capped or xpPaused) and 3600 * remaining / rate or nil
         local prefix = session.partial and "≥ " or ""
-        sessionText:SetText("SITZUNG · " .. durationText(elapsed))
+        sessionText:SetText(suite.L("SITZUNG · ") .. durationText(elapsed))
         values[1]:SetText(prefix .. numberText(session.total))
         values[2]:SetText(rate and prefix .. numberText(rate) or "–")
-        values[3]:SetText(numberText(recentExperience(session, now)) .. " EP")
-        values[4]:SetText(eta and ("ca. " .. durationText(eta)) or "–")
-        values[5]:SetText(numberText(session.best) .. " EP")
-        values[6]:SetText(session.count > 0 and numberText(session.total / session.count) .. " EP" or "–")
+        values[3]:SetText(numberText(recentExperience(session, now)) .. suite.L(" EP"))
+        values[4]:SetText(eta and (suite.L("ca. ") .. durationText(eta)) or "–")
+        values[5]:SetText(numberText(session.best) .. suite.L(" EP"))
+        values[6]:SetText(session.count > 0 and numberText(session.total / session.count) .. suite.L(" EP") or "–")
         values[7]:SetText(tostring(session.count))
         values[8]:SetText(tostring(session.levels))
         empty:SetShown(#session.recent == 0)
@@ -472,8 +472,8 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
             row:SetShown(event ~= nil)
             if event then
                 row.at:SetText(date("%H:%M:%S", event.at))
-                row.zone:SetText(event.level and ("Aufstieg auf Stufe %d"):format(event.level) or (event.zone:gsub("|", "||")))
-                row.gain:SetText("+" .. numberText(event.gain) .. " EP")
+                row.zone:SetText(event.level and (suite.L("Aufstieg auf Stufe %d")):format(event.level) or (event.zone:gsub("|", "||")))
+                row.gain:SetText("+" .. numberText(event.gain) .. suite.L(" EP"))
             end
         end
     end
@@ -493,11 +493,11 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
     local questsButton = style.TextButton(panel)
     questsButton:SetPoint("TOPRIGHT", -94, -108)
     questsButton:SetSize(67, 20)
-    questsButton:SetText("Quests")
+    questsButton:SetText(suite.L("Quests"))
     questsButton:SetScript("OnClick", function() setPage("quests") end)
 
     local x = -10
-    for _, definition in ipairs({ { "levels", "Stufen", 52 }, { "farm", "Farm", 42 }, { "analysis", "Analyse", 54 }, { "overview", "Übersicht", 64 } }) do
+    for _, definition in ipairs({ { "levels", suite.L("Stufen"), 52 }, { "farm", suite.L("Farm"), 42 }, { "analysis", suite.L("Analyse"), 54 }, { "overview", suite.L("Übersicht"), 64 } }) do
         local name, text, width = unpack(definition)
         local button = style.TextButton(parent)
         button:SetPoint("TOPRIGHT", x, -31)
@@ -600,7 +600,7 @@ function addon.CreateExperiencePanel(parent, label, barTexture)
     local reset = style.TextButton(panel)
     reset:SetPoint("TOPRIGHT", -10, -108)
     reset:SetSize(78, 20)
-    reset:SetText("Neu starten")
+    reset:SetText(suite.L("Neu starten"))
     local function sample(retries)
         local current = snapshot()
         local previous = session and session.last

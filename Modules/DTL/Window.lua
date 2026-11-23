@@ -20,7 +20,7 @@ local pendingTimer, retries
 local function label(parent, template, point, relativePoint, x, y)
     local font = parent:CreateFontString(nil, "OVERLAY", template)
     font:SetPoint(point, parent, relativePoint, x, y)
-    local color = template:find("Normal", 1, true) and style.gold
+    local color = template:find(suite.L("Normal"), 1, true) and style.gold
         or (template == "GameFontDisableSmall" and style.muted or style.cream)
     font:SetTextColor(unpack(color))
     return font
@@ -28,6 +28,12 @@ end
 
 local function formatDps(dps)
     return dps and BreakUpLargeNumbers(math.floor(dps + 0.5)) or "–"
+end
+
+local function fightName(name)
+    if name == "Kampf" or name == "Fight" then return suite.L("Kampf") end
+    local id = name:match("^Kampf #(%d+)$") or name:match("^Fight #(%d+)$")
+    return id and suite.LF("Kampf #%d", tonumber(id)) or name
 end
 
 local function formatDuration(duration)
@@ -41,11 +47,11 @@ end
 local function setComparison(latest, sum, count)
     comparison:SetTextColor(unpack(style.muted))
     if not latest or latest.dps == nil then
-        comparison:SetText(latest and "Letzter Kampf · DPS fehlen" or "")
+        comparison:SetText(latest and suite.L("Letzter Kampf · DPS fehlen") or "")
     elseif count == 0 then
-        comparison:SetText("Letzter Kampf · warte auf frühere DPS")
+        comparison:SetText(suite.L("Letzter Kampf · warte auf frühere DPS"))
     elseif sum == 0 then
-        comparison:SetText("Letzter Kampf · Ø davor war 0 DPS")
+        comparison:SetText(suite.L("Letzter Kampf · Ø davor war 0 DPS"))
     else
         local percent = (latest.dps / (sum / count) - 1) * 100
         if percent >= 0.05 then
@@ -55,11 +61,11 @@ local function setComparison(latest, sum, count)
         else
             percent = 0
         end
-        local delta = ("%+.1f"):format(percent):gsub("%.", ",")
+        local delta = suite.LocalizeDecimal(("%+.1f"):format(percent))
         if percent == 0 then
-            delta = "0,0"
+            delta = suite.LocalizeDecimal("0.0")
         end
-        comparison:SetText(("Letzter Kampf  %s %% zum Ø davor"):format(delta))
+        comparison:SetText((suite.L("Letzter Kampf  %s %% zum Ø davor")):format(delta))
     end
 end
 
@@ -84,9 +90,9 @@ local function render()
     latestDps, meanDps = history[1] and history[1].dps, mean
     local value = formatDps(mean)
     if count < #history then
-        average:SetText(("Ø %s DPS  |cffbaa894· %d/%d mit DPS|r"):format(value, count, #history))
+        average:SetText((suite.L("Ø %s DPS  |cffbaa894· %d/%d mit DPS|r")):format(value, count, #history))
     else
-        average:SetText(("Ø %s DPS  |cffbaa894· %d/%d Kämpfe|r"):format(value, count, limit))
+        average:SetText((suite.L("Ø %s DPS  |cffbaa894· %d/%d Kämpfe|r")):format(value, count, limit))
     end
     setComparison(history[1], priorSum, priorCount)
     empty:SetShown(#history == 0)
@@ -99,7 +105,7 @@ local function render()
         row.fight = fight
         row:SetShown(fight ~= nil)
         if fight then
-            row.name:SetText(fight.name)
+            row.name:SetText(fightName(fight.name))
             row.duration:SetText(formatDuration(fight.duration))
             row.dps:SetText(formatDps(fight.dps))
             row.bar:SetMinMaxValues(0, maxValue)
@@ -154,8 +160,8 @@ local function showView(view)
     if view == "profiles" then renderProfiles() end
 end
 
-local miniMetrics = { "Noch %s Mobs", "%s EP/h", "%s %% Stufe", "%s letzte DPS", "Ø %s DPS", "%s" }
-local farmLabels = { idle = "Start", active = "Pause", paused = "Weiter" }
+local miniMetrics = { suite.L("Noch %s Mobs"), suite.L("%s EP/h"), suite.L("%s %% Stufe"), suite.L("%s letzte DPS"), suite.L("Ø %s DPS"), "%s" }
+local farmLabels = { idle = suite.L("Start"), active = suite.L("Pause"), paused = suite.L("Weiter") }
 
 function addon.RefreshMini()
     if not miniButtons or not miniWindow:IsShown() then
@@ -172,7 +178,7 @@ function addon.RefreshMini()
         if metric == 6 then
             text = value
         elseif metric == 3 and value then
-            text = ("%.1f"):format(value):gsub("%.", ",")
+            text = suite.LocalizeDecimal(("%.1f"):format(value))
         else
             text = formatDps(value)
         end
@@ -199,10 +205,10 @@ local function createLogbook()
     compactButton = style.TextButton(titleBar)
     compactButton:SetPoint("RIGHT", -4, 0)
     compactButton:SetSize(65, 22)
-    compactButton:SetText("Kompakt")
+    compactButton:SetText(suite.L("Kompakt"))
     compactButton:SetScript("OnClick", toggleMiniWindow)
     local previous = compactButton
-    for _, definition in ipairs({ { "xp", "EP", 29 }, { "crits", "Crits", 39 }, { "dps", "DPS", 35 } }) do
+    for _, definition in ipairs({ { "xp", suite.L("EP"), 29 }, { "crits", suite.L("Crits"), 39 }, { "dps", "DPS", 35 } }) do
         local name, titleText, tabWidth = unpack(definition)
         local panel = CreateFrame("Frame", nil, page)
         panel:SetAllPoints()
@@ -228,21 +234,21 @@ local function createLogbook()
     local profilesButton = style.TextButton(timeline)
     profilesButton:SetPoint("TOPRIGHT", -12, -32)
     profilesButton:SetSize(60, 20)
-    profilesButton:SetText("Profile")
+    profilesButton:SetText(suite.L("Profile"))
     profilesButton:SetScript("OnClick", function() showView("profiles") end)
     PaulchenQoLTimelineDB.view = PaulchenQoLTimelineDB.view or (PaulchenQoLTimelineDB.showCrits and "crits" or "dps")
 
     average = label(timeline, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34)
     comparison = label(timeline, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -54)
     local fightHeading = label(timeline, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 29, -76)
-    fightHeading:SetText("KAMPF · NEUESTE ZUERST")
+    fightHeading:SetText(suite.L("KAMPF · NEUESTE ZUERST"))
     local timeHeading = label(timeline, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -83, -76)
-    timeHeading:SetText("DAUER")
+    timeHeading:SetText(suite.L("DAUER"))
     local dpsHeading = label(timeline, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -11, -76)
     dpsHeading:SetText("DPS")
 
     empty = label(timeline, "GameFontHighlight", "TOP", "TOP", 0, -137)
-    empty:SetText("Warte auf abgeschlossene Kämpfe …")
+    empty:SetText(suite.L("Warte auf abgeschlossene Kämpfe …"))
 
     rows = {}
     for index = 1, limit do
@@ -288,15 +294,15 @@ local function createLogbook()
                 return
             end
             GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-            GameTooltip:SetText(fight.name, unpack(style.gold))
-            GameTooltip:AddDoubleLine("Deine DPS", formatDps(fight.dps), 1, 1, 1)
-            GameTooltip:AddDoubleLine("Dein Schaden", formatDps(fight.damage), 1, 1, 1)
-            GameTooltip:AddDoubleLine("Dauer", formatDuration(fight.duration), 1, 1, 1)
+            GameTooltip:SetText(fightName(fight.name), unpack(style.gold))
+            GameTooltip:AddDoubleLine(suite.L("Deine DPS"), formatDps(fight.dps), 1, 1, 1)
+            GameTooltip:AddDoubleLine(suite.L("Dein Schaden"), formatDps(fight.damage), 1, 1, 1)
+            GameTooltip:AddDoubleLine(suite.L("Dauer"), formatDuration(fight.duration), 1, 1, 1)
             if fight.endTime then
-                GameTooltip:AddDoubleLine("Kampfende", fight.endTime, 1, 1, 1)
+                GameTooltip:AddDoubleLine(suite.L("Kampfende"), fight.endTime, 1, 1, 1)
             end
             if not fight.dps then
-                GameTooltip:AddLine("Für dich liegen hier keine auswertbaren DPS vor.", 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine(suite.L("Für dich liegen hier keine auswertbaren DPS vor."), 0.8, 0.8, 0.8, true)
             end
             GameTooltip:Show()
         end)
@@ -371,7 +377,7 @@ local function createMiniWindow()
         end)
         button:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:SetText("Klick wechselt die Kennzahl", 1, 1, 1)
+            GameTooltip:SetText(suite.L("Klick wechselt die Kennzahl"), 1, 1, 1)
             GameTooltip:Show()
         end)
         button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -395,8 +401,8 @@ local function createMiniWindow()
         button:SetScript("OnLeave", function() GameTooltip:Hide() end)
         return button
     end
-    farmToggle = miniFarmButton("Start", "Farmrunde starten, pausieren oder fortsetzen", 208, 45, addon.FarmControls.Toggle)
-    farmStop = miniFarmButton("■", "Farmrunde beenden und speichern", 254, 17, addon.FarmControls.Stop)
+    farmToggle = miniFarmButton(suite.L("Start"), suite.L("Farmrunde starten, pausieren oder fortsetzen"), 208, 45, addon.FarmControls.Toggle)
+    farmStop = miniFarmButton("■", suite.L("Farmrunde beenden und speichern"), 254, 17, addon.FarmControls.Stop)
 
     local db = PaulchenQoLTimelineDB
     if db.miniShown == nil then db.miniShown = db.mini == true and db.hidden ~= true end
@@ -441,9 +447,9 @@ local function createMinimapButton(broker, icons)
         end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine(suite.logbookName, unpack(style.gold))
-            tooltip:AddLine("Linksklick · Logbuch-Reiter öffnen oder schließen", 1, 1, 1)
-            tooltip:AddLine("Rechtsklick · Kompaktansicht umschalten", 1, 1, 1)
-            tooltip:AddLine("Ziehen · Position ändern", 0.7, 0.7, 0.7)
+            tooltip:AddLine(suite.L("Linksklick · Logbuch-Reiter öffnen oder schließen"), 1, 1, 1)
+            tooltip:AddLine(suite.L("Rechtsklick · Kompaktansicht umschalten"), 1, 1, 1)
+            tooltip:AddLine(suite.L("Ziehen · Position ändern"), 0.7, 0.7, 0.7)
         end,
     })
     icons:Register(addonName, launcher, db.minimap)

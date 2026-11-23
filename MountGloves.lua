@@ -78,7 +78,7 @@ end
 local function equip(item, riding)
     local request = { item = item, riding = riding, before = readable(GetInventoryItemLink("player", hands)) }
     pending = request
-    app.SecureCall("Reithandschuhe anlegen", C_Item.EquipItemByName, item, hands)
+    app.SecureCall(app.L("Reithandschuhe anlegen"), C_Item.EquipItemByName, item, hands)
     C_Timer.After(1.5, function()
         if pending ~= request then return end
         pending = nil
@@ -89,11 +89,11 @@ local function equip(item, riding)
         end
         if riding then
             if mounted() and canChangeGear() and wornGloves() ~= ridingGloves then
-                tell("Die Handschuhe der Vorhut konnten nicht angelegt werden.")
+                tell(app.L("Die Handschuhe der Vorhut konnten nicht angelegt werden."))
             end
         elseif canChangeGear() and wornGloves() == ridingGloves then
             restoreFailed = true
-            tell("Deine bisherigen Handschuhe konnten nicht angelegt werden. Lege " .. item .. " aus der Tasche an.")
+            tell(app.L("Deine bisherigen Handschuhe konnten nicht angelegt werden. Lege ") .. item .. app.L(" aus der Tasche an."))
         end
         app.RefreshMountGloves()
     end)
@@ -137,7 +137,7 @@ local function update()
                     equip(original, false)
                 elseif not missingReported then
                     missingReported = true
-                    tell("Die bisherigen Handschuhe fehlen in deinen Taschen.")
+                    tell(app.L("Die bisherigen Handschuhe fehlen in deinen Taschen."))
                 end
             end
             return
@@ -159,7 +159,7 @@ function app.RefreshMountGloves()
     queued = true
     C_Timer.After(0, function()
         queued = false
-        app.SecureCall("Reithandschuhe", update)
+        app.SecureCall(app.L("Reithandschuhe"), update)
     end)
 end
 

@@ -16,6 +16,7 @@ function GetLocale() return "deDE" end
 -- No TableBuilderCellMixin / CreateFromMixins: addon may load before them.
 ''')
 load=lua.eval('function(s) assert(loadstring(s))("PaulchenQoL",suite) end')
+load((root/'Localization.lua').read_text(encoding='utf-8'))
 load((root/'Modules/Upgrades/AuctionFilter.lua').read_text(encoding='utf-8'))
 lua.execute('''
 local mixin=assert(PaulchenQoLAuctionValueCellMixin)
