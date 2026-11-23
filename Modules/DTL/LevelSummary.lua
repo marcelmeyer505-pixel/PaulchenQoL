@@ -33,7 +33,7 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
         local delta = entry and entry.comparisonPercent
         if not delta then return end
         local text = math.abs(delta) < 0.05 and "0,0" or ("%+.1f"):format(delta):gsub("%.", ",")
-        return ("Stufe %d · %s %% EP/h gegenüber Stufe %d"):format(entry.level, text, entry.comparisonLevel)
+        return (suite.L("Stufe %d · %s %% EP/h gegenüber Stufe %d")):format(entry.level, text, entry.comparisonLevel)
     end
 
     for index, entry in ipairs(data.history) do
@@ -56,12 +56,12 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
     label(panel, "GameFontNormalLarge", "TOPLEFT", "TOPLEFT", 12, -34):SetText("Stufenbilanz")
     local activeText = label(panel, "GameFontHighlightSmall", "TOPLEFT", "TOPLEFT", 12, -61)
     local comparisonLabel = label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -80)
-    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -101):SetText("STUFE")
+    label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -101):SetText(suite.L("STUFE"))
     label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -231, -101):SetText("DAUER")
     label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -130, -101):SetText("EP/H")
-    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -101):SetText("TOP-QUELLE")
+    label(panel, "GameFontDisableSmall", "TOPRIGHT", "TOPRIGHT", -12, -101):SetText(suite.L("TOP-QUELLE"))
     local empty = label(panel, "GameFontDisableSmall", "TOPLEFT", "TOPLEFT", 12, -130)
-    empty:SetText("Die Bilanz füllt sich bei deinen nächsten Stufenaufstiegen.")
+    empty:SetText(suite.L("Die Bilanz füllt sich bei deinen nächsten Stufenaufstiegen."))
 
     local rows = {}
     for index = 1, limit do
@@ -81,13 +81,13 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
                 return
             end
             GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-            GameTooltip:SetText(("Stufe %d · %s EP"):format(entry.level, numberText(entry.xp)), 1, 0.82, 0)
+            GameTooltip:SetText((suite.L("Stufe %d · %s EP")):format(entry.level, numberText(entry.xp)), 1, 0.82, 0)
             for _, source in ipairs(sourceList) do
                 local amount = entry.sources[source[1]] or 0
                 GameTooltip:AddDoubleLine(source[2], numberText(amount) .. " EP", source[3], source[4], source[5], 1, 1, 1)
             end
             if entry.partial then
-                GameTooltip:AddLine("Zeit und EP für den aufgezeichneten Teil der Stufe.", 0.7, 0.75, 0.82, true)
+                GameTooltip:AddLine(suite.L("Zeit und EP für den aufgezeichneten Teil der Stufe."), 0.7, 0.75, 0.82, true)
             end
             local comparison = comparisonText(entry)
             if comparison then GameTooltip:AddLine(comparison, 0.7, 0.75, 0.82, true) end
@@ -101,7 +101,7 @@ function addon.CreateLevelPanel(panel, label, sourceList, numberText, durationTe
         local active = data.active
         if active then
             local seconds = elapsed(active)
-            activeText:SetText(("Stufe %d%s läuft · %s · %s EP/h"):format(active.level, active.partial and " *" or "", durationText(seconds), rate(active, seconds)))
+            activeText:SetText((suite.L("Stufe %d%s läuft · %s · %s EP/h")):format(active.level, active.partial and " *" or "", durationText(seconds), rate(active, seconds)))
         else
             activeText:SetText("")
         end
