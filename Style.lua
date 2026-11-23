@@ -17,8 +17,8 @@ local style = {
     rowColors = { { 0.105, 0.082, 0.068 }, { 0.132, 0.101, 0.080 } },
 }
 app.style = style
-app.logbookName = "Paulchens Logbuch"
-app.logbookLabel = "Logbuch"
+app.logbookName = app.L("Paulchens Logbuch")
+app.logbookLabel = app.L("Logbuch")
 
 function style.Panel(frame, color, edge)
     frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
