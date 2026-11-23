@@ -1100,15 +1100,15 @@ local function transferMessage(text)
     end
 end
 local function showTransferProgress(state)
-    transferMessage(("%s … %d / %d Stück"):format(state.action, state.moved, state.total))
+    transferMessage((app.L("%s … %d / %d Stück")):format(state.action, state.moved, state.total))
 end
 local function finishTransfer(state, reason)
     if transfer ~= state then return end
     transfer = nil
     local remaining = state.total - state.moved
-    local text = ("%d Stück %s"):format(state.moved, state.fromBank and "ausgelagert" or "eingelagert")
+    local text = (app.L("%d Stück %s")):format(state.moved, state.fromBank and app.L("ausgelagert") or app.L("eingelagert"))
     if remaining > 0 then
-        text = text .. (" · %d übrig %s"):format(remaining, state.fromBank and "in der Bank" or "in den Taschen")
+        text = text .. (app.L(" · %d übrig %s")):format(remaining, state.fromBank and app.L("in der Bank") or app.L("in den Taschen"))
     end
     if reason then text = text .. " · " .. reason end
     bank.transferMessage = text
