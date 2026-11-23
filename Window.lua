@@ -7,10 +7,10 @@ local cream, muted = style.cream, style.muted
 local gold, green, orange = style.gold, style.green, style.orange
 local parchment, ink = { 0.94, 0.84, 0.68 }, { 0.20, 0.11, 0.07 }
 local pageTabs = {
-    { "travel", app.L("Übersicht"), 137, 94, 7, 47, app.L("Reise") },
+    { "travel", app.L(app.L("Übersicht")), 137, 94, 7, 47, app.L(app.L("Reise")) },
     { "logbook", app.logbookLabel, 235, 62, 57, 58 },
     { "upgrades", "Upgrades", 301, 65, 118, 61 },
-    { "buffs", app.L("Buffs"), 370, 65, 183, 51 },
+    { "buffs", app.L(app.L("Buffs")), 370, 65, 183, 51 },
 }
 local settingsWidth = 88
 local db, dashboard, travelPage, travel
@@ -52,7 +52,7 @@ local function readTravel()
 end
 
 local function hearthText(info)
-    if not info.hasHearth then return app.L("Fehlt in den Taschen"), muted end
+    if not info.hasHearth then return app.L(app.L("Fehlt in den Taschen")), muted end
     local seconds = math.max(0, math.ceil((info.readyAt or 0) - GetTime()))
     if seconds == 0 then return "Bereit", green end
     return ("%d:%02d min"):format(math.floor(seconds / 60), seconds % 60), gold
@@ -75,14 +75,14 @@ local function paintTravel()
     elseif merchant then
         local _, count, total = app.FindItems(items, db.marks, "vendor", "")
         if count > 0 then
-            speech = (app.L("Beim Händler sind %d Stück vorgemerkt. Das gibt ungefähr %s.")):format(count, coinText(total))
+            speech = (app.L(app.L("Beim Händler sind %d Stück vorgemerkt. Das gibt ungefähr %s."))):format(count, coinText(total))
         else
-            speech = app.L("Du bist beim Händler. Deine Vormerkungen findest du in Paulchens Taschen.")
+            speech = app.L(app.L("Du bist beim Händler. Deine Vormerkungen findest du in Paulchens Taschen."))
         end
     elseif warning then
         speech = warning
         if cheapest then
-            speech = (app.L("Taschen voll. Günstigster Stapel: %d × %s (%s beim Händler)."))
+            speech = (app.L(app.L("Taschen voll. Günstigster Stapel: %d × %s (%s beim Händler).")))
                 :format(cheapest.count, cheapest.item.name, coinText(cheapest.value))
         end
     end
@@ -107,7 +107,7 @@ local function paintTravel()
         elseif key == "auction" then
             local amount = 0
             for _, item in ipairs(marked) do amount = amount + item.count end
-            travelPage[key].detail:SetText(amount .. app.L(" Stück vorgemerkt"))
+            travelPage[key].detail:SetText(amount .. app.L(app.L(" Stück vorgemerkt")))
         end
     end
     if app.overview then app.overview.Render() end
@@ -120,11 +120,11 @@ local function paintStatus()
     if destination then
         app.SetCompanionStatus("Flug · " .. destination, flightTime)
     elseif cheapest then
-        app.SetCompanionStatus(app.L("Günstigster Stapel: ") .. cheapest.item.name,
-            app.L("Händlerwert · ") .. coinText(cheapest.value))
+        app.SetCompanionStatus(app.L(app.L("Günstigster Stapel: ")) .. cheapest.item.name,
+            app.L(app.L("Händlerwert · ")) .. coinText(cheapest.value))
     elseif merchant and db then
         local marked = app.FindItems(items, db.marks, "vendor", "")
-        app.SetCompanionStatus(#marked > 0 and app.L("Der Händler ist da. Deine Vormerkungen warten.") or nil)
+        app.SetCompanionStatus(#marked > 0 and app.L(app.L("Der Händler ist da. Deine Vormerkungen warten.")) or nil)
     else
         app.SetCompanionStatus()
     end
@@ -243,22 +243,22 @@ local function createTravelPage(parent)
     f.avatar = portrait(bird, 82, 0, 0)
     bird:SetScript("OnClick", app.TestComment)
     f.speech, f.speechFrame = speaker(f, 111, -10, 551, 64)
-    f.bags = travelCard(f, 18, app.L("Taschenplätze"), app.L("Allgemeine Taschen"), -87)
-    f.durability = travelCard(f, 236, "Haltbarkeit", app.L("Niedrigster Ausrüstungswert"), -87)
+    f.bags = travelCard(f, 18, app.L(app.L("Taschenplätze")), app.L(app.L("Allgemeine Taschen")), -87)
+    f.durability = travelCard(f, 236, "Haltbarkeit", app.L(app.L("Niedrigster Ausrüstungswert")), -87)
     f.hearth = travelCard(f, 454, "Ruhestein", "Heimatort", -87)
     if app.CreateOverviewPanel then f.overview = app.CreateOverviewPanel(f) end
 
     label(f, "Vormerkungen", 18, -556, 350, 27, "GameFontNormalLarge", gold)
-    local openBags = button(f, app.L("Taschen öffnen"), 502, -556, 160, 27)
+    local openBags = button(f, app.L(app.L("Taschen öffnen")), 502, -556, 160, 27)
     openBags:SetScript("OnClick", function()
         app.CloseDashboard()
         if app.inventory and app.inventory.Show then app.inventory.Show()
         elseif ToggleAllBags then ToggleAllBags() end
     end)
     f.openBags = openBags
-    f.keep = travelCard(f, 18, app.L("Behalten"), "inkl. der Ausrüstungssets", -591)
-    f.auction = travelCard(f, 236, app.L("Auktionshaus"), app.L("Vorgemerkte Gegenstände"), -591)
-    f.vendor = travelCard(f, 454, app.L("Händler"), app.L("Vorgemerkter Verkaufswert"), -591)
+    f.keep = travelCard(f, 18, app.L(app.L("Behalten")), "inkl. der Ausrüstungssets", -591)
+    f.auction = travelCard(f, 236, app.L(app.L("Auktionshaus")), app.L(app.L("Vorgemerkte Gegenstände")), -591)
+    f.vendor = travelCard(f, 454, app.L(app.L("Händler")), app.L(app.L("Vorgemerkter Verkaufswert")), -591)
     label(f, "Vormerken: Rechtsklick auf eine Gegenstandszeile in Paulchens Taschen.",
         18, -669, 644, 22, "GameFontHighlightSmall", muted)
 
@@ -273,7 +273,7 @@ local function createTravelPage(parent)
         if app.overview then app.overview.Render() end
     end)
     f:SetScript("OnShow", function()
-        app.SecureCall(app.L("Reiseübersicht"), refresh)
+        app.SecureCall(app.L(app.L("Reiseübersicht")), refresh)
     end)
     return f
 end
@@ -310,7 +310,7 @@ local function layoutHeader(f, compact, titleHeight)
     local optionWidth = compact and 66 or settingsWidth
     f.settings:SetWidth(optionWidth)
     f.settings.text:SetWidth(optionWidth - 8)
-    f.settings.text:SetText(compact and "Optionen" or app.L("Einstellungen"))
+    f.settings.text:SetText(compact and "Optionen" or app.L(app.L("Einstellungen")))
 end
 
 function app.LayoutDashboard()
@@ -342,18 +342,18 @@ local function selectPage(f, key)
             page = createTravelPage(f.body)
         elseif key == "logbook" then
             page = app.timeline and app.timeline.GetPage and app.timeline.GetPage(f.body)
-                or unavailablePage(f.body, app.L("Öffne das installierte Logbuch mit /dtl."))
+                or unavailablePage(f.body, app.L(app.L("Öffne das installierte Logbuch mit /dtl.")))
         elseif key == "upgrades" then
             if app.upgrades and app.upgrades.GetPage then
                 page = app.upgrades.GetPage(f.body)
             else
-                local message = SlashCmdList.PAULCHENUPGRADES and app.L("Öffne das installierte Upgrade-Fenster mit /pu.")
-                    or app.L("Die Ausrüstungsbewertung konnte nicht geladen werden.")
+                local message = SlashCmdList.PAULCHENUPGRADES and app.L(app.L("Öffne das installierte Upgrade-Fenster mit /pu."))
+                    or app.L(app.L("Die Ausrüstungsbewertung konnte nicht geladen werden."))
                 page = unavailablePage(f.body, message)
             end
         elseif key == "buffs" then
             page = app.buffCheck and app.buffCheck.GetPage(f.body)
-                or unavailablePage(f.body,app.L("Buffwächter nicht verfügbar."))
+                or unavailablePage(f.body,app.L(app.L("Buffwächter nicht verfügbar.")))
         end
         page:SetPoint("TOP", f.body, "TOP")
         f.pages[key] = page
@@ -410,7 +410,7 @@ local function createDashboard()
         f.pageTabs[key] = tab
     end
 
-    local settings = button(header, app.L("Einstellungen"), 0, -7, settingsWidth, 25)
+    local settings = button(header, app.L(app.L("Einstellungen")), 0, -7, settingsWidth, 25)
     settings:ClearAllPoints()
     settings:SetPoint("RIGHT", header, "RIGHT", -40, 0)
     settings:SetScript("OnClick", app.OpenConfig)
@@ -419,7 +419,7 @@ local function createDashboard()
     companionCheck:SetPoint("RIGHT", settings, "LEFT", -76, 0)
     companionCheck:SetSize(24, 24)
     companionCheck:SetChecked(app.Profile().show)
-    label(companionCheck, app.L("Begleiter"), 26, 0, 65, 24, "GameFontHighlightSmall", cream)
+    label(companionCheck, app.L(app.L("Begleiter")), 26, 0, 65, 24, "GameFontHighlightSmall", cream)
     companionCheck:SetScript("OnClick", function(self)
         app.SetProfile("show", not not self:GetChecked())
     end)
@@ -509,11 +509,11 @@ local function createMinimap()
         end
         if travel then
             local hearth = hearthText(travel)
-            GameTooltip:AddLine("Taschen · " .. travel.free .. app.L(" freie Plätze"), unpack(cream))
+            GameTooltip:AddLine("Taschen · " .. travel.free .. app.L(app.L(" freie Plätze")), unpack(cream))
             if travel.durability then GameTooltip:AddLine("Haltbarkeit · " .. math.floor(travel.durability) .. " %", unpack(cream)) end
             GameTooltip:AddLine("Ruhestein · " .. hearth, unpack(cream))
         end
-        GameTooltip:AddLine(app.L("Linksklick · Paulchen öffnen  |  Rechtsklick · Schnellzugriff"), unpack(muted))
+        GameTooltip:AddLine(app.L(app.L("Linksklick · Paulchen öffnen  |  Rechtsklick · Schnellzugriff")), unpack(muted))
         GameTooltip:AddLine("Ziehen · Verschieben", unpack(muted))
         GameTooltip:Show()
     end)
@@ -549,6 +549,6 @@ events:SetScript("OnEvent", function(_, event, id, success)
     refreshQueued = true
     C_Timer.After(0.1, function()
         refreshQueued = false
-        app.SecureCall(app.L("Reiseübersicht"), refresh)
+        app.SecureCall(app.L(app.L("Reiseübersicht")), refresh)
     end)
 end)
