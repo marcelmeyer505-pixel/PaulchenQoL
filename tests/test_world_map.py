@@ -213,7 +213,7 @@ C_QuestLog = {
 load = lua.eval('function(code, name) assert(loadstring(code, "@" .. name))("PaulchenQoL", app) end')
 for path in ("Localization.lua", "Core.lua", "Style.lua", "Config.lua", "QuestMap.lua", "Modules/Comfort/Window.lua",
              "Modules/WorldMap/ExplorationData.lua", "Modules/WorldMap/Landmarks.lua", "Modules/WorldMap/Travel.lua",
-             "Modules/WorldMap/Pins.lua", "Modules/WorldMap/Window.lua"):
+             "Modules/WorldMap/Dungeons.lua", "Modules/WorldMap/Pins.lua", "Modules/WorldMap/Window.lua"):
     load((root / path).read_text(encoding="utf-8-sig"), path)
 
 binding = ElementTree.parse(root / "Bindings.xml").getroot().find("./Binding[@name='PAULCHENQOLPLAYERMAP']")
@@ -303,3 +303,125 @@ comfort.SetEnabled("mapLearnCrossings", false)
 assert(sample == nil and count(1413, "cross") == 0)
 ''')
 print("World map options, navigation, exploration, travel markers, and crossing tracking passed.")
+
+lua.execute(r'''
+local map, world, comfort = WorldMapFrame, app.worldMap, app.comfort
+local journalName = "Wailing Caverns"
+local selections = {}
+local journalFrame = CreateFrame("Frame")
+journalFrame:Hide()
+ForeverDungeonJournalFrame = journalFrame
+ForeverDungeonJournal_NS = {
+    DB = { [journalName] = {
+        quests = { {id = 10} }, bosses = { {name = "Boss"} },
+        entrance = { mapID = 1413, x = .46, y = .36 },
+    } },
+    ORDER = { journalName },
+    DUNGEON_MAPS = { [journalName] = {} },
+    INSTANCE_ID_TO_DUNGEON = { [43] = journalName },
+    LocalizeDungeonName = function() return "Höhlen des Wehklagens" end,
+    OpenDungeonMap = function(name)
+        assert(journalFrame:IsShown() and name == journalName)
+        selections[#selections + 1] = "map"
+    end,
+    OpenQuestPage = function(name, id)
+        assert(journalFrame:IsShown() and name == journalName and id == nil)
+        selections[#selections + 1] = "quests"
+    end,
+    OpenBossPage = function(name, index)
+        assert(journalFrame:IsShown() and name == journalName and index == 1)
+        selections[#selections + 1] = "boss"
+    end,
+}
+local entrances = {
+    wailingcaverns = { map = 1413, x = .4599, y = .3627 },
+    testnorth = { map = 1413, x = .6, y = .66 },
+    testsouth = { map = 1413, x = .615, y = .655 },
+}
+ForeverDungeonRoutes = {
+    Dungeons = {
+        {key = "wailingcaverns", instanceID = 43, name = journalName},
+        {key = "testnorth", instanceID = 5001, name = "North"},
+        {key = "testsouth", instanceID = 5001, name = "South"},
+    },
+    GetEntrance = function(_, key) return entrances[key] end,
+    Window = {Open = function(_, key) selections[#selections + 1] = key end},
+}
+UiMapPoint = {CreateFromCoordinates = function(mapID, x, y) return {mapID, x, y} end}
+C_Map.CanSetUserWaypointOnMap = function(id) return id == 1413 end
+C_Map.SetUserWaypoint = function(point) selectedWaypoint = point end
+C_SuperTrack = {SetSuperTrackedUserWaypoint = function(active) trackingWaypoint = active end}
+C_EncounterJournal = {
+    GetDungeonEntrancesForMap = function(id)
+        if id == 1413 then return { {
+            name = "Native", position = {x = .460, y = .363}, journalInstanceID = 107,
+        } } end
+    end,
+}
+function EJ_GetInstanceInfo(id)
+    assert(id == 107)
+    return "Native Title", nil, nil, nil, nil, nil, 0, nil, nil, 43
+end
+local enumerate = map.EnumeratePinsByTemplate
+function map:EnumeratePinsByTemplate(template)
+    if self.id == 1413 and template == "DungeonEntrancePinTemplate" then
+        local returned
+        return function()
+            if returned then return end
+            returned = true
+            return {
+                IsShown = function() return true end, GetPosition = function() return .46, .363 end,
+                GetFrameLevel = function() return 35 end,
+            }
+        end
+    end
+    return enumerate(self, template)
+end
+map:Show()
+map:SetMapID(1413)
+flush()
+local provider = map.providers[#map.providers]
+local function findPin(predicate)
+    for index = 1, provider.used do
+        local pin = provider.pins[index]
+        if predicate(pin.point) then return pin end
+    end
+    error("Dungeon entrance marker was not rendered")
+end
+local single = findPin(function(point) return point.dungeon and point.dungeon.route == "wailingcaverns" end)
+assert(single.point.x == .46 and single.point.dungeon.journal == journalName)
+single.scripts.OnClick(single, "LeftButton")
+assert(selections[#selections] == "map")
+single.scripts.OnClick(single, "RightButton")
+local options = menu.children
+combat = true
+options["Instanzquests öffnen"].callback()
+assert(#selections == 1)
+combat = false
+options["Instanzquests öffnen"].callback()
+assert(selections[#selections] == "quests")
+options["Bosse und Beute öffnen"].callback()
+assert(selections[#selections] == "boss")
+options["In Forever DungeonRoutes öffnen"].callback()
+assert(selections[#selections] == "wailingcaverns")
+options["Wegpunkt zum Eingang setzen"].callback()
+assert(selectedWaypoint[1] == 1413 and selectedWaypoint[2] == .46 and trackingWaypoint)
+local group = findPin(function(point) return point.dungeons and #point.dungeons == 2 end)
+group.scripts.OnClick(group, "LeftButton")
+menu.children.South.children["In Forever DungeonRoutes öffnen"].callback()
+assert(selections[#selections] == "testsouth", "A shared entrance menu must open the selected wing")
+ForeverDungeonJournal_NS.IsDungeonMapLocked = function() return true end
+single.scripts.OnClick(single, "LeftButton")
+assert(selections[#selections] == "wailingcaverns", "Routes can supply the preview if Journal cannot")
+ForeverDungeonJournal_NS, ForeverDungeonJournalFrame = nil, nil
+world.Refresh()
+flush()
+single = findPin(function(point) return point.dungeon and point.dungeon.route == "wailingcaverns" end)
+assert(single.point.dungeon.journal == nil)
+single.scripts.OnClick(single, "LeftButton")
+assert(selections[#selections] == "wailingcaverns")
+comfort.SetEnabled("mapDungeons", false)
+flush()
+for index = 1, provider.used do assert(provider.pins[index].point.kind ~= "dungeon") end
+''')
+print("Dungeon entrance links, Journal map and quests, Routes fallback and shared entrances passed.")

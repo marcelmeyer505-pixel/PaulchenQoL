@@ -475,8 +475,8 @@ events:SetScript("OnEvent", function(_, event, name)
         end
         attach()
     elseif event == "ADDON_LOADED" then
-        if name ~= "Blizzard_BattlefieldMap" then return end
-        attachBattlefield()
+        if name == "Blizzard_BattlefieldMap" then attachBattlefield()
+        elseif name ~= "ForeverDungeonJournal" and name ~= "ForeverDungeonRoutes" then return end
     end
     world.Refresh()
 end)

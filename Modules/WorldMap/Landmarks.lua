@@ -15,10 +15,10 @@ app.mapRoadLandmarks = {
     [1452] = { { 0.2791, 0.3449, 1448 } },
 }
 app.mapDungeonLandmarks = {
-    [1413] = { { 0.4599, 0.3627, "Höhlen des Wehklagens" } },
-    [1418] = { { 0.4423, 0.1221, "Uldaman" } },
-    [1422] = { { 0.6968, 0.7341, "Scholomance" } },
-    [1435] = { { 0.7000, 0.5291, "Tempel von Atal’Hakkar" } },
-    [1443] = { { 0.2925, 0.6253, "Maraudon" } },
-    [1445] = { { 0.5230, 0.7614, "Onyxias Hort" } },
+    [1413] = { { 0.4599, 0.3627, "Höhlen des Wehklagens", "Wailing Caverns" } },
+    [1418] = { { 0.4423, 0.1221, "Uldaman", "Uldaman" } },
+    [1422] = { { 0.6968, 0.7341, "Scholomance", "Scholomance" } },
+    [1435] = { { 0.7000, 0.5291, "Tempel von Atal’Hakkar", "Sunken Temple" } },
+    [1443] = { { 0.2925, 0.6253, "Maraudon", "Maraudon" } },
+    [1445] = { { 0.5230, 0.7614, "Onyxias Hort", "Onyxia's Lair" } },
 }

@@ -148,7 +148,6 @@ function world.Collect(id)
     local showCross = options.Enabled("mapCrossings")
     local showTransport = options.Enabled("mapTransport")
     local showHealer = options.Enabled("mapSpiritHealers")
-    local showDungeon = options.Enabled("mapDungeons")
     local savedCrossings = app.Settings().mapCrossings
     local crossings = options.Enabled("mapLearnCrossings") and type(savedCrossings) == "table" and savedCrossings
     local sources = collectSources(id)
@@ -236,22 +235,8 @@ function world.Collect(id)
                 end
             end
         end
-        if showDungeon then
-            local entrances = list(C_EncounterJournal and C_EncounterJournal.GetDungeonEntrancesForMap, source)
-            for _, raw in ipairs(entrances) do
-                local dungeon = plain(raw)
-                if dungeon then
-                    local name, x, y = nameAndPosition(dungeon)
-                    add("dungeon", source, x, y, name, nil, plain(dungeon.description), plain(dungeon.atlasName))
-                end
-            end
-            if #entrances == 0 then
-                for _, entry in ipairs(app.mapDungeonLandmarks[source] or {}) do
-                    add("dungeon", source, entry[1], entry[2], app.L(entry[3]))
-                end
-            end
-        end
     end
+    if options.Enabled("mapDungeons") then world.CollectDungeons(id, sources, points) end
     return points
 end
 

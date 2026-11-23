@@ -6,7 +6,7 @@
 ## LoadSavedVariablesFirst: 1
 ## SavedVariables: PaulchenQoLSettings, PaulchenQoLAuctionDB
 ## SavedVariablesPerCharacter: PaulchenQoLDB, PaulchenQoLTimelineDB, PaulchenQoLUpgradesDB
-## OptionalDeps: Details, Polestar, AtlasLootClassic, ForeverDungeonJournal, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan, Bagnon, BagBrother, TradeSkillMaster
+## OptionalDeps: Details, Polestar, AtlasLootClassic, ForeverDungeonJournal, ForeverDungeonRoutes, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan, Bagnon, BagBrother, TradeSkillMaster
 ## IconTexture: Interface\AddOns\PaulchenQoL\Textures\paulchen_idle.tga
 
 Localization.lua
@@ -35,6 +35,7 @@ Modules\Comfort\Quests.lua
 Modules\WorldMap\ExplorationData.lua
 Modules\WorldMap\Landmarks.lua
 Modules\WorldMap\Travel.lua
+Modules\WorldMap\Dungeons.lua
 Modules\WorldMap\Pins.lua
 Modules\WorldMap\Window.lua
 Overview.lua

@@ -64,8 +64,10 @@ local function createPin(canvas, map)
     pin.icon = pin:CreateTexture(nil, "ARTWORK")
     pin.icon:SetPoint("CENTER")
     pin.icon:SetSize(14, 14)
-    pin:SetScript("OnClick", function(self)
-        if self.point then navigate(map, self.point.target) end
+    pin:SetScript("OnClick", function(self, button)
+        local point = self.point
+        if point and point.dungeons then world.DungeonClick(self, point.dungeons, button)
+        elseif point and button == "RightButton" then navigate(map, point.target) end
     end)
     pin:SetScript("OnEnter", function(self)
         local point = self.point
@@ -74,7 +76,15 @@ local function createPin(canvas, map)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(point.name or L(kind[1]), kind[3], kind[4], kind[5])
         if point.name then GameTooltip:AddLine(L(kind[1]), unpack(style.muted)) end
-        if point.note and point.note ~= "" then GameTooltip:AddLine(point.note, unpack(style.cream)) end
+        if point.note and point.note ~= "" then
+            GameTooltip:AddLine(point.note, style.cream[1], style.cream[2], style.cream[3], true)
+        end
+        if point.dungeons then
+            if #point.dungeons > 1 then
+                for _, entry in ipairs(point.dungeons) do GameTooltip:AddLine(entry.name, unpack(style.cream)) end
+            end
+            GameTooltip:AddLine(L("Linksklick öffnet die Instanz. Rechtsklick zeigt die Optionen."), unpack(style.muted))
+        end
         if point.target then GameTooltip:AddLine(L("Rechtsklick öffnet die Zielkarte."), unpack(style.muted)) end
         GameTooltip:Show()
     end)
@@ -91,6 +101,12 @@ local function configure(pin, point)
     local choice = colors[point.kind]
     local label, width = point.label or choice[2], point.kind == "level" and 42 or 18
     pin:SetSize(width, 18)
+    local acceptsLeft = point.dungeons ~= nil
+    if acceptsLeft ~= pin.acceptsLeft then
+        if acceptsLeft then pin:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        else pin:RegisterForClicks("RightButtonUp") end
+        pin.acceptsLeft = acceptsLeft
+    end
     pin:SetBackdropBorderColor(choice[3], choice[4], choice[5], 0.96)
     pin.text:SetText(label)
     pin.text:SetTextColor(choice[3], choice[4], choice[5])
@@ -99,7 +115,7 @@ local function configure(pin, point)
     pin.icon:SetShown(not not icon)
     pin.text:SetShown(not icon)
     if icon then pin.icon:SetAtlas(atlas) end
-    if pin.SetMouseClickEnabled then pin:SetMouseClickEnabled(point.target ~= nil) end
+    if pin.SetMouseClickEnabled then pin:SetMouseClickEnabled(point.target ~= nil or point.dungeons ~= nil) end
     if pin.SetMouseMotionEnabled then pin:SetMouseMotionEnabled(true) end
 end
 
@@ -126,7 +142,9 @@ local function nativePositions(map)
         result[kind] = positions
         for pin in map:EnumeratePinsByTemplate(template) do
             local x, y = read(pin.GetPosition, pin)
-            if app.ValidMapPoint(x, y) and pin:IsShown() then positions[#positions + 1] = { x, y } end
+            if app.ValidMapPoint(x, y) and pin:IsShown() then
+                positions[#positions + 1] = { x, y, read(pin.GetFrameLevel, pin) }
+            end
         end
     end
     for _, template in ipairs({ "AreaPOIPinTemplate", "MapLinkPinTemplate" }) do
@@ -148,9 +166,43 @@ end
 
 local function hasNative(point, positions)
     for _, location in ipairs(positions[point.kind] or {}) do
-        if math.abs(point.x - location[1]) <= 0.008 and math.abs(point.y - location[2]) <= 0.008 then return true end
+        if math.abs(point.x - location[1]) <= 0.008 and math.abs(point.y - location[2]) <= 0.008 then
+            return true, location[3]
+        end
     end
     return false
+end
+
+local function groupDungeonEntrances(points, canvas)
+    local result, groups = {}, {}
+    local width, height = canvas:GetSize()
+    for _, point in ipairs(points) do
+        local entry = point.dungeon
+        local group
+        if entry then
+            for _, candidate in ipairs(groups) do
+                local dx, dy = (point.x - candidate.x) * width, (point.y - candidate.y) * height
+                if dx * dx + dy * dy <= 18 * 18 then group = candidate; break end
+            end
+        end
+        if group then
+            group.dungeons[#group.dungeons + 1] = entry
+        else
+            result[#result + 1] = point
+            if entry then
+                point.dungeons = { entry }
+                groups[#groups + 1] = point
+            end
+        end
+    end
+    for _, group in ipairs(groups) do
+        if #group.dungeons > 1 then
+            table.sort(group.dungeons, function(a, b) return a.name < b.name end)
+            group.label, group.atlas, group.note = tostring(#group.dungeons), nil, nil
+            group.name = L("Instanzeingänge")
+        end
+    end
+    return result
 end
 
 local function powerOfTwo(value)
@@ -253,11 +305,14 @@ local function draw(provider)
     explore(provider, canvas, mapID, points)
     if provider.showLevels then levelMarkers(mapID, points) end
     local used = 0
-    for _, point in ipairs(points) do
-        if not hasNative(point, native) then
+    for _, point in ipairs(groupDungeonEntrances(points, canvas)) do
+        local nativePin, nativeLevel = hasNative(point, native)
+        if not nativePin or point.dungeons then
             used = used + 1
             local pin = provider.pins[used] or createPin(canvas, map)
             provider.pins[used] = pin
+            local level = canvas:GetFrameLevel() + 18
+            pin:SetFrameLevel(nativeLevel and math.max(level, nativeLevel + 1) or level)
             configure(pin, point)
             pin:Show()
         end

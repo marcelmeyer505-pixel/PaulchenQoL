@@ -6,7 +6,7 @@ app.comfort = comfort
 local defaults = {
     sellSummary = true,
     mapCompact = true, mapMouseCoords = true, mapPlayerCoords = true, mapZoneMenu = true,
-    mapCoordsBackground = true,
+    mapCoordsBackground = true, mapDungeons = true,
     mapNoBlackout = true, mapNoFade = true, mapFlight = true, mapPortals = true, mapCrossings = true, mapLearnCrossings = true,
 }
 
@@ -83,7 +83,8 @@ local categories = {
         { "mapTransport", "Boote, Zeppeline und Bahnen anzeigen" },
         { "mapOtherFaction", "Verkehrspunkte der anderen Fraktion anzeigen" },
         { "mapSpiritHealers", "Geistheiler auf der Karte anzeigen" },
-        { "mapDungeons", "Instanz- und Raideingänge anzeigen" },
+        { "mapDungeons", "Instanz- und Raideingänge anzeigen",
+            "Öffnet Innenkarten, Quests und Routen aus den installierten Instanz-Addons." },
         { "mapZoneLevels", "Ungefähre Gebietsstufen anzeigen" },
         { "mapFishing", "Ungefähre Angelfertigkeit anzeigen" },
         { "mapReveal", "Unerforschte Karte aufdecken" },
