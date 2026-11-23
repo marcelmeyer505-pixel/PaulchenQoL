@@ -7,8 +7,8 @@
 ## OptionalDeps: Details, Polestar, AtlasLootClassic, ForeverDungeonJournal, Details_CombatTimeline, PaulchenUpgrades, PaulchenAuktionsscan, Bagnon, BagBrother, TradeSkillMaster
 ## IconTexture: Interface\AddOns\PaulchenQoL\Textures\paulchen_idle.tga
 
-Core.lua
 Localization.lua
+Core.lua
 Style.lua
 Modules.lua
 Memory.lua
