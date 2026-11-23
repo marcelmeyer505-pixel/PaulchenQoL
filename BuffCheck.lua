@@ -387,7 +387,7 @@ function buff.Report(data)
         end
         if #names>0 then
             local who = #names<=2 and table.concat(names,", ") or names[1] .. app.L(" und ") .. (#names-1) .. app.L(" weitere")
-            parts[#parts+1] = family.label .. app.L(" fehlt ") .. who
+            parts[#parts+1] = app.L(family.label) .. app.L(" fehlt ") .. who
         end
     end
     if #parts==0 then
@@ -540,15 +540,15 @@ local function tooltip(icon)
     if not member then return end
     local entry=member.buffs[family.key]
     GameTooltip:SetOwner(icon,"ANCHOR_RIGHT")
-    GameTooltip:AddLine(family.label,unpack(style.gold))
+    GameTooltip:AddLine(app.L(family.label),unpack(style.gold))
     GameTooltip:AddLine(member.name .. " · " .. stateLabels[entry.state],unpack(stateColors[entry.state]))
     if not entry.required then GameTooltip:AddLine(app.L("Nicht angefordert"),unpack(style.muted)) end
     if entry.variant~="any" then
         for _, variant in ipairs(family.variants or {}) do
-            if variant.key==entry.variant then GameTooltip:AddLine("Gewünschter Segen: " .. variant.label,unpack(style.cream)) end
+            if variant.key==entry.variant then GameTooltip:AddLine(app.L("Gewünschter Segen: ") .. app.L(variant.label),unpack(style.cream)) end
         end
     end
-    if entry.reason then GameTooltip:AddLine(entry.reason,0.72,0.72,0.72,true) end
+    if entry.reason then GameTooltip:AddLine(app.L(entry.reason),0.72,0.72,0.72,true) end
     if entry.auras then
         for _, aura in pairs(entry.auras) do GameTooltip:AddLine(aura.name,0.5,0.9,0.6) end
     end
@@ -560,9 +560,9 @@ function buff.Render()
     local maximum=math.max(0,#data.members-12)
     page.offset=math.max(0,math.min(maximum,page.offset or 0))
     page.slider:SetMinMaxValues(0,maximum);page.slider:SetValue(page.offset);page.slider:SetShown(maximum>0)
-    page.summary:SetText(("%s · %d Spieler · %d geprüft · %d Buffs fehlen · %d unbekannt")
+    page.summary:SetText(app.L("%s · %d Spieler · %d geprüft · %d Buffs fehlen · %d unbekannt")
         :format(data.mode=="RAID" and app.L("Raid") or data.mode=="PARTY" and app.L("Gruppe") or "Solo",#data.members,data.checkedCount,data.missingCount,data.unknownCount)
-        .. ((data.excluded or data.unverifiableCount>0) and " · unvollständig" or ""))
+        .. ((data.excluded or data.unverifiableCount>0) and app.L(" · unvollständig") or ""))
     page.notice:SetText(not buff.Settings().enabled and app.L("Buffwächter ausgeschaltet.") or buff.notice or app.L("Nur sicher lesbare Daten werden als fehlend bewertet."))
     for index,row in ipairs(page.rows) do
         local member=data.members[index+page.offset]
@@ -572,11 +572,11 @@ function buff.Render()
             local classColor=RAID_CLASS_COLORS and RAID_CLASS_COLORS[member.class]
             row.name:SetTextColor(classColor and classColor.r or 0.9,classColor and classColor.g or 0.86,classColor and classColor.b or 0.75)
             local missing={}
-            for _,key in ipairs(member.missing) do missing[#missing+1]=byKey[key].label end
+            for _,key in ipairs(member.missing) do missing[#missing+1]=app.L(byKey[key].label) end
             local status=#missing>0 and table.concat(missing,", ") or not member.checked and app.L("Prüfung ausgeschaltet")
                 or (#member.unknown>0 or not member.verifiable) and (member.reason or app.L("Buffstatus teilweise unbekannt"))
                 or #member.present>0 and app.L("Alles vorhanden") or app.L("Keine Buffanforderungen")
-            if #missing>0 and #member.unknown>0 then status=status .. " · weitere unbekannt" end
+            if #missing>0 and #member.unknown>0 then status=status .. app.L(" · weitere unbekannt") end
             row.status:SetText(status)
             local state=#missing>0 and buff.MISSING or (#member.unknown>0 or not member.checked or not member.verifiable) and buff.UNKNOWN or buff.PRESENT
             row.status:SetTextColor(unpack(stateColors[state]))
@@ -634,7 +634,7 @@ function buff.GetPage(parent)
     f.slider=slider
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel",function(_,delta) f.offset=f.offset-delta*3;buff.Render() end)
-    label(f,"|cff59e673Vorhanden|r · |cffff5447Fehlt|r · |cff9ea3abUnbekannt / nicht angefordert|r",18,-545,824,22)
+    label(f,app.L("|cff59e673Vorhanden|r · |cffff5447Fehlt|r · |cff9ea3abUnbekannt / nicht angefordert|r"),18,-545,824,22)
     f.notice=label(f,"",18,-572,824,32,style.muted);f.notice:SetWordWrap(true)
     f:SetScript("OnShow",function() buff.Scan() end)
     local elapsed=0
@@ -675,7 +675,7 @@ local function requirementMenu(owner)
         for _,class in ipairs(classes) do
             local branch=root:CreateButton(className(class))
             for _,family in ipairs(buff.families) do
-                local choices=branch:CreateButton(family.label)
+                local choices=branch:CreateButton(app.L(family.label))
                 for _,choice in ipairs({{"auto",app.L("Automatisch")},{"on",app.L("Pflicht")},{"off",app.L("Aus")}}) do
                     local key,value=family.key,choice[1]
                     choices:CreateRadio(choice[2],function()
@@ -689,7 +689,7 @@ local function requirementMenu(owner)
             for _,variant in ipairs(byKey.blessing.variants) do choices[#choices+1]=variant end
             for _,variant in ipairs(choices) do
                 local key=variant.key
-                blessings:CreateRadio(variant.label,function() return (buff.Settings().blessings[class] or "any")==key end,function()
+                blessings:CreateRadio(app.L(variant.label),function() return (buff.Settings().blessings[class] or "any")==key end,function()
                     buff.Settings().blessings[class]=key;buff.Request(nil,true)
                 end)
             end
@@ -701,13 +701,13 @@ function buff.OpenConfig()
         local f=CreateFrame("Frame","PaulchenBuffConfig",UIParent,"BackdropTemplate")
         options=f;f:Hide();f:SetSize(720,530);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");style.Panel(f,style.background)
         f:SetScale(math.min(1,(UIParent:GetWidth()-20)/720,(UIParent:GetHeight()-20)/530))
-        label(f,"Paulchen · Buffwächter",18,-12,650,28,style.gold,"GameFontNormalLarge")
+        label(f,app.L("Paulchen · Buffwächter"),18,-12,650,28,style.gold,"GameFontNormalLarge")
         local close=CreateFrame("Button",nil,f,"UIPanelCloseButton");close:SetPoint("TOPRIGHT");close:SetScript("OnClick",function() f:Hide() end)
         f.controls={}
         local function check(caption,x,y,get,set)
             local control=CreateFrame("CheckButton",nil,f,"UICheckButtonTemplate")
             control:SetSize(24,24);control:SetPoint("TOPLEFT",x,y)
-            label(control,caption,28,0,306,24)
+            label(control,app.L(caption),28,0,306,24)
             control:SetScript("OnClick",function(self) set(not not self:GetChecked());refreshOptions() end)
             f.controls[#f.controls+1]=function() control:SetChecked(get()) end
         end
@@ -721,12 +721,12 @@ function buff.OpenConfig()
         label(f,"Bufffamilien",378,-48,310,24,style.gold)
         for index,family in ipairs(buff.families) do
             local key=family.key
-            check(family.label .. (family.optional and " (optional)" or ""),378,-79-(index-1)*31,
+            check(app.L(family.label) .. (family.optional and app.L(" (optional)") or ""),378,-79-(index-1)*31,
                 function() return buff.Settings().families[key] end,function(value)
                     buff.Settings().families[key]=value;buff.Request(nil,true)
                 end)
         end
-        button(f,"Anforderungen pro Klasse",378,-281,306,function(self) requirementMenu(self) end)
+        button(f,app.L("Anforderungen pro Klasse"),378,-281,306,function(self) requirementMenu(self) end)
         label(f,"Automatisch: nur mit passendem Buffgeber.\nIntelligenz/Wille nur für Manaklassen.\nPflicht/Aus und gewünschter Segen sind je Klasse wählbar.",378,-318,306,68,style.muted):SetWordWrap(true)
         label(f,"Chat-Abstand (60–600 Sekunden)",18,-328,320,24,style.gold)
         local cooldown=style.EditBox(f);cooldown:SetSize(90,28);cooldown:SetPoint("TOPLEFT",18,-358);cooldown:SetNumeric(true)
@@ -750,12 +750,12 @@ function buff.Command(command)
     elseif command=="debug" then
         local db=buff.Settings();db.debug=not db.debug
         local data=buff.Scan()
-        print("Paulchen Buffwächter · Diagnose " .. (db.debug and "an" or "aus") .. " · " .. data.mode)
-        print("Aura-API: " .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
+        print(app.L("Paulchen Buffwächter · Diagnose ") .. (db.debug and "an" or "aus") .. " · " .. data.mode)
+        print(app.L("Aura-API: ") .. tostring(C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex)=="function" or false)
             .. " · Chat-API: " .. tostring(type(C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage)=="function")
-            .. " · Chat eingeschränkt: " .. tostring(chatRestricted()) .. " · Versand abgelehnt: " .. tostring(buff.autoBlocked==true))
+            .. app.L(" · Chat eingeschränkt: ") .. tostring(chatRestricted()) .. " · Versand abgelehnt: " .. tostring(buff.autoBlocked==true))
         for _,member in ipairs(data.members) do
-            print(member.name .. " · " .. member.class .. " · fehlt " .. #member.missing .. " · unbekannt " .. #member.unknown .. " · " .. (member.reason or "lesbar"))
+            print(member.name .. " · " .. member.class .. app.L(" · fehlt ") .. #member.missing .. app.L(" · unbekannt ") .. #member.unknown .. " · " .. (member.reason or "lesbar"))
         end
     else
         buff.SetOption("showWindow",true);app.OpenDashboard("buffs")
