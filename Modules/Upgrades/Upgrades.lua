@@ -758,7 +758,7 @@ function app.InstanceChoices(rows)
         choices[#choices + 1] = { name, ("%s (%d)"):format(name, count) }
     end
     table.sort(choices, function(a, b) return lower(a[1]) < lower(b[1]) end)
-    table.insert(choices, 1, { "", "Alle Instanzen & Raids" })
+    table.insert(choices, 1, { "", suite.L("Alle Instanzen & Raids") })
     return choices
 end
 
