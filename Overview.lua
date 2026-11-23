@@ -195,7 +195,7 @@ function overview.Render()
         f.level.progress:SetValue(xp.xp / xp.maximum)
         f.level.body:SetText(("Stufe %d · %.1f %% · noch %s EP\n%s · %s Gegner")
             :format(xp.level, xp.xp / xp.maximum * 100, count(remaining),
-                xp.paused and "EP-Stopp" or xp.eta and ("ca. " .. duration(xp.eta)) or "Zeit noch offen", count(xp.mobs)))
+                xp.paused and app.L("EP-Stopp") or xp.eta and ("ca. " .. duration(xp.eta)) or "Zeit noch offen", count(xp.mobs)))
     else
         f.level.progress:SetValue(xp and 1 or 0)
         f.level.body:SetText(xp and app.L("Maximalstufe erreicht") or app.L("EP-Daten werden geladen …"))
@@ -207,7 +207,7 @@ function overview.Render()
     f.farm.progress:SetValue(farm.goal and math.min(1, farm.itemCount / farm.goal) or 0)
     if farm.active then
         local target = farm.goal and (" · Ziel %d/%d"):format(farm.itemCount, farm.goal) or ""
-        f.farm.body:SetText(("%s · %s · %s\n%s EP%s"):format(farm.paused and "Pausiert" or app.L("Läuft"),
+        f.farm.body:SetText((app.L("%s · %s · %s\n%s EP%s")):format(farm.paused and "Pausiert" or app.L("Läuft"),
             farm.area or "Unbekanntes Gebiet", duration(farm.elapsed), (farm.partial and "≥ " or "") .. count(farm.xp), target))
     else f.farm.body:SetText(app.L("Keine aktive Runde.\nFarmziele unter Ziel / Details einstellen.")) end
     f.location.body:SetText(data.zone .. " · " .. (data.coordinates or app.L("Koordinaten nicht verfügbar"))
@@ -215,7 +215,7 @@ function overview.Render()
     local upgrade = data.upgrade
     local statuses = { waiting = app.L("Warte auf Ausrüstungsdaten …"), scanning = app.L("Suche läuft …"), combat = app.L("Im Kampf pausiert"),
         stale = "Liste veraltet · Aktualisieren",
-        error = "Suchfehler · /pu diagnose", idle = "Noch kein Suchlauf", ready = "Keine bekannten Upgrades" }
+        error = "Suchfehler · /pu diagnose", idle = "Noch kein Suchlauf", ready = app.L("Keine bekannten Upgrades") }
     if upgrade and upgrade.best then
         local best = upgrade.best
         local gain = best.pct and ("%+.1f %%"):format(best.pct) or ("+%s Punkte"):format(count(best.delta))
