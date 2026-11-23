@@ -28,7 +28,7 @@ local professions = {
     { "Enchanting", "Verzauberkunst", 333 },
     { "Jewelcrafting", "Juwelierskunst", 755 },
 }
-app.professionChoices = { { "", "Alle Berufe" } }
+app.professionChoices = { { "", suite.L("Alle Berufe") } }
 local professionByName = {}
 for _, profession in ipairs(professions) do
     local name, label, line = unpack(profession)
@@ -641,14 +641,14 @@ function app.GetSources(scan, id, item)
         }
     elseif browse then
         list[#list + 1] = {
-            kind = "auction", title = "AH-Übersicht", price = browse.price or estimate,
+            kind = "auction", title = suite.L("AH-Übersicht"), price = browse.price or estimate,
             isEstimate = not browse.price and estimate ~= nil, tsmPrice = browse.price and estimate, effort = 2,
         }
     end
     if tradeable then
         local effort = item.quality >= 4 and 7 or item.quality >= 3 and 5 or 3
         if estimate and not offer and not browse then
-            list[#list + 1] = { kind = "auction", title = "TSM-Schätzpreis", price = estimate, isEstimate = true, effort = effort }
+            list[#list + 1] = { kind = "auction", title = suite.L("TSM-Schätzpreis"), price = estimate, isEstimate = true, effort = effort }
         end
         list[#list + 1] = { kind = "boe", title = "Auktionshaus / Handel", detail = suite.L("Bestand und Preis unbekannt"), effort = effort }
     end
