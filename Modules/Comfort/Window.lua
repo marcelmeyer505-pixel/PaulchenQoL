@@ -85,7 +85,7 @@ local categories = {
         { "mapOtherFaction", "Verkehrspunkte der anderen Fraktion anzeigen" },
         { "mapSpiritHealers", "Geistheiler auf der Karte anzeigen" },
         { "mapDungeons", "Instanz- und Raideingänge anzeigen",
-            "Öffnet Innenkarten, Quests und Routen aus den installierten Instanz-Addons." },
+            "Öffnet die Innenkarte im Paulchen-Instanzführer." },
         { "mapZoneLevels", "Ungefähre Gebietsstufen anzeigen" },
         { "mapFishing", "Ungefähre Angelfertigkeit anzeigen" },
         { "mapReveal", "Unerforschte Karte aufdecken" },

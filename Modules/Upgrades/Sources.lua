@@ -133,6 +133,39 @@ local function markNPCs(index, npc, location)
     end
 end
 
+local bundledIndex = {}
+local function bundledSources(faction)
+    local key = faction or ""
+    if bundledIndex[key] then return bundledIndex[key] end
+    local guide = suite.instances
+    local result = { items = {}, quests = {}, zones = {}, npcs = {}, locations = {}, loaded = guide ~= nil }
+    for _, entry in ipairs(guide and guide.entries or {}) do
+        local location = guide.Location(entry)
+        result.locations[#result.locations + 1] = location
+        if location.map and not result.zones[location.map] then result.zones[location.map] = location end
+        for _, boss in ipairs(entry.loot) do
+            local source = guide.Location(entry)
+            source.boss = boss.name
+            markNPCs(result.npcs, boss.npcs, source)
+            for _, item in ipairs(boss.items) do
+                if not item[3] or item[3] == faction then
+                    availability.NoteItem(item[1], source)
+                    add(result.items, item[1], { location = source, pct = item[2] > 0 and item[2] or nil })
+                end
+            end
+        end
+        for _, quest in ipairs(entry.quests) do
+            if not quest.faction or quest.faction == faction then
+                for _, item in ipairs(quest.rewards) do
+                    add(result.quests, item, { quest = quest, location = location })
+                end
+            end
+        end
+    end
+    bundledIndex[key] = result
+    return result
+end
+
 local atlasIndex
 local function atlasSources(faction)
     local atlas = AtlasLoot
@@ -436,7 +469,10 @@ function app.PrepareSources(scan)
     scan.questOptions = { lowLevel = true, skillRank = skillRank }
     scan.questMemo = {}
     scan.activeRewards = liveRewards()
+    local bundled = bundledSources(scan.faction)
     scan.atlas = atlasSources(scan.faction)
+    if not scan.atlas.loaded and bundled.loaded then scan.atlas = bundled end
+    scan.instanceQuestRewards = bundled.quests
     scan.journal = journalSources(scan.faction, scan.atlas)
     scan.crafting = craftingSources()
     scan.professionRanks = {}
@@ -596,6 +632,16 @@ function app.GetSources(scan, id, item)
     local released = availability.ItemAllowed(scan, id)
     for _, quest in ipairs(released and scan.activeRewards[id] or {}) do
         addQuest(scan, list, quests, quest.questID, quest)
+    end
+    for _, row in ipairs(released and scan.instanceQuestRewards and scan.instanceQuestRewards[id] or {}) do
+        local quest = row.quest
+        if not quests[quest.id] and (not quest.min or scan.level >= quest.min)
+            and availability.LocationAllowed(scan, row.location) and availability.QuestAllowed(scan, quest.id)
+            and not suite.ReadGameValue(C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted, quest.id) then
+            quests[quest.id] = true
+            list[#list + 1] = { kind = "quest", title = suite.instances.QuestTitle(quest), quest = quest.id,
+                zone = row.location.localName, detail = suite.L("Instanzquest"), effort = 3 }
+        end
     end
     for _, drop in ipairs(scan.atlas.items[id] or {}) do
         local location = drop.location

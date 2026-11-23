@@ -86,6 +86,8 @@ for _, name in ipairs({
     "EnableMouse", "RegisterForDrag", "RegisterForClicks", "SetJustifyH", "SetWordWrap", "SetTextColor",
     "SetHighlightTexture", "SetColorTexture", "SetNormalFontObject", "SetHighlightFontObject",
     "SetDisabledFontObject", "SetTexCoord", "SetVertexColor", "SetMouseMotionEnabled", "SetMouseClickEnabled",
+    "SetDrawLayer", "SetThickness", "SetColorTexture", "SetStartPoint", "SetEndPoint",
+    "EnableMouseWheel", "SetEnabled",
 }) do methods[name] = function() end end
 function CreateFrame(_, _, parent)
     local widget = setmetatable({ parent = parent, shown = true, children = {}, scripts = {}, events = {},
@@ -96,6 +98,7 @@ function CreateFrame(_, _, parent)
 end
 methods.CreateTexture = function(self) return CreateFrame("Texture", nil, self) end
 methods.CreateFontString = methods.CreateTexture
+methods.CreateLine = methods.CreateTexture
 UIParent = CreateFrame("Frame")
 UIParent:SetSize(1600, 900)
 GameTooltip = { IsOwned = function() return false end }
@@ -447,3 +450,75 @@ flush()
 for index = 1, provider.used do assert(provider.pins[index].point.kind ~= "dungeon") end
 ''')
 print("Dungeon entrance links, Journal map and quests, Routes fallback and shared entrances passed.")
+
+for path in ("Modules/Instances/Data.lua", "Modules/Instances/Guide.lua", "Modules/Instances/Window.lua"):
+    load((root / path).read_text(encoding="utf-8-sig"), path)
+lua.execute(r'''
+ForeverDungeonJournal_NS, ForeverDungeonRoutes, AtlasLoot = nil, nil, nil
+local guide = app.instances
+local map = WorldMapFrame
+local wailing = assert(guide.byKey.wailingcaverns)
+local custom = assert(guide.byKey.alcazprison)
+assert(#guide.entries >= 40 and #wailing.quests >= 5 and #wailing.loot >= 5)
+assert(#custom.floors > 1 and #guide.floors[custom.floors[1]].art > 0)
+local instancePage
+app.OpenDashboard = function(tab)
+    assert(tab == "instances")
+    instancePage = guide.GetPage(UIParent)
+    instancePage:Show()
+end
+app.CloseDashboard = function() instancePage:Hide() end
+local function textWidget(text)
+    for _, frame in ipairs(frames) do
+        if frame:IsVisible() and frame.textValue == text then return frame end
+    end
+    error("Missing instance guide text: " .. text)
+end
+
+app.comfort.SetEnabled("mapDungeons", true)
+map:SetMapID(1413)
+map:Show()
+flush()
+local provider = map.providers[#map.providers]
+local entrance
+for index = 1, provider.used do
+    local marker = provider.pins[index]
+    if marker.point.dungeon and marker.point.dungeon.guideKey == wailing.key then entrance = marker; break end
+end
+assert(entrance, "The entrance comes from Paulchen's own data")
+entrance.scripts.OnClick(entrance, "LeftButton")
+assert(guide.selection.entry == wailing and guide.selection.tab == "map")
+textWidget("Höhlen des Wehklagens")
+textWidget("Bossreihenfolge")
+textWidget("Route").scripts.OnClick()
+textWidget("Schematische Route")
+textWidget("Quests").scripts.OnClick()
+textWidget("Instanzquests")
+textWidget("Beute").scripts.OnClick()
+textWidget("Alle Bosse")
+textWidget(wailing.loot[1].name)
+for _, row in ipairs(instancePage.rows) do
+    if row.row and row.row.item then
+        assert(row.left.textValue:match("^Gegenstand #%d+$"))
+        break
+    end
+end
+guide.Open(custom.key, "map")
+assert(guide.selection.floor == custom.floors[1])
+instancePage.nextFloor.scripts.OnClick()
+assert(guide.selection.floor == custom.floors[2])
+assert(instancePage.map.art[1]:IsShown() and type(instancePage.map.art[1].textureID) == "number")
+
+app.upgrades = { gear = { SkillRank = function() return nil end } }
+''')
+for path in ("Modules/Upgrades/Content.lua", "Modules/Upgrades/Sources.lua"):
+    load((root / path).read_text(encoding="utf-8-sig"), path)
+lua.execute(r'''
+local scan = { faction = "Horde", level = 60, playerLevel = 60 }
+app.upgrades.PrepareSources(scan)
+local drop = assert(scan.atlas.items[6473], "Wailing Caverns loot should be available without AtlasLoot")
+assert(drop[1].location.instanceID == 43 and #app.upgrades.GetSources(scan, 6473) > 0)
+assert(not app.upgrades.CanSearchItem(scan, 17063), "The standalone loot index respects locked raids")
+assert(next(scan.instanceQuestRewards), "The standalone quest reward index is populated")
+''')
+print("Standalone instance guide, map art, quest and loot tabs, floors, and upgrade sources passed with all three addons absent.")

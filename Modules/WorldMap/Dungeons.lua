@@ -27,6 +27,26 @@ local function catalog(journal, routes)
         entries[#entries + 1] = entry
         return entry
     end
+    local guide = app.instances
+    if guide then
+        for _, dungeon in ipairs(guide.entries) do
+            local at = dungeon.entrance
+            local entry = add({
+                guideKey = dungeon.key, instance = dungeon.id, name = guide.Name(dungeon),
+                routeEntrance = at and { map = at[1], x = at[2], y = at[3] },
+            })
+            alias(entry, dungeon.name)
+            alias(entry, dungeon.de)
+            alias(entry, dungeon.key)
+        end
+        for _, entry in ipairs(entries) do
+            if entry.instance then
+                local previous = byInstance[entry.instance]
+                byInstance[entry.instance] = previous == nil and entry or false
+            end
+        end
+        return entries, byName, byInstance
+    end
     if journal then
         local ids = {}
         for id, key in pairs(journal.INSTANCE_ID_TO_DUNGEON or {}) do ids[key] = id end
@@ -183,7 +203,18 @@ local function actions(entry)
     local function add(label, action, mapAction)
         choices[#choices + 1] = { L(label), action, mapAction }
     end
-    if record and frame then
+    local guide = app.instances
+    local dungeon = guide and entry and guide.byKey[entry.guideKey]
+    if dungeon then
+        local function open(tab)
+            closeMaximizedMap()
+            guide.Open(dungeon.key, tab)
+        end
+        if #dungeon.floors > 0 then add("Innenkarte öffnen", function() open("map") end, true) end
+        if #dungeon.paths > 0 then add("Route öffnen", function() open("route") end) end
+        if #dungeon.quests > 0 then add("Instanzquests öffnen", function() open("quests") end) end
+        if #dungeon.loot > 0 then add("Bosse und Beute öffnen", function() open("loot") end) end
+    elseif record and frame then
         if type(journal.OpenDungeonMap) == "function" and journal.DUNGEON_MAPS and journal.DUNGEON_MAPS[key]
             and read(journal.IsDungeonMapLocked, key) ~= true and read(journal.IsDungeonLocked, key) ~= true then
             add("Innenkarte öffnen", function() journalAction(journal.OpenDungeonMap) end, true)
@@ -195,7 +226,7 @@ local function actions(entry)
             add("Bosse und Beute öffnen", function() journalAction(journal.OpenBossPage, 1) end)
         end
     end
-    if routes and entry and entry.route and routes.Window and type(routes.Window.Open) == "function" then
+    if not dungeon and routes and entry and entry.route and routes.Window and type(routes.Window.Open) == "function" then
         add("In Forever DungeonRoutes öffnen", function()
             closeMaximizedMap()
             routes.Window:Open(entry.route, entry.floor)

@@ -398,6 +398,7 @@ function app.NewScan(maxRequiredLevel)
         end
     end
     for id in pairs(scan.activeRewards) do include(id) end
+    for id in pairs(scan.instanceQuestRewards or {}) do include(id) end
     for _, index in ipairs(instanceIndexes) do
         for id in pairs(index.items) do include(id) end
     end

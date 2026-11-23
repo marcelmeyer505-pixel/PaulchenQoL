@@ -226,6 +226,8 @@ function app.CompanionCommand(message)
         if value and names[value] then write("language", names[value]) else app.OpenConfig() end
     elseif (cmd == "karte" or cmd == "map") and ToggleWorldMap then
         ToggleWorldMap()
+    elseif (cmd == "instanzen" or cmd == "instances") and app.instances then
+        app.OpenDashboard("instances")
     elseif (cmd == "komfort" or cmd == "comfort") and app.comfort then
         if window then window:Hide() end
         app.comfort.Open()
@@ -243,7 +245,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, instances, lang auto|de|en]")
     end
     refreshSettings()
 end

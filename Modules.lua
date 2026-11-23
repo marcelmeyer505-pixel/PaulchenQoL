@@ -69,6 +69,7 @@ function app.OpenModulesMenu(owner)
         menu:CreateButton(app.L("Logbuch · Kompaktansicht"), function() app.OpenModule("dtl", "mini") end)
         menu:CreateButton(app.L("Logbuch · EP und Farmrunden"), function() app.OpenModule("dtl", "farm") end)
         menu:CreateButton(app.L("Paulchen Upgrades"), function() app.OpenModule("upgrades") end)
+        menu:CreateButton(app.L("Instanzführer"), function() app.OpenDashboard("instances") end)
         menu:CreateButton(app.L("Paulchens Buffwächter"), function() app.OpenDashboard("buffs") end)
         menu:CreateButton(app.L("Auktionshaus scannen"), function() app.OpenModule("auction") end)
         if app.comfort and app.comfort.Enabled("mapMinimap") and ToggleWorldMap then

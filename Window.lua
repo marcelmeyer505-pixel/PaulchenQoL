@@ -7,10 +7,11 @@ local cream, muted = style.cream, style.muted
 local gold, green, orange = style.gold, style.green, style.orange
 local parchment, ink = { 0.94, 0.84, 0.68 }, { 0.20, 0.11, 0.07 }
 local pageTabs = {
-    { "travel", app.L("Übersicht"), 137, 94, 7, 47, app.L("Reise") },
-    { "logbook", app.logbookLabel, 235, 62, 57, 58 },
-    { "upgrades", "Upgrades", 301, 65, 118, 61 },
-    { "buffs", app.L("Buffs"), 370, 65, 183, 51 },
+    { "travel", app.L("Übersicht"), 126, 77, 7, 47, app.L("Reise") },
+    { "logbook", app.logbookLabel, 207, 56, 57, 58 },
+    { "upgrades", "Upgrades", 267, 62, 118, 61 },
+    { "instances", app.L("Instanzen"), 333, 64, 183, 61, app.L("Instanzen") },
+    { "buffs", app.L("Buffs"), 401, 47, 248, 48 },
 }
 local settingsWidth = 88
 local db, dashboard, travelPage, travel
@@ -350,6 +351,9 @@ local function selectPage(f, key)
                     or app.L("Die Ausrüstungsbewertung konnte nicht geladen werden.")
                 page = unavailablePage(f.body, message)
             end
+        elseif key == "instances" then
+            page = app.instances and app.instances.GetPage(f.body)
+                or unavailablePage(f.body, app.L("Keine Innenkartendaten"))
         elseif key == "buffs" then
             page = app.buffCheck and app.buffCheck.GetPage(f.body)
                 or unavailablePage(f.body,app.L("Buffwächter nicht verfügbar."))

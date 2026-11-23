@@ -84,7 +84,7 @@ local function createPin(canvas, map)
                 for _, entry in ipairs(point.dungeons) do GameTooltip:AddLine(entry.name, unpack(style.cream)) end
             end
             GameTooltip:AddLine(L("Linksklick öffnet die Instanz. Rechtsklick zeigt die Optionen."), unpack(style.muted))
-        elseif point.kind == "dungeon" and not (_G.ForeverDungeonJournal_NS or _G.ForeverDungeonRoutes) then
+        elseif point.kind == "dungeon" and not (app.instances or _G.ForeverDungeonJournal_NS or _G.ForeverDungeonRoutes) then
             GameTooltip:AddLine(L("Für Innenkarten DungeonJournal oder Forever DungeonRoutes aktivieren."),
                 style.muted[1], style.muted[2], style.muted[3], true)
         end
