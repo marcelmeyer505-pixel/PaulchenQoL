@@ -297,16 +297,10 @@ local enUS = {
     ["Ereignis fehlt: "] = "Missing Event: ",
 }
 
-local function requested()
-    local settings = type(PaulchenQoLSettings) == "table" and PaulchenQoLSettings
-    local lang = settings and settings.language
-    return lang == "deDE" or lang == "enUS" and lang or "auto"
-end
-
 function app.GetLanguageSetting()
     local settings = type(PaulchenQoLSettings) == "table" and PaulchenQoLSettings
     local value = settings and settings.language
-    return value == "deDE" or value == "enUS" and value or "auto"
+    return (value == "deDE" or value == "enUS") and value or "auto"
 end
 
 function app.GetLanguage()
