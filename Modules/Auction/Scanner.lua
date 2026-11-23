@@ -87,14 +87,14 @@ local function finish(job)
     local count = 0
     for _ in pairs(job.items) do count = count + 1 end
     if count == 0 then
-        report("Der Vollscan hat keine Ausrüstung mit Sofortkaufpreis geliefert. Normale AH-Suchen werden weiter erfasst.")
+        report(suite.L("Der Vollscan hat keine Ausrüstung mit Sofortkaufpreis geliefert. Normale AH-Suchen werden weiter erfasst."))
         return
     end
     data.full = { at = job.at, items = job.items, count = count }
     for signature, search in pairs(data.searches) do
         if search.at <= job.at then data.searches[signature] = nil end
     end
-    report(("Vollscan gespeichert · %d verschiedene Ausrüstungsgegenstände."):format(count))
+    report((suite.L("Vollscan gespeichert · %d verschiedene Ausrüstungsgegenstände.")):format(count))
     updated()
 end
 
@@ -133,7 +133,7 @@ local function readReplicate(job)
         local index = job.retry and job.pending[job.cursor + 1] or job.cursor
         if not readListing(job, index, job.retry) then
             scan = nil
-            report("Der Serverstand konnte nicht gelesen werden. Vorherige Daten bleiben verfügbar.")
+            report(suite.L("Der Serverstand konnte nicht gelesen werden. Vorherige Daten bleiben verfügbar."))
             return
         end
         job.cursor = job.cursor + 1
@@ -151,24 +151,24 @@ local function readReplicate(job)
 end
 
 function api.Start()
-    if not open then report("Öffne zuerst das Auktionshaus."); return false end
+    if not open then report(suite.L("Öffne zuerst das Auktionshaus.")); return false end
     if scan then print("Paulchen Auktionsscan · " .. status); return false end
     if not (ah and ah.ReplicateItems and ah.GetNumReplicateItems and ah.GetReplicateItemInfo and ah.GetReplicateItemLink) then
-        report("Der Client bietet keinen Vollscan an. Normale AH-Suchen werden erfasst.")
+        report(suite.L("Der Client bietet keinen Vollscan an. Normale AH-Suchen werden erfasst."))
         return false
     end
     local job = { items = {}, equipment = {}, pending = {}, requested = {}, cursor = 0, playerName = UnitName("player") }
     scan = job
-    report("Vollscan angefragt. Warte auf die Antwort des Auktionshauses.")
+    report(suite.L("Vollscan angefragt. Warte auf die Antwort des Auktionshauses."))
     if not pcall(ah.ReplicateItems) then
         scan = nil
-        report("Vollscan derzeit nicht möglich. Normale AH-Suchen werden erfasst.")
+        report(suite.L("Vollscan derzeit nicht möglich. Normale AH-Suchen werden erfasst."))
         return false
     end
     C_Timer.After(30, function()
         if scan == job and not job.total then
             scan = nil
-            report("Keine Antwort auf den Vollscan. Normale AH-Suchen werden weiter erfasst.")
+            report(suite.L("Keine Antwort auf den Vollscan. Normale AH-Suchen werden weiter erfasst."))
         end
     end)
     return true
@@ -221,13 +221,13 @@ if ah then
             open = true
         elseif event == "AUCTION_HOUSE_CLOSED" then
             open = false
-            if scan then scan = nil; report("Vollscan abgebrochen. Das Auktionshaus wurde geschlossen.") end
+            if scan then scan = nil; report(suite.L("Vollscan abgebrochen. Das Auktionshaus wurde geschlossen.")) end
         elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
             if not scan or scan.total then return end
             local ok, count = pcall(ah.GetNumReplicateItems)
             if not ok or type(plain(count)) ~= "number" or count <= 0 then
                 scan = nil
-                report("Der Vollscan hat keine Daten geliefert. Normale AH-Suchen werden erfasst.")
+                report(suite.L("Der Vollscan hat keine Daten geliefert. Normale AH-Suchen werden erfasst."))
                 return
             end
             scan.total, scan.at = count, GetServerTime()
