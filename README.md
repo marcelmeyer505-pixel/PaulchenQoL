@@ -206,6 +206,8 @@ In bekannten Instanzen startet die normale Kartentaste mit der Innenkarte und de
 
 Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Paulchens zusätzliche Flugpunkte starten auf den Kontinentkarten. Die Option **Flugpunkte auch auf der Azeroth-Übersicht** blendet sie dort ebenfalls ein. Falls Titan Panel Koordinaten auf derselben Karte anzeigt, blendet Paulchen die entsprechenden Titan-Labels aus, solange seine eigene Anzeige aktiv ist.
 
+Kleine runde Marker bündeln nahe Reisepunkte und Instanzeingänge auf Übersichtskarten. Ein Rechtsklick auf einen Reise-Sammelmarker öffnet seine Ziele. Auf Gebietskarten werden Reisepunkte einzeln angezeigt. Eng benachbarte Eingänge bleiben über die Flügelauswahl erreichbar.
+
 - **Händler & Taschen** verkauft bei eingeschalteter Automatik nur graue, lesbar bewertete Gegenstände aus den mitgeführten Taschen. Behalten, DPS, Tank, AH und eigene Kategorien schützen den vorgemerkten Gegenstand. Für unmarkierte graue Gegenstände und die Vormerkung **Händler** gelten die normalen Verkaufsregeln. Die optionale Chat-Zusammenfassung zählt bestätigte Verkäufe.
 - **Quests & Dialoge** bietet getrennte Schalter für normale, tägliche und wöchentliche Quests, Abgaben und einzelne NPC-Dialoge per Alt. Quests mit mehr als einer Belohnung zur Wahl, Kosten sowie normalen oder vorgemerkten Abgabeitems bleiben zur manuellen Prüfung offen.
 - Mit **Umschalt** beim Ansprechen kannst du die Automatik überspringen.

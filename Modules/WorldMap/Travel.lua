@@ -145,8 +145,8 @@ end
 function world.CollectEntrances(id)
     local points = {}
     local info = world.Info(id)
-    if info and options.Enabled("mapDungeons") then
-        local sources = dungeonSources(id, collectSources(id), plain(info.mapType) == mapType.World)
+    if type(id) == "number" and options.Enabled("mapDungeons") then
+        local sources = dungeonSources(id, collectSources(id), info and plain(info.mapType) == mapType.World)
         world.CollectDungeons(id, sources, points)
     end
     return points
@@ -170,7 +170,9 @@ function world.Collect(id, excludeDungeons)
             if other.kind == kind and (other.name == name or target and other.target == target)
                 and math.abs(other.x - x) < 0.012 and math.abs(other.y - y) < 0.012 then return end
         end
-        points[#points + 1] = { kind = kind, x = x, y = y, name = name, target = target, note = note, atlas = atlas }
+        points[#points + 1] = {
+            kind = kind, x = x, y = y, name = name, target = target, source = source, note = note, atlas = atlas,
+        }
     end
 
     local showFlight = options.Enabled("mapFlight") and (not isWorld or options.Enabled("mapFlightsOnWorld"))

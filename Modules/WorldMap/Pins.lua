@@ -42,6 +42,7 @@ local colors = {
     transport = { "Verkehrsverbindung", "V", 0.36, 0.78, 0.70 },
     healer = { "Geistheiler", "+", 0.73, 0.87, 0.96 },
     dungeon = { "Instanzeingang", "I", 0.93, 0.58, 0.34 },
+    travel = { "Reisepunkte", "", 0.73, 0.81, 0.94 },
     discovery = { "Unerforschtes Teilgebiet", "?", 1.00, 0.84, 0.38 },
     discovered = { "Erforschtes Teilgebiet", "+", 0.58, 0.86, 0.60 },
     level = { "Gebietsstufe", "", 0.96, 0.87, 0.66 },
@@ -53,12 +54,39 @@ local function navigate(map, target)
 end
 world.Navigate = navigate
 
+local function nameOf(point)
+    return point.name or L(colors[point.kind][1])
+end
+
+local function destination(point, mapID)
+    return point.target or point.source ~= mapID and point.source or nil
+end
+
+local function showTravelMenu(pin, map, members)
+    local locked, known = options.Read(InCombatLockdown)
+    if not known or locked or not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    local mapID = read(map.GetMapID, map)
+    MenuUtil.CreateContextMenu(pin, function(_, menu)
+        menu:CreateTitle(L("Reisepunkte"))
+        if menu.SetScrollMode then menu:SetScrollMode(300) end
+        for _, member in ipairs(members) do
+            local target = destination(member, mapID)
+            if target then menu:CreateButton(nameOf(member), function() navigate(map, target) end)
+            else menu:CreateTitle(nameOf(member)) end
+        end
+    end)
+end
+
 local function createPin(canvas, map)
-    local pin = CreateFrame("Button", nil, canvas, "BackdropTemplate")
-    pin:SetFrameLevel(canvas:GetFrameLevel() + 18)
-    pin:SetSize(18, 18)
+    local anchor = CreateFrame("Frame", nil, canvas)
+    anchor:SetSize(1, 1)
+    local pin = CreateFrame("Button", nil, anchor)
+    pin.positionAnchor = anchor
+    pin:SetPoint("CENTER", anchor, "CENTER")
     pin:RegisterForClicks("RightButtonUp")
-    style.Panel(pin, { 0.10, 0.08, 0.07, 0.94 })
+    pin.badge = pin:CreateTexture(nil, "BACKGROUND")
+    pin.badge:SetAllPoints()
+    pin.badge:SetTexture(app.artPath .. "map_pin.tga")
     pin.text = pin:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     pin.text:SetPoint("CENTER", 0, 0)
     pin.icon = pin:CreateTexture(nil, "ARTWORK")
@@ -67,19 +95,23 @@ local function createPin(canvas, map)
     pin:SetScript("OnClick", function(self, button)
         local point = self.point
         if point and point.dungeons then world.DungeonClick(self, point.dungeons, button)
-        elseif point and button == "RightButton" then navigate(map, point.target) end
+        elseif point and point.members then showTravelMenu(self, map, point.members)
+        elseif point and button == "RightButton" then navigate(map, destination(point, read(map.GetMapID, map))) end
     end)
     pin:SetScript("OnEnter", function(self)
         local point = self.point
         if not point or not GameTooltip or GameTooltip:IsForbidden() then return end
         local kind = colors[point.kind]
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(point.name or L(kind[1]), kind[3], kind[4], kind[5])
-        if point.name then GameTooltip:AddLine(L(kind[1]), unpack(style.muted)) end
+        GameTooltip:SetText(nameOf(point), kind[3], kind[4], kind[5])
+        if point.name and not point.members then GameTooltip:AddLine(L(kind[1]), unpack(style.muted)) end
         if point.note and point.note ~= "" then
             GameTooltip:AddLine(point.note, style.cream[1], style.cream[2], style.cream[3], true)
         end
-        if point.dungeons then
+        if point.members then
+            for _, member in ipairs(point.members) do GameTooltip:AddLine(nameOf(member), unpack(style.cream)) end
+            GameTooltip:AddLine(L("Rechtsklick zeigt die Reisepunkte."), unpack(style.muted))
+        elseif point.dungeons then
             if #point.dungeons > 1 then
                 for _, entry in ipairs(point.dungeons) do GameTooltip:AddLine(entry.name, unpack(style.cream)) end
             end
@@ -88,7 +120,9 @@ local function createPin(canvas, map)
             GameTooltip:AddLine(L("Für Innenkarten DungeonJournal oder Forever DungeonRoutes aktivieren."),
                 style.muted[1], style.muted[2], style.muted[3], true)
         end
-        if point.target then GameTooltip:AddLine(L("Rechtsklick öffnet die Zielkarte."), unpack(style.muted)) end
+        if not point.members and destination(point, read(map.GetMapID, map)) then
+            GameTooltip:AddLine(L("Rechtsklick öffnet die Zielkarte."), unpack(style.muted))
+        end
         GameTooltip:Show()
     end)
     local function clear()
@@ -99,23 +133,26 @@ local function createPin(canvas, map)
     return pin
 end
 
-local function configure(pin, point)
+local function configure(pin, point, overview, mapID)
     pin.point = point
     local choice = colors[point.kind]
-    local label, width = point.label or choice[2], point.kind == "level" and 42 or 18
+    local label = point.label or choice[2]
     local dungeon = point.kind == "dungeon"
-    pin:SetSize(dungeon and 24 or width, dungeon and 24 or 18)
+    local size = dungeon and (overview and 19 or 22) or (overview and 16 or 19)
+    pin:SetSize(point.kind == "level" and 44 or size, size)
+    pin.icon:SetSize(size - 6, size - 6)
     local acceptsLeft = point.dungeons ~= nil
     if acceptsLeft ~= pin.acceptsLeft then
         if acceptsLeft then pin:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         else pin:RegisterForClicks("RightButtonUp") end
         pin.acceptsLeft = acceptsLeft
     end
-    pin:SetBackdropBorderColor(choice[3], choice[4], choice[5], 0.96)
+    pin.badge:SetShown(point.kind ~= "level")
+    pin.badge:SetVertexColor(choice[3], choice[4], choice[5])
     pin.text:SetText(label)
     pin.text:SetTextColor(choice[3], choice[4], choice[5])
     local atlas = point.atlas
-    local icon = not dungeon and type(atlas) == "string" and C_Texture and read(C_Texture.GetAtlasInfo, atlas)
+    local icon = not dungeon and not point.members and type(atlas) == "string" and C_Texture and read(C_Texture.GetAtlasInfo, atlas)
     local dungeonIcon = dungeon and not point.label
     pin.icon:SetShown(not not icon or dungeonIcon)
     pin.text:SetShown(not icon and not dungeonIcon)
@@ -125,21 +162,25 @@ local function configure(pin, point)
     elseif icon then
         pin.icon:SetAtlas(atlas)
     end
-    if pin.SetMouseClickEnabled then pin:SetMouseClickEnabled(point.target ~= nil or point.dungeons ~= nil) end
+    if pin.SetMouseClickEnabled then
+        pin:SetMouseClickEnabled(acceptsLeft or point.members ~= nil or destination(point, mapID) ~= nil)
+    end
     if pin.SetMouseMotionEnabled then pin:SetMouseMotionEnabled(true) end
 end
 
 local function placePins(provider)
     local map = provider:GetMap()
     local canvas = map:GetCanvas()
-    local scale = read(map.GetCanvasScale, map)
+    local scale = read(map.GetCanvasScale, map) or canvas and read(canvas.GetScale, canvas)
     if not canvas or type(scale) ~= "number" or scale <= 0 then return end
     local width, height = canvas:GetWidth(), canvas:GetHeight()
     for i = 1, provider.used do
         local pin = provider.pins[i]
+        local anchor = pin.positionAnchor
+        if anchor:GetParent() ~= canvas then anchor:SetParent(canvas) end
+        anchor:ClearAllPoints()
+        anchor:SetPoint("CENTER", canvas, "TOPLEFT", pin.point.x * width, -pin.point.y * height)
         pin:SetScale(1 / scale)
-        pin:ClearAllPoints()
-        pin:SetPoint("CENTER", canvas, "TOPLEFT", pin.point.x * width * scale, -pin.point.y * height * scale)
     end
 end
 
@@ -186,33 +227,44 @@ local function hasNative(point, positions)
     return false
 end
 
-local function groupDungeonEntrances(points, canvas)
+local travelKinds = { flight = true, portal = true, cross = true, transport = true, healer = true }
+
+local function groupMarkers(points, canvas, scale, overview, entrancesOnly)
+    if not overview and not entrancesOnly then return points end
     local result, groups = {}, {}
     local width, height = canvas:GetSize()
+    width, height = width * scale, height * scale
+    local distance = overview and (entrancesOnly and 29 or 26) or 13
     for _, point in ipairs(points) do
-        local entry = point.dungeon
-        local group
-        if entry then
+        if (entrancesOnly and point.dungeon) or (not entrancesOnly and travelKinds[point.kind]) then
+            local group
             for _, candidate in ipairs(groups) do
                 local dx, dy = (point.x - candidate.x) * width, (point.y - candidate.y) * height
-                if dx * dx + dy * dy <= 18 * 18 then group = candidate; break end
+                if dx * dx + dy * dy <= distance * distance then group = candidate; break end
             end
-        end
-        if group then
-            group.dungeons[#group.dungeons + 1] = entry
+            if not group then
+                group = { contents = {} }
+                for key, value in pairs(point) do group[key] = value end
+                groups[#groups + 1] = group
+                result[#result + 1] = group
+            end
+            local contents = group.contents
+            contents[#contents + 1] = entrancesOnly and point.dungeon or point
         else
             result[#result + 1] = point
-            if entry then
-                point.dungeons = { entry }
-                groups[#groups + 1] = point
-            end
         end
     end
     for _, group in ipairs(groups) do
-        if #group.dungeons > 1 then
-            table.sort(group.dungeons, function(a, b) return a.name < b.name end)
-            group.label, group.atlas, group.note = tostring(#group.dungeons), nil, nil
-            group.name = L("Instanzeingänge")
+        local contents = group.contents
+        if entrancesOnly then group.dungeons = contents end
+        if #contents > 1 then
+            table.sort(contents, function(a, b)
+                if entrancesOnly then return a.name < b.name end
+                return nameOf(a) < nameOf(b)
+            end)
+            group.label, group.atlas, group.note = tostring(#contents), nil, nil
+            group.name = L(entrancesOnly and "Instanzeingänge" or "Reisepunkte")
+            if not entrancesOnly then group.kind, group.members = "travel", contents end
         end
     end
     return result
@@ -307,24 +359,15 @@ local function clear(provider)
     for i = 1, provider.used do provider.pins[i]:Hide() end
     for i = 1, provider.tileCount do provider.tiles[i]:Hide() end
     provider.used, provider.tileCount = 0, 0
+    provider.points, provider.drawingMap, provider.layoutScale = nil, nil, nil
 end
 
-local function draw(provider)
-    local map = provider:GetMap()
-    local canvas, mapID = map:GetCanvas(), read(map.GetMapID, map)
-    if not canvas or not mapID or not map:IsVisible()
-        or (not provider.showLevels and not options.Enabled("mapBattlefield")) then return clear(provider) end
+local function layoutPins(provider, map, canvas, scale)
     local entrancesOnly = provider.entrancesOnly
-    local points = entrancesOnly and world.CollectEntrances(mapID) or world.Collect(mapID, true)
-    local native = nativePositions(map, entrancesOnly)
-    if not entrancesOnly then
-        explore(provider, canvas, mapID, points)
-        if provider.showLevels then levelMarkers(mapID, points) end
-    end
+    local points = groupMarkers(provider.points, canvas, scale, provider.overview, entrancesOnly)
     local used = 0
-    if entrancesOnly then points = groupDungeonEntrances(points, canvas) end
     for _, point in ipairs(points) do
-        local nativePin, nativeLevel = hasNative(point, native)
+        local nativePin, nativeLevel = hasNative(point, provider.native)
         if not nativePin or point.dungeons then
             used = used + 1
             local pin = provider.pins[used] or createPin(canvas, map)
@@ -334,13 +377,47 @@ local function draw(provider)
                 pin:SetFrameStrata(map:GetFrameStrata())
             end
             pin:SetFrameLevel(nativeLevel and math.max(level, nativeLevel + 1) or level)
-            configure(pin, point)
+            configure(pin, point, provider.overview, provider.drawingMap)
             pin:Show()
         end
     end
     for i = used + 1, provider.used do provider.pins[i]:Hide() end
     provider.used = used
+    provider.layoutScale = scale
     placePins(provider)
+end
+
+local function mapGeometry(map)
+    local canvas = map:GetCanvas()
+    if not canvas then return end
+    local width, height = canvas:GetSize()
+    local scale = read(map.GetCanvasScale, map) or read(canvas.GetScale, canvas)
+    if type(scale) ~= "number" or scale <= 0 or width <= 0 or height <= 0 then return end
+    return canvas, scale
+end
+
+local function draw(provider)
+    local map = provider:GetMap()
+    local mapID = read(map.GetMapID, map)
+    if not mapID or not map:IsVisible() or (not provider.showLevels and not options.Enabled("mapBattlefield")) then
+        return clear(provider)
+    end
+    local canvas, scale = mapGeometry(map)
+    if not canvas then return end
+    local entrancesOnly = provider.entrancesOnly
+    local points = entrancesOnly and world.CollectEntrances(mapID) or world.Collect(mapID, true)
+    local info = world.Info(mapID)
+    local kind = info and plain(info.mapType)
+    provider.overview = kind == world.types.World or kind == world.types.Continent
+    local native
+    app.SecureCall(L("Weltkarte"), function() native = nativePositions(map, entrancesOnly) end)
+    provider.native = native or {}
+    if not entrancesOnly then
+        explore(provider, canvas, mapID, points)
+        if provider.showLevels then levelMarkers(mapID, points) end
+    end
+    provider.points, provider.drawingMap = points, mapID
+    layoutPins(provider, map, canvas, scale)
 end
 
 function world.AttachPins(map, showLevels, entrancesOnly)
@@ -359,9 +436,28 @@ function world.AttachPins(map, showLevels, entrancesOnly)
     provider.OnHide = clear
     provider.RemoveAllData = clear
     provider.OnShow = provider.RefreshAllData
-    provider.OnCanvasScaleChanged = placePins
+    provider.OnCanvasScaleChanged = function(self)
+        local canvas, scale = mapGeometry(map)
+        if not canvas or not map:IsVisible() then return end
+        if not self.points or self.drawingMap ~= read(map.GetMapID, map) then self:RefreshAllData()
+        elseif not self.layoutScale or math.abs(scale - self.layoutScale) > self.layoutScale * .1 then
+            app.SecureCall(L("Weltkarte"), layoutPins, self, map, canvas, scale)
+        else
+            placePins(self)
+        end
+    end
     provider.OnCanvasSizeChanged = provider.RefreshAllData
-    provider.OnMapChanged = function(self) clear(self); self:RefreshAllData() end
+    provider.OnMapChanged = function(self)
+        clear(self)
+        self:RefreshAllData()
+        local mapID = read(map.GetMapID, map)
+        -- Zoom navigation can deliver the new map ID before its canvas has a usable size.
+        local transition = {}
+        self.transition = transition
+        C_Timer.After(.18, function()
+            if self.transition == transition and read(map.GetMapID, map) == mapID then self:RefreshAllData() end
+        end)
+    end
     map:AddDataProvider(provider)
     provider:RefreshAllData()
     return provider

@@ -64,6 +64,8 @@ local methods = {
     SetSize = function(self, width, height) self.width, self.height = width, height end,
     SetHeight = function(self, height) self.height = height end,
     GetSize = function(self) return self.width, self.height end,
+    GetParent = function(self) return self.parent end,
+    SetParent = function(self, parent) self.parent = parent end,
     GetWidth = function(self) return self.width end,
     GetHeight = function(self) return self.height end,
     GetFrameLevel = function() return 1 end,
@@ -118,7 +120,7 @@ map.BlackoutFrame = CreateFrame("Frame", nil, map)
 map.id, map.providers = 1411, {}
 function map:GetMapID() return self.id end
 function map:GetCanvas() return self.ScrollContainer end
-function map:GetCanvasScale() return 2 end
+function map:GetCanvasScale() return self.canvasScale or 2 end
 function map:IsMaximized() return self.maximized end
 function map:OnFrameSizeChanged() self.sized = (self.sized or 0) + 1 end
 function map:OnMapChanged() end
@@ -363,7 +365,7 @@ ForeverDungeonJournal_NS = {
 local entrances = {
     wailingcaverns = { map = 1413, x = .4599, y = .3627 },
     testnorth = { map = 1413, x = .6, y = .66 },
-    testsouth = { map = 1413, x = .615, y = .655 },
+    testsouth = { map = 1413, x = .605, y = .658 },
 }
 ForeverDungeonRoutes = {
     Dungeons = {
@@ -537,6 +539,63 @@ end
 assert(travelError and stratholme.stratholme_living and stratholme.stratholme_undead,
     "Both Stratholme entrances render even if the travel and exploration layer fails")
 app.worldMap.Collect, app.SecureCall = collect, guard
+
+local travelProvider = map.providers[2]
+local getTaxiNodes = C_TaxiMap.GetTaxiNodesForMap
+C_TaxiMap.GetTaxiNodesForMap = function(id)
+    if id ~= 1423 then return getTaxiNodes(id) end
+    return {
+        {name = "Flugpunkt Nord", faction = 1, position = {x = .56, y = .22}},
+        {name = "Flugpunkt Süd", faction = 1, position = {x = .58, y = .24}},
+    }
+end
+map.canvasScale = .75
+map:SetMapID(1415)
+flush()
+local overviewGroup
+for index = 1, travelProvider.used do
+    local pin = travelProvider.pins[index]
+    if pin.point.members then overviewGroup = pin; break end
+end
+assert(overviewGroup and #overviewGroup.point.members == 2, "Overview groups adjacent travel points")
+assert(overviewGroup.badge.textureID:match("map_pin%.tga$"))
+overviewGroup.scripts.OnClick(overviewGroup, "RightButton")
+assert(menu.children["Flugpunkt Nord"] and menu.children["Flugpunkt Süd"])
+
+local canvas = map:GetCanvas()
+local originalAfter = C_Timer.After
+local afterTransition = {}
+C_Timer.After = function(delay, fn)
+    if delay == .18 then afterTransition[#afterTransition + 1] = fn
+    else originalAfter(delay, fn) end
+end
+canvas:SetSize(0, 0)
+menu.children["Flugpunkt Nord"].callback()
+flush()
+assert(map:GetMapID() == 1423 and provider.used == 0, "The old overview pins are cleared while the zone canvas is resizing")
+canvas:SetSize(700, 500)
+map.canvasScale = 1
+for _, callback in ipairs(afterTransition) do callback() end
+C_Timer.After = originalAfter
+flush()
+local north, strath
+for index = 1, travelProvider.used do
+    local pin = travelProvider.pins[index]
+    if pin.point.name == "Flugpunkt Nord" then north = pin end
+end
+for index = 1, provider.used do
+    local pin = provider.pins[index]
+    if pin.point.dungeon and pin.point.dungeon.guideKey == "stratholme_living" then strath = pin end
+end
+assert(north and not north.point.members and strath, "Zone redraw restores individual flight points and dungeon entrances")
+local _, _, _, anchorX, anchorY = strath.positionAnchor:GetPoint()
+assert(anchorX == strath.point.x * 700 and anchorY == -strath.point.y * 500)
+map.canvasScale = 1.8
+provider:OnCanvasScaleChanged()
+local _, _, _, zoomedX, zoomedY = strath.positionAnchor:GetPoint()
+assert(zoomedX == anchorX and zoomedY == anchorY and strath:GetScale() == 1 / 1.8,
+    "Zoom preserves the world position and the visual size of the marker")
+map.canvasScale, C_TaxiMap.GetTaxiNodesForMap = nil, getTaxiNodes
 
 local inDungeon, dungeonID, interiorFloor = false, nil, nil
 local outdoorMap, outdoorPosition
