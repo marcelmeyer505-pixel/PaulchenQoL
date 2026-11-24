@@ -427,7 +427,7 @@ local roomCorners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
 
 local function renderPlayerRoom(view, room, floor, inside)
     local text
-    if inside and (room or not view.compact) then
+    if inside then
         text = room and app.LF("Bereich · %s", guide.Name(room)) or L("Position nicht verfügbar")
     end
     local status = view.roomStatus
@@ -530,7 +530,6 @@ local function renderMap(f, s)
             local pin = view.pins[pinCount] or createBossPin(view, f.openBoss)
             view.pins[pinCount] = pin
             pin:SetFrameLevel(view.markers:GetFrameLevel() + 1)
-            sizeBossPin(pin, view.compact and 22 or 30)
             pin:ClearAllPoints()
             pin:SetPoint("CENTER", view, "TOPLEFT", stop.x * mapWidth, -stop.y * mapHeight)
             renderBossPin(pin, stop, index, guide.IsDefeated(entry, index), s.highlight == index)
@@ -769,20 +768,34 @@ local function minimapIsNorthUp()
         or read(C_CVar and C_CVar.GetCVarBool or GetCVarBool, "rotateMinimap") == false
 end
 
+local function playerMoving(state)
+    local speed = read(GetUnitSpeed, "player")
+    return state.moving or type(speed) == "number" and speed > 0 or read(IsFalling) == true
+end
+
 local function updateMinimapRoute(state, redraw)
     local overlay = state.liveRoute
     local saved, selection = state.minimapLayout, state.selection
     local api = C_Minimap
     local radius = saved and read(api and api.GetViewRadius)
-    local project, floor, u, v, half
+    local project, floor, u, v, half, exact, manual
     if saved and type(radius) == "number" and radius > 0 and minimapIsNorthUp() then
         local hint = read(api.GetUiMapID)
         floor, u, v = guide.PlayerPosition(selection.entry, selection.floor, hint)
+        exact = floor ~= nil
+        local reference = state.liveReference
+        if exact or reference and playerMoving(state) then
+            state.liveReference = nil
+        elseif reference and reference.entry == selection.entry and reference.floor == selection.floor then
+            floor, u, v, manual = reference.floor, reference.x, reference.y, true
+        end
         if floor then
             half = saved.frame:GetWidth() / 2
             if half > 2 then project = minimapProjector(floor, u, v, half / radius) end
         end
     end
+    state.alignButton:SetShown(not exact)
+    state.mapNote:SetText(manual and project and L("Manuell ausgerichtet") or "")
     if not project then
         overlay.floor = nil
         overlay:Hide()
@@ -930,7 +943,7 @@ local function showLiveMinimap(state, size)
         frame:SetFrameStrata(state.livePanel:GetFrameStrata())
         frame:SetFrameLevel(state.livePanel:GetFrameLevel() + 1)
         frame:SetPoint("CENTER", state.livePanel, "CENTER", 0, 0)
-        frame:SetZoom(0)
+        frame:SetZoom(state.liveZoom or 0)
         frame:Show()
         hideMinimapChrome(saved)
         saved.size = size
@@ -941,44 +954,29 @@ local function showLiveMinimap(state, size)
 end
 
 local function hideLiveMinimap(state)
+    local saved = state.minimapLayout
+    if saved and saved.moved then state.liveZoom = read(saved.frame.GetZoom, saved.frame) end
     restoreMinimap(state)
     state.livePanel:Hide()
 end
 
-local function layoutLiveViews(state, width, height)
-    local dock, pane, canvas = state.livePanel, state.routePane, state.map
-    local contentHeight = height - 72
-    local sideBySide = width >= 460
-    local liveWidth, routeWidth = width - 16, width - 16
-    local liveLimit, routeLimit = contentHeight, contentHeight
-    if sideBySide then
-        local available = width - 26
-        liveWidth = state.fullFloor and math.min(220, math.max(146, available * .27)) or available / 2
-        routeWidth = available - liveWidth
-    else
-        local available = contentHeight - 10
-        liveLimit = available * (state.fullFloor and .36 or .5)
-        routeLimit = available - liveLimit
+local function setLiveReference(state)
+    if playerMoving(state) then
+        state.mapNote:SetText(L("Zum Ausrichten stehen bleiben"))
+        return
     end
-    local liveHeight = math.max(1, math.min(liveLimit, liveWidth + 40))
-    local fit = math.max(1, math.min((routeWidth - 16) / 3, (routeLimit - 38) / 2))
-    dock:SetSize(liveWidth, liveHeight)
-    dock:ClearAllPoints()
-    pane:SetSize(routeWidth, fit * 2 + 38)
-    pane:ClearAllPoints()
-    if sideBySide then
-        dock:SetPoint("LEFT", state.panel, "LEFT", 8, -4)
-        pane:SetPoint("RIGHT", state.panel, "RIGHT", -8, -4)
-    else
-        dock:SetPoint("TOP", state.panel, "TOP", 0, -40)
-        pane:SetPoint("TOP", dock, "BOTTOM", 0, -10)
-    end
-    canvas:ClearAllPoints()
-    canvas:SetPoint("CENTER", pane, "CENTER", 0, -10)
-    canvas:SetSize(fit * 3, fit * 2)
-    canvas.compact = not state.fullFloor
-    canvas.preferMinimapArt = true
-    return math.max(1, math.floor(math.min(liveWidth - 18, liveHeight - 58)))
+    local canvas = state.map
+    local x, y = GetCursorPosition()
+    local scale = canvas:GetEffectiveScale()
+    local left, top = canvas:GetLeft(), canvas:GetTop()
+    if not left or not top or scale <= 0 then return end
+    local u = (x / scale - left) / canvas:GetWidth()
+    local v = (top - y / scale) / canvas:GetHeight()
+    if not app.ValidMapPoint(u, v) then return end
+    local current = state.selection
+    state.liveReference = { entry = current.entry, floor = current.floor, x = u, y = v }
+    state.viewMode = "live"
+    guide.UpdateWorldOverlay(state.owner)
 end
 
 local function createWorldOverlay(map)
@@ -990,20 +988,29 @@ local function createWorldOverlay(map)
     local state = { owner = map, host = host, panel = panel }
     state.map = mapCanvas(panel)
     state.map:SetPoint("CENTER", panel, "CENTER", 0, -4)
+    state.alignPicker = CreateFrame("Button", nil, state.map)
+    state.alignPicker:SetAllPoints(state.map)
+    state.alignPicker:RegisterForClicks("LeftButtonUp")
+    state.alignPicker:SetScript("OnClick", function() setLiveReference(state) end)
+    state.alignPicker:Hide()
     state.livePanel = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+    state.livePanel:SetPoint("CENTER", panel, "CENTER", 0, -4)
     state.livePanel:Hide()
     style.Panel(state.livePanel, style.background)
     style.Label(state.livePanel, "Live-Minimap", 10, -5, 160, 22, "GameFontHighlightSmall", style.gold)
     state.floorZoom = button(state.livePanel, "Ganze Etage", 0, 0, 124, function()
-        state.fullFloor = not state.fullFloor
+        state.viewMode = "floor"
         guide.UpdateWorldOverlay(map)
     end)
     state.floorZoom:ClearAllPoints()
-    state.floorZoom:SetPoint("BOTTOM", state.livePanel, "BOTTOM", 0, 7)
-    state.routePane = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    state.routePane:Hide()
-    style.Panel(state.routePane, style.background)
-    state.routeTitle = style.Label(state.routePane, "Routenübersicht", 10, -5, 160, 22, "GameFontHighlightSmall", style.gold)
+    state.floorZoom:SetPoint("BOTTOM", state.livePanel, "BOTTOM", -67, 7)
+    state.alignButton = button(state.livePanel, "Position setzen", 0, 0, 124, function()
+        state.liveReference = nil
+        state.viewMode = "align"
+        guide.UpdateWorldOverlay(map)
+    end)
+    state.alignButton:ClearAllPoints()
+    state.alignButton:SetPoint("BOTTOM", state.livePanel, "BOTTOM", 67, 7)
     state.liveRoute = CreateFrame("Frame", nil, state.livePanel)
     state.liveRoute:SetAllPoints(state.livePanel)
     state.liveRoute:EnableMouse(false)
@@ -1050,7 +1057,7 @@ local function createWorldOverlay(map)
     state.wings:ClearAllPoints()
     state.wings:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -146, -6)
     state.liveSwitch = button(panel, "Live-Minimap", 0, 0, 114, function()
-        state.liveWanted = not state.liveWanted
+        if state.viewMode == "live" then state.viewMode = nil else state.viewMode = "live" end
         guide.UpdateWorldOverlay(map)
     end)
     state.liveSwitch:ClearAllPoints()
@@ -1066,11 +1073,27 @@ local function createWorldOverlay(map)
         if HideUIPanel then HideUIPanel(map) elseif map.Hide then map:Hide() end
         guide.Open(entry.key, "loot", floor, stop.loot or stop.name)
     end
-    map:HookScript("OnHide", function() hideLiveMinimap(state) end)
+    map:HookScript("OnHide", function()
+        if state.viewMode == "align" then state.viewMode = "live" end
+        hideLiveMinimap(state)
+    end)
     local events = CreateFrame("Frame")
-    app.RegisterSupported(events, "PLAYER_REGEN_ENABLED")
-    events:SetScript("OnEvent", function()
-        if not state.liveWanted or not state.livePanel:IsVisible() then restoreMinimap(state) end
+    for _, event in ipairs({ "PLAYER_REGEN_ENABLED", "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING",
+        "PLAYER_LEAVING_WORLD", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA" }) do
+        app.RegisterSupported(events, event)
+    end
+    events:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_ENABLED" then
+            if not state.livePanel:IsVisible() then restoreMinimap(state) end
+            return
+        end
+        if event == "PLAYER_STOPPED_MOVING" then
+            state.moving = nil
+            return
+        end
+        if event == "PLAYER_STARTED_MOVING" then state.moving = true end
+        state.liveReference = nil
+        if state.livePanel:IsVisible() then updateMinimapRoute(state, true) end
     end)
     return state
 end
@@ -1079,8 +1102,9 @@ function guide.ResetWorldOverlay()
     outdoorRequested = nil
     if worldView then
         worldView.outdoor, worldView.manualEntry, worldView.manualFloor = nil, nil, nil
-        worldView.positionFloor, worldView.liveWanted, worldView.fullFloor = nil, nil, nil
         hideLiveMinimap(worldView)
+        worldView.positionFloor, worldView.viewMode, worldView.liveZoom, worldView.liveReference, worldView.moving =
+            nil, nil, nil, nil, nil
     end
 end
 
@@ -1132,27 +1156,29 @@ function guide.UpdateWorldOverlay(map)
     state.title:SetText(guide.Name(selected))
     state.map:SetFrameLevel(level + 2)
     state.livePanel:SetFrameLevel(level + 1)
-    state.routePane:SetFrameLevel(level + 1)
-    local wanted = state.liveWanted
-    local live = wanted and showLiveMinimap(state, layoutLiveViews(state, width, height))
+    state.alignPicker:SetFrameLevel(level + 14)
+    local mode = state.viewMode
+    local wanted = mode == "live"
+    state.livePanel:SetSize(width - 16, height - 72)
+    local live = wanted and showLiveMinimap(state, math.max(1, math.floor(math.min(width - 32, height - 130))))
     state.liveSwitch:SetShown(Minimap ~= nil)
-    state.liveSwitch:SetText(L(live and "Nur Routenkarte" or "Live-Minimap"))
-    state.wings:SetShown(#candidates > 1)
-    state.routePane:SetShown(live == true)
+    state.liveSwitch:SetText(L(live and "Routenkarte" or mode and not wanted and "Zur Live-Minimap" or "Live-Minimap"))
+    state.wings:SetShown(not live and #candidates > 1)
+    state.prevFloor:SetShown(not live)
+    state.nextFloor:SetShown(not live)
+    state.map:SetShown(not live)
+    state.alignPicker:SetShown(mode == "align")
     if live then
-        state.floorZoom:SetText(L(state.fullFloor and "Live vergrößern" or "Ganze Etage"))
-        state.routeTitle:SetText(L(state.fullFloor and "Ganze Etage" or "Routenübersicht"))
-        renderMap(state, state.selection)
         state.livePanel:Show()
+        state.floorName:SetText(guide.floors[selectedFloor] and guide.Name(guide.floors[selectedFloor]) or "")
         updateMinimapRoute(state, true)
         return
     end
-    state.liveWanted = nil
+    if wanted then state.viewMode = nil end
     hideLiveMinimap(state)
-    state.map.compact, state.map.preferMinimapArt = nil, nil
-    state.map:ClearAllPoints()
-    state.map:SetPoint("CENTER", state.panel, "CENTER", 0, -4)
+    state.map.preferMinimapArt = mode == "align" or mode == "floor"
     state.map:SetSize(fit * 3, fit * 2)
     renderMap(state, state.selection)
-    if wanted then state.mapNote:SetText(L("Live-Minimap nicht verfügbar")) end
+    if mode == "align" then state.mapNote:SetText(L("Stillstehen und Standort anklicken"))
+    elseif wanted then state.mapNote:SetText(L("Live-Minimap nicht verfügbar")) end
 end

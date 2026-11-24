@@ -985,12 +985,16 @@ local fullWidth = dungeonCanvas:GetWidth()
 liveSwitch.scripts.OnClick()
 local dock = Minimap:GetParent()
 assert(dock ~= home and Minimap:IsVisible() and north and Minimap:GetWidth() > 198 and Minimap:GetZoom() == 0)
-assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() < fullWidth and liveSwitch.textValue == "Nur Routenkarte",
-    "The overview and its boss pins stay visible alongside the live minimap without player coordinates")
-assert(dungeonCanvas.lines[1]:IsVisible() and dungeonCanvas.pins[1]:IsVisible())
+assert(not dungeonCanvas:IsVisible() and liveSwitch.textValue == "Routenkarte",
+    "The live view never shows the floor map beside the minimap")
 assert(MinimapBackdrop:GetAlpha() == 0 and not PaulchenQoLMinimapButton:IsShown() and not launcher:IsShown())
+Minimap:SetZoom(1)
+textWidget("Ganze Etage").scripts.OnClick()
+restoreChecked()
+assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() == fullWidth and dungeonCanvas.lines[1]:IsVisible())
+assert(liveSwitch.textValue == "Zur Live-Minimap")
 local artFloor = guide.floors[dungeonCanvas.positionFloor]
-assert(dungeonCanvas.art[1].textureID == artFloor.art[1][1], "The combined view uses the local minimap artwork")
+assert(dungeonCanvas.art[1].textureID == artFloor.art[1][1], "The full-floor view uses the local minimap artwork")
 local firstTexture = dungeonCanvas.art[1]
 local setTexture = firstTexture.SetTexture
 local missing = {}
@@ -1004,15 +1008,10 @@ assert(firstTexture.textureID == artFloor.tiles[1] and dungeonCanvas.pins[1]:IsV
     "Unavailable minimap assets fall back to normal art with all boss pins intact")
 firstTexture.SetTexture = nil
 guide.UpdateWorldOverlay(map)
-local combinedWidth, liveWidth = dungeonCanvas:GetWidth(), Minimap:GetWidth()
-Minimap:SetZoom(1)
-textWidget("Ganze Etage").scripts.OnClick()
-assert(dungeonCanvas:GetWidth() > combinedWidth and Minimap:GetWidth() < liveWidth and Minimap:GetParent() == dock)
-assert(Minimap:IsVisible() and Minimap:GetZoom() == 1 and dungeonCanvas.lines[1]:IsVisible(),
-    "The whole floor expands the route without changing the native zoom or hiding the live map")
 assert(firstTexture.textureID == artFloor.art[1][1] and dungeonCanvas.pins[1]:IsVisible())
-textWidget("Live vergrößern").scripts.OnClick()
-assert(dungeonCanvas:GetWidth() == combinedWidth and Minimap:GetWidth() == liveWidth)
+liveSwitch.scripts.OnClick()
+assert(not dungeonCanvas:IsVisible() and Minimap:GetParent() == dock and Minimap:GetZoom() == 1,
+    "Returning from the floor view preserves the live zoom")
 local boss = dungeonCanvas.positionEntry.stops[1]
 interiorFloor, coords = boss.floor, {x = boss.x, y = boss.y}
 guide.UpdateWorldOverlay(map)
@@ -1036,8 +1035,48 @@ assert(projected.pins[1].stop == boss and select(4, projected.pins[1]:GetPoint()
     "Moving east shifts the projected boss west on the north-up minimap")
 coords = secret
 dock.scripts.OnUpdate(dock, .11)
-assert(not projected:IsShown() and dungeonCanvas.pins[1]:IsVisible(),
-    "Losing readable coordinates clears the direct overlay without hiding the overview")
+assert(not projected:IsShown() and not dungeonCanvas:IsVisible(),
+    "Unavailable coordinates never open an unsolicited second map")
+local speed = 0
+function GetUnitSpeed() return speed end
+function dungeonCanvas:GetEffectiveScale() return .8 end
+function dungeonCanvas:GetLeft() return 70 end
+function dungeonCanvas:GetTop() return 500 end
+function GetCursorPosition()
+    return (70 + boss.x * dungeonCanvas:GetWidth()) * .8, (500 - boss.y * dungeonCanvas:GetHeight()) * .8
+end
+local function settingPosition()
+    textWidget("Position setzen").scripts.OnClick()
+    assert(dungeonCanvas:IsVisible() and Minimap:GetParent() == home)
+    for _, child in ipairs(dungeonCanvas.children) do
+        if child:IsVisible() and child.scripts.OnClick then return child end
+    end
+    error("Missing position picker")
+end
+local picker = settingPosition()
+fire("PLAYER_STARTED_MOVING")
+picker.scripts.OnClick()
+assert(dungeonCanvas:IsVisible(), "A moving player cannot set a stationary reference")
+fire("PLAYER_STOPPED_MOVING")
+picker.scripts.OnClick()
+assert(Minimap:GetParent() == dock and not dungeonCanvas:IsVisible() and projected:IsVisible())
+assert(projected.pins[1].stop == boss and math.abs(select(4, projected.pins[1]:GetPoint())) < .001)
+assert(textWidget("Manuell ausgerichtet"):IsVisible())
+map:Hide()
+restoreChecked()
+map:Show()
+flush()
+assert(projected:IsVisible(), "The manual alignment survives closing the map while standing still")
+fire("PLAYER_STARTED_MOVING")
+assert(not projected:IsShown() and not dungeonCanvas:IsVisible(), "Moving clears the manual alignment")
+fire("PLAYER_STOPPED_MOVING")
+picker = settingPosition()
+picker.scripts.OnClick()
+assert(projected:IsVisible())
+speed = 1
+dock.scripts.OnUpdate(dock, .11)
+assert(not projected:IsShown(), "A readable speed can also invalidate the manual position")
+speed = 0
 Minimap:SetZoom(2)
 local hostWidth, hostHeight = map.ScrollContainer:GetSize()
 map.ScrollContainer:SetSize(hostWidth, hostHeight - 50)
@@ -1073,7 +1112,7 @@ liveSwitch.scripts.OnClick()
 restoreChecked()
 assert(dungeonCanvas:IsVisible(), "An unavailable Minimap leaves the route view and the HUD in place")
 combat = false
-Minimap, C_Minimap, GetCVarBool = nil, nil, nil
+Minimap, C_Minimap, GetCVarBool, GetUnitSpeed, GetCursorPosition = nil, nil, nil, nil, nil
 MinimapBackdrop, PaulchenQoLMinimapButton = nil, nil
 
 C_Map.GetPlayerMapPosition = oldPositionAPI
