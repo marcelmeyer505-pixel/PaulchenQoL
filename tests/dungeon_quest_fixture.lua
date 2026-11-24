@@ -1,9 +1,9 @@
 -- Self-contained dungeon quest planner regression tests (Lua 5.1).
 -- No Polestar globals/addon/quest data are loaded. Run from repo root.
-local characterDB = {}
+local characterDB, protected = {}, {}
 local app = {
     style = {},
-    Readable = function(v) return v end,
+    Readable = function(v) if v ~= protected then return v end end,
     GetLanguage = function() return "deDE" end,
     RegisterSupported = function() return true end,
     Settings = function() return characterDB end,
@@ -75,9 +75,14 @@ assert(westfallQuest.start and westfallQuest.start.map == 1436, "Deadmines quest
 assert(math.abs(westfallQuest.start.x - 0.562) < 0.00001, "Waypoints need 0..1 coordinates")
 local waypoint
 _G.UiMapPoint = { CreateFromCoordinates = function(map, x, y) return {map=map, x=x, y=y} end }
-_G.C_Map = { SetUserWaypoint = function(point) waypoint=point end }
+_G.C_Map = { SetUserWaypoint = function(point) waypoint = point; return true end }
 assert(provider.GuideToPoint(westfallQuest.start) == true)
 assert(waypoint and waypoint.map == 1436 and math.abs(waypoint.x - 0.562) < 0.00001)
+local openedMap
+_G.C_Map.SetUserWaypoint = function() return false end
+_G.C_Map.OpenWorldMap = function(map) openedMap = map end
+_G.C_SuperTrack = { SetSuperTrackedUserWaypoint = function() error("An unavailable waypoint must not be tracked") end }
+assert(provider.GuideToPoint(westfallQuest.start) and openedMap == 1436)
 
 -- NPCs inside dungeons are known, but must not have invented outdoor coordinates.
 local thaelrid = assert(provider.Quest("BFD", 6561))
@@ -110,6 +115,14 @@ for _, f in ipairs(frames) do
     if f.OnEvent then f:OnEvent("QUEST_DETAIL") end
 end
 assert(characterDB.dungeonQuestLocations[6561].giver.x == 0.51)
+_G.C_Map.GetPlayerMapPosition = function()
+    return { x = 0.9, y = 0.9, GetXY = function() return protected, 0.8 end }
+end
+for _, f in ipairs(frames) do
+    if f.OnEvent then f:OnEvent("QUEST_DETAIL") end
+end
+assert(characterDB.dungeonQuestLocations[6561].giver.x == 0.51,
+    "Protected coordinate components must not replace an existing sighting")
 local chainSource = provider.Quest("WC", 914)
 assert(chainSource and #chainSource.chain == 3)
 assert(provider.Prerequisites(914)[1] == 1489)

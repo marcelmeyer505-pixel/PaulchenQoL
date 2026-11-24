@@ -5,10 +5,15 @@ local provider = {}
 app.DungeonQuestData = provider
 
 local function sources() return app.dungeonQuestSeed or {} end
+local function plain(value)
+    if app.Readable then return app.Readable(value) end
+    return value
+end
+
 local function safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok, value = pcall(fn, ...)
-    if ok and (not app.Readable or app.Readable(value) ~= nil) then return value end
+    if ok then return plain(value) end
 end
 
 local index
@@ -151,14 +156,14 @@ function provider.RecordSighting(id, role, npcID, npcName, map, x, y)
     if type(id) ~= "number" or id < 1 or (role ~= "giver" and role ~= "ender")
         or type(npcID) ~= "number" or type(map) ~= "number"
         or type(x) ~= "number" or type(y) ~= "number"
-        or x < 0 or x > 1 or y < 0 or y > 1 then return false end
+        or not (x >= 0 and x <= 1 and y >= 0 and y <= 1) then return false end
     local record = sources().quests and sources().quests[id]
     if type(record) ~= "table" then return false end
     local keys = role == "giver" and record.starts or record.ends
     -- Only learn from an actual dialogue with a matching existing NPC.
     -- The exceptional case of a missing start/end list can be learned too.
     local accepted = type(keys) ~= "table" or #keys == 0
-    for _, code in ipairs(keys or {}) do
+    for _, code in ipairs(type(keys) == "table" and keys or {}) do
         if code == "npc:" .. npcID then accepted = true; break end
         local named = sources().places and sources().places[code]
         if named and named.name == npcName and type(npcName) == "string"
@@ -269,8 +274,7 @@ function provider.GuideToPoint(point)
     if mapPoint and C_Map and C_Map.SetUserWaypoint then
         local marker = safe(mapPoint, map, x, y)
         if marker then
-            local ok = pcall(C_Map.SetUserWaypoint, marker)
-            if ok then
+            if safe(C_Map.SetUserWaypoint, marker) == true then
                 if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
                     pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
                 end
@@ -310,11 +314,13 @@ local function observeInteraction(role)
     local position = map and safe(C_Map and C_Map.GetPlayerMapPosition, map, "player")
     if not position then return end
     local x, y
-    if type(position.GetXY) == "function" then
-        local ok, a, b = pcall(position.GetXY, position)
-        if ok then x, y = a, b end
+    local getXY = plain(position.GetXY)
+    if type(getXY) == "function" then
+        local ok, a, b = pcall(getXY, position)
+        if ok then x, y = plain(a), plain(b) end
+    else
+        x, y = plain(position.x), plain(position.y)
     end
-    x, y = x or position.x, y or position.y
     if provider.RecordSighting(id, role, npcID, npcName, map, x, y)
         and app.dungeonQuests and app.dungeonQuests.Refresh then
         app.dungeonQuests.Refresh()
@@ -326,6 +332,7 @@ for _, event in ipairs({"QUEST_DATA_LOAD_RESULT", "QUEST_DETAIL", "QUEST_PROGRES
     if app.RegisterSupported then app.RegisterSupported(pending, event) end
 end
 pending:SetScript("OnEvent", function(_, event, id, success)
+    id, success = plain(id), plain(success)
     if event == "QUEST_DETAIL" then
         observeInteraction("giver")
     elseif event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
