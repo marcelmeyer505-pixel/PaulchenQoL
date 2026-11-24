@@ -34,6 +34,8 @@ Bei aktiven Kampf-/Client-/Chatrestriktionen wird nichts gesendet. Moderne Chat-
 
 **Paulchens Logbuch** zeigt die letzten zehn Kämpfe, eigene DPS mit Durchschnitt, Crit-Rekorde, Gegnerprofile sowie EP-Statistiken und Farmrunden. Die Kompaktansicht zeigt zwei wählbare Kennzahlen und die Steuerung für Farmrunden. **Paulchen Upgrades** vergleicht Ausrüstung inklusive manuell geplanter Charakterstufe, Spalten, Filtern und Loot-Alarm. Der Auktionsscan liefert Marktangebote an das Upgrade-Fenster.
 
+**Paulchens Beute** öffnet sich bei neu erfasster Beute und zeigt Item-Symbol, Tooltip und den Zugewinn für das aktive Statprofil. Bei Gruppenbeute kannst du mit **Bedarf**, **Gier** oder **Passen** abstimmen und die vom Spiel gemeldeten Entscheidungen, Wurfzahlen und Gewinner sehen. Bestätigungen für bindende Beute laufen über WoW. Ziehe das Fenster an der Titelleiste oder öffne die letzten Funde erneut über `/pq beute`, `/pq loot` oder das Minimap-Menü. Der Loot-Alarm schaltet die zusätzliche Chat- und Tonmeldung für Upgrades um.
+
 **Upgrades → Statprofile** bietet 28 Startprofile für die neun Klassen in Forever. Katze und Bär haben eigene Profile. Wähle die Spezialisierung und passe die Punkte pro Attribut an. Paulchen speichert deine Auswahl und Änderungen pro Charakter. Der Profilname steht oben im Upgrade-Fenster und neben dem Vergleich im Item-Tooltip. Die Vorgaben sind Ausgangswerte für die Ausrüstungssuche.
 
 **Feral Katze** startet mit 1,90 Punkten pro Beweglichkeit, 0,80 pro Stärke, 0,40 pro Angriffskraft und 5,60 pro Nahkampfwaffen-DPS. Dazu kommen 10,20 pro Prozent Krit, 8,77 pro Prozent Trefferchance, 4,78 pro Prozent Angriffstempo, 0,85 pro Waffenkundewertung und 0,13 pro Rüstungsdurchschlag.

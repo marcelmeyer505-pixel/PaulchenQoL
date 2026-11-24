@@ -52,6 +52,7 @@ Modules\Upgrades\Tooltip.lua
 Modules\Upgrades\AuctionFilter.lua
 Modules\Upgrades\AuctionFilter.xml
 Modules\Upgrades\Loot.lua
+Modules\Upgrades\LootWindow.lua
 Modules\Upgrades\Window.lua
 Modules\DTL\History.lua
 Modules\DTL\OpponentProfiles.lua

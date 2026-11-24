@@ -228,6 +228,8 @@ function app.CompanionCommand(message)
         ToggleWorldMap()
     elseif (cmd == "instanzen" or cmd == "instances") and app.instances then
         app.OpenDashboard("instances")
+    elseif (cmd == "beute" or cmd == "loot") and app.upgrades and app.upgrades.loot then
+        app.upgrades.loot.Open()
     elseif (cmd == "komfort" or cmd == "comfort") and app.comfort then
         if window then window:Hide() end
         app.comfort.Open()
@@ -245,7 +247,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, instances, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, instances, loot, lang auto|de|en]")
     end
     refreshSettings()
 end
