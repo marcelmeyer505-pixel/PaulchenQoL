@@ -22,6 +22,7 @@ Flight.lua
 Config.lua
 MountGloves.lua
 QuestMap.lua
+DungeonQuests.lua
 UI.lua
 BuffCheck.lua
 Events.lua
