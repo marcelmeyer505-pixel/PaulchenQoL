@@ -19,7 +19,10 @@ end
 local function safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok, result = pcall(fn, ...)
-    if ok then return readable and readable(result) or result end
+    if ok then
+        if readable then return readable(result) end
+        return result
+    end
 end
 
 local function dataSource()
@@ -448,7 +451,7 @@ local function render()
     end
     local selected
     for _, row in ipairs(snapshot.quests) do if row.id == selectedQuest then selected = row; break end end
-    local chain, completed = selected and planner.Chain(selectedQuest, snapshot) or {}, 0
+    local chain, completed = {}, 0
     if selected then chain, completed = planner.Chain(selectedQuest, snapshot) end
     frame.selected:SetText(selected and (selected.title .. " (#" .. selected.id .. ")") or "")
     frame.questgiver:SetText(selected and (L("Questgeber: ", "Quest giver: ") .. pointText(selected.giver)) or "")
@@ -465,7 +468,8 @@ local function render()
         row:SetShown(step ~= nil)
         if step then
             row:SetText(("%d. [%s] %s"):format(index + chainOffset, stateText(step.status), step.title))
-            row:SetTextColor(stateColor(step.status))
+            local text = row.GetFontString and row:GetFontString()
+            if text then text:SetTextColor(stateColor(step.status)) end
         end
     end
 end
