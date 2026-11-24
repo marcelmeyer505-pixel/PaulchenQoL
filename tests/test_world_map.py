@@ -117,6 +117,7 @@ GameTooltip = { IsOwned = function() return false end }
 WorldMapFrame = CreateFrame("Frame", nil, UIParent)
 local map = WorldMapFrame
 map.ScrollContainer = CreateFrame("Frame", nil, map)
+map.ScrollContainer.Child = CreateFrame("Frame", nil, map.ScrollContainer)
 function map.ScrollContainer:GetHorizontalScroll()
     return self.scrollX or self:GetWidth() * (1 - 1 / map:GetCanvasScale()) / 2
 end
@@ -132,7 +133,7 @@ map.BorderFrame.NineSlice = CreateFrame("Frame", nil, map.BorderFrame)
 map.BlackoutFrame = CreateFrame("Frame", nil, map)
 map.id, map.providers = 1411, {}
 function map:GetMapID() return self.id end
-function map:GetCanvas() return self.ScrollContainer end
+function map:GetCanvas() return self.ScrollContainer.Child end
 function map:GetCanvasScale() return self.canvasScale or 2 end
 function map:IsMaximized() return self.maximized end
 function map:OnFrameSizeChanged() self.sized = (self.sized or 0) + 1 end
@@ -248,6 +249,7 @@ binding = ElementTree.parse(root / "Bindings.xml").getroot().find("./Binding[@na
 assert binding is not None
 lua.execute(r'''
 app.SecureCall = function(_, call, ...) call(...) end -- Fail the fixture if any guarded path errors.
+realFlightLandmarks, app.mapFlightLandmarks = app.mapFlightLandmarks, {}
 local world, comfort = app.worldMap, app.comfort
 local map = WorldMapFrame
 local function count(id, kind)
@@ -293,9 +295,12 @@ comfort.SetEnabled("mapMouseCoords", true)
 flush()
 assert(#map.providers == 3 and map.providers[1].used == 1, "Ready quests remain on the map without other addons")
 local waypoints = map.providers[2]
-for _, pin in ipairs(waypoints.pins) do
-    assert(pin.point.name ~= "Horde", "A native flight pin takes precedence over the same location")
+local ownFlight
+for index = 1, waypoints.used do
+    local pin = waypoints.pins[index]
+    if pin.point.name == "Horde" then ownFlight = pin end
 end
+assert(ownFlight and ownFlight:IsVisible(), "A native pin that reports shown cannot suppress the raised marker")
 assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -49)
 assert(map.BorderFrame.NineSlice:GetAlpha() == 0 and not map.BlackoutFrame:IsShown())
 local function widget(text)
@@ -606,6 +611,7 @@ assert(north and not north.point.members and strath, "Zone redraw restores indiv
 local layer = assert(provider.layer)
 assert(strath:GetParent() == layer and layer:GetParent() == map and layer.clipsChildren,
     "Entrance buttons sit in a separate clipped viewport, outside the map artwork")
+assert(north:GetParent() == layer and travelProvider.layer == layer and north:GetFrameLevel() < strath:GetFrameLevel())
 assert(layer:GetFrameStrata() == "DIALOG" and strath:GetFrameLevel() > map.BorderFrame:GetFrameLevel())
 assert(strath.icon.atlasID == "Dungeon" and not strath.badge:IsShown(), "Use the game's blue dungeon icon")
 assert(north.icon.atlasID == "TaxiNode_Horde")
@@ -613,16 +619,21 @@ local _, _, _, anchorX, anchorY = strath:GetPoint()
 assert(anchorX == strath.point.x * 700 and anchorY == -strath.point.y * 500)
 map.canvasScale = 1.8
 provider:OnCanvasScaleChanged()
-canvas.scrollX, canvas.scrollY = 80, 30
+travelProvider:OnCanvasScaleChanged()
+local viewport = map.ScrollContainer
+viewport.scrollX, viewport.scrollY = 80, 30
 provider:OnCanvasPanChanged()
+travelProvider:OnCanvasPanChanged()
 local _, _, _, zoomedX, zoomedY = strath:GetPoint()
 assert(zoomedX == (anchorX - 80) * 1.8 and zoomedY == (anchorY + 30) * 1.8 and strath:GetScale() == 1,
     "Elevated entrances follow viewport zoom and pan without changing icon size")
 assert(strath:IsVisible())
-canvas.scrollX = 300
+local _, _, _, travelX, travelY = north:GetPoint()
+assert(travelX == (north.point.x * 700 - 80) * 1.8 and travelY == (30 - north.point.y * 500) * 1.8)
+viewport.scrollX = 300
 provider:OnCanvasPanChanged()
 assert(not strath:IsShown(), "An off-map entrance does not leak beyond the viewport or intercept clicks")
-canvas.scrollX, canvas.scrollY = nil, nil
+viewport.scrollX, viewport.scrollY = nil, nil
 map.canvasScale, C_TaxiMap.GetTaxiNodesForMap = nil, getTaxiNodes
 
 map.canvasScale = 1
@@ -650,6 +661,62 @@ for index = 1, travelProvider.used do
     if pin.icon.atlasID then seenAtlases[pin.icon.atlasID] = true end
 end
 assert(seenAtlases.MagePortalHorde and seenAtlases.TaxiNode_Alliance and seenAtlases.Garr_LevelUpgradeArrow)
+
+app.mapFlightLandmarks = realFlightLandmarks
+explored = {}
+C_TaxiMap.GetTaxiNodesForMap = function() return {} end
+app.comfort.SetEnabled("mapReveal", false)
+app.comfort.SetEnabled("mapOtherFaction", false)
+fire("MAP_EXPLORATION_UPDATED")
+flush()
+local function visibleMarker(name, kind)
+    for i = 1, travelProvider.used do
+        local pin = travelProvider.pins[i]
+        if pin:IsVisible() and pin.point.name == name and pin.point.kind == kind then return pin end
+    end
+end
+local orgrimmar = assert(visibleMarker("Orgrimmar, Durotar", "flight"))
+assert(orgrimmar:GetParent() == layer and orgrimmar.icon.atlasID == "TaxiNode_Horde" and travelProvider.tileCount == 0,
+    "A completely unexplored map still has flight icons when the taxi API returns nothing")
+assert(visibleMarker("Undercity", "portal") and map.providers[1].used == 1)
+app.comfort.SetEnabled("mapReveal", true)
+flush()
+assert(visibleMarker("Orgrimmar, Durotar", "flight") and travelProvider.tileCount > 0)
+assert(travelProvider.art:GetParent() == canvas and layer:GetFrameLevel() > travelProvider.art:GetFrameLevel())
+
+map:SetMapID(1423)
+flush()
+local chapel = assert(visibleMarker("Kapelle des hoffnungsvollen Lichts, östliche Pestländer", "flight"))
+assert(chapel.point.faction == "Horde" and chapel.point.x > .70 and chapel.point.x < .71)
+local count = 0
+for _, point in ipairs(app.worldMap.Collect(1423)) do
+    if point.kind == "flight" then count = count + 1 end
+end
+assert(count == 1, "Fallback flight points respect the faction option")
+app.comfort.SetEnabled("mapOtherFaction", true)
+C_TaxiMap.GetTaxiNodesForMap = function(id)
+    if id == 1423 then
+        return {{ nodeID = 68, name = "Client flight name", faction = 1, position = {x = .67, y = .48},
+            isUndiscovered = true }}
+    end
+end
+fire("TAXI_NODE_STATUS_CHANGED")
+flush()
+chapel = assert(visibleMarker("Client flight name", "flight"))
+assert(chapel.point.x == .67 and chapel.point.note == "Noch nicht entdeckt")
+local allianceChapel = assert(visibleMarker("Kapelle des hoffnungsvollen Lichts, östliche Pestländer", "flight"))
+assert(allianceChapel.point.faction == "Alliance")
+for _, point in ipairs(app.worldMap.Collect(1423)) do
+    assert(point.kind ~= "flight" or point.faction ~= "Horde" or point.name == "Client flight name",
+        "The native taxi location supersedes the fallback with the same node ID")
+end
+app.comfort.SetEnabled("mapFlight", false)
+flush()
+assert(not visibleMarker("Client flight name", "flight") and not allianceChapel:IsVisible())
+app.comfort.SetEnabled("mapFlight", true)
+C_TaxiMap.GetTaxiNodesForMap = getTaxiNodes
+map:SetMapID(1411)
+flush()
 map.canvasScale = nil
 
 local inDungeon, dungeonID, interiorFloor = false, nil, nil

@@ -111,7 +111,7 @@ local function collectSources(id)
     return maps
 end
 
-local function dungeonSources(id, maps, isWorld)
+local function includeWorldZones(id, maps, isWorld)
     if not isWorld then return maps end
     local result, seen = { id }, { [id] = true }
     local function include(zones)
@@ -142,11 +142,16 @@ local function nameAndPosition(record)
     return plain(record.name), world.Vector(plain(record.position))
 end
 
+local function flightOwner(faction)
+    if faction == factions.Alliance then return "Alliance" end
+    if faction == factions.Horde then return "Horde" end
+end
+
 function world.CollectEntrances(id)
     local points = {}
     local info = world.Info(id)
     if type(id) == "number" and options.Enabled("mapDungeons") then
-        local sources = dungeonSources(id, collectSources(id), info and plain(info.mapType) == mapType.World)
+        local sources = includeWorldZones(id, collectSources(id), info and plain(info.mapType) == mapType.World)
         world.CollectDungeons(id, sources, points)
     end
     return points
@@ -168,15 +173,18 @@ function world.Collect(id, excludeDungeons)
         if not x then return end
         for _, other in ipairs(points) do
             if other.kind == kind and (other.name == name or target and other.target == target)
-                and math.abs(other.x - x) < 0.012 and math.abs(other.y - y) < 0.012 then return end
+                and (kind ~= "flight" or other.faction == owner)
+                and math.abs(other.x - x) < 0.012 and math.abs(other.y - y) < 0.012 then return true end
         end
         points[#points + 1] = {
             kind = kind, x = x, y = y, name = name, target = target, source = source, note = note, atlas = atlas,
             faction = owner,
         }
+        return true
     end
 
     local showFlight = options.Enabled("mapFlight") and (not isWorld or options.Enabled("mapFlightsOnWorld"))
+    local seenFlights = {}
     local showPortal = options.Enabled("mapPortals")
     local showCross = options.Enabled("mapCrossings")
     local showTransport = options.Enabled("mapTransport")
@@ -188,13 +196,14 @@ function world.Collect(id, excludeDungeons)
         if showFlight then
             for _, raw in ipairs(list(C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap, source)) do
                 local node = plain(raw)
-                if node then
-                    local owner = plain(node.faction)
-                    owner = owner == factions.Alliance and "Alliance" or owner == factions.Horde and "Horde" or nil
+                local nodeID = node and plain(node.nodeID)
+                if node and not seenFlights[nodeID] then
+                    local owner = flightOwner(plain(node.faction))
                     if allowed(owner) then
                         local name, x, y = nameAndPosition(node)
                         local note = plain(node.isUndiscovered) == true and app.L("Noch nicht entdeckt") or nil
-                        add("flight", source, x, y, name, nil, note, plain(node.atlasName), owner)
+                        local added = add("flight", source, x, y, name, nil, note, plain(node.atlasName), owner)
+                        if added and type(nodeID) == "number" then seenFlights[nodeID] = true end
                     end
                 end
             end
@@ -266,6 +275,18 @@ function world.Collect(id, excludeDungeons)
                 if grave then
                     local name, x, y = nameAndPosition(grave)
                     add("healer", source, x, y, name or app.L("Geistheiler"))
+                end
+            end
+        end
+    end
+    if showFlight then
+        local nameIndex = app.GetLanguage() == "deDE" and 6 or 5
+        for _, source in ipairs(includeWorldZones(id, sources, isWorld)) do
+            for _, node in ipairs(app.mapFlightLandmarks[source] or {}) do
+                local owner = flightOwner(node[4])
+                if not seenFlights[node[1]] and allowed(owner)
+                    and add("flight", source, node[2], node[3], node[nameIndex], nil, nil, nil, owner) then
+                    seenFlights[node[1]] = true
                 end
             end
         end

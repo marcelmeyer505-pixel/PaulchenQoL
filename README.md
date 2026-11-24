@@ -204,7 +204,7 @@ Der Instanzführer und seine Fundorte für Upgrades funktionieren bei deaktivier
 
 In bekannten Instanzen startet die normale Kartentaste mit der Innenkarte und der Route. **Weltkarte** wechselt zur Außenansicht, **Instanzkarte** wieder zurück. Über **Flügel** und die Pfeile kannst du den Abschnitt und die Ebene manuell wählen. Die Innenkarte und die Routenlinie lassen sich in **Komfort → Weltkarte & Erkundung** getrennt schalten.
 
-Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Paulchens zusätzliche Flugpunkte starten auf den Kontinentkarten. Die Option **Flugpunkte auch auf der Azeroth-Übersicht** blendet sie dort ebenfalls ein. Falls Titan Panel Koordinaten auf derselben Karte anzeigt, blendet Paulchen die entsprechenden Titan-Labels aus, solange seine eigene Anzeige aktiv ist.
+Reisemarker und Instanzeingänge liegen über dem Kartennebel. Fehlen Flugpunkte in den Live-Daten, ergänzt Paulchen bekannte Standorte aus den [Flugpunktdaten des Forever-Clients](https://wago.tools/db2/TaxiNodes?build=1.60.1.70959). Instanzeingänge sind auch auf der Azeroth-Übersicht verfügbar. Für Flugpunkte lässt sich das unter **Flugpunkte auch auf der Azeroth-Übersicht** einschalten. Falls Titan Panel Koordinaten auf derselben Karte anzeigt, blendet Paulchen die entsprechenden Titan-Labels aus, solange seine eigene Anzeige aktiv ist.
 
 Kleine runde Marker bündeln nahe Reisepunkte und Instanzeingänge auf Übersichtskarten. Ein Rechtsklick auf einen Reise-Sammelmarker öffnet seine Ziele. Auf Gebietskarten werden Reisepunkte einzeln angezeigt. Eng benachbarte Eingänge bleiben über die Flügelauswahl erreichbar.
 
