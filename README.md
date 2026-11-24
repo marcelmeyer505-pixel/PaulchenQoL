@@ -1,18 +1,32 @@
 # Paulchen QoL v0.12.0
 
-## Paulchens Instanz-Questplaner (Entwicklungszweig)
+## Paulchens Instanz-Questplaner – ohne Polestar (Entwicklungszweig)
 
-Öffne den neuen Planer über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder **`/pq quests`** (auch `/pq dungeons`). Die Ansicht nutzt die **optionale** Laufzeitdaten-Schnittstelle von **Polestar.Dungeons** und zeigt bekannte Instanzquests für die eigene Fraktion. Ohne installierten bzw. aktivierten Polestar-Dungeon-Kodex wird eine klare Datenquellenmeldung angezeigt; Paulchen behauptet dann nicht, alle Quests zu kennen.
+Der neue **Instanz-Questplaner läuft vollständig eigenständig**, auch wenn Polestar, Dungeon Quest Atlas und alle anderen Quest-Addons **nicht installiert** sind. Öffne ihn über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder `/pq quests` beziehungsweise `/pq dungeons`.
 
-Der Planer enthält eine durchsuchbare Instanzauswahl und Questliste, die Namen und bekannten Koordinaten von Questgeber und Abgabeort, den persönlichen Queststatus (**abgeschlossen**, **abgabebereit**, **im Questlog**, **Vorquests fehlen**, **noch nicht angenommen**, **Status unbekannt**, **nicht mehr erhältlich** bzw. Klassen-/Fraktions-/Stufenbeschränkungen), eine Reihe mit vorausgehenden und zugehörigen Instanz-Folgequests einschließlich deren eigener Questgeber sowie einen **kopierbaren Questbericht**. Den Questgeber und die Abgabe kannst du mit Polestars vorhandenem Wegpunkt-/Navigationssystem ansteuern, wenn dafür Koordinaten verfügbar sind. Klick auf einen Schritt der Questreihe öffnet seine Details, auch wenn er selbst nur eine Vorquest außerhalb der Instanz ist.
+### Eigenständige Datenbank
 
-**Datenregeln:** Polestars `chain` ist eine geordnete narrative Questreihe und **nicht automatisch** eine harte Abgabevoraussetzung. Fehlende Pflicht-Vorquests werden nur bei tatsächlich hinterlegten `Codex.Quest`-Voraussetzungen angezeigt (`pre`, `preAll`, `preAny`). Der Abschluss wird über unterstützte WoW-Quest-APIs und ggf. Polestars Kompatibilitätsfunktionen ermittelt; unlesbare/fehlende Statuswerte erscheinen als **unbekannt** und nicht als unerledigt. „Nicht angenommen“ behauptet ausdrücklich nicht, dass der Questgeber die Aufgabe gerade schon anbietet. Die Namen/Koordinaten stammen aus Polestar, und können bei nicht beobachteten Forever-Quests fehlen oder veraltet sein. Questabschlüsse werden **nicht** dauerhaft unabhängig vom Client als erledigt behauptet.
+Die Erweiterung enthält **35 Instanzen bzw. Instanzflügel** mit zusammen **395 Quest-Zuordnungen**, **480 Questdatensätzen** und **309 Questgeber-/Ortsdatensätzen**. Die Daten stammen aus der ausdrücklich MIT-lizenzierten historischen Version **Dungeon Quest Atlas v1.04**, nicht aus dem aktuellen (restriktiver lizenzierten) Release und nicht aus Polestars GPL-Datenbank. Die originalen Lizenz- und Quellenhinweise stehen in `Data/LICENSE-DQA-MIT.txt` und `Data/SOURCES.md`.
 
-Der Planer lädt nur die Daten der aktuell geöffneten Instanz und verwendet keine eigenen Kopien von Polestars Datenbank. Er überprüft den Stand nach Questlog-/Stufenänderungen, ohne selbst Quests anzunehmen oder geschützte Spielfunktionen auszuführen. Deutsche und englische Oberfläche folgen Paulchens bestehender Sprachauswahl.
+**Datenstand Oktober 2026:** Sieben neuere Forever-Instanzen stehen im damaligen Datensatz noch ohne Questzuordnungen: Alcaz Prison, Blackmaw Hold, City of Dalaran, Excavation Site, Krol'dok Stronghold, Shaper's Terrace und The Drowned City. Auch andere Einträge können noch fehlen oder veraltet sein. Der Planer kennzeichnet diese Fälle ausdrücklich und behauptet **keine Vollständigkeit**, solange die Questdaten das nicht belegen.
 
-Die Lua-5.1-Testdatei `tests/dungeon_quest_fixture.lua` prüft Fraktionsfilter, Questgeber, Vorquests, Reihenfolge, aktiv/abgabebereit/abgeschlossen und das Verhalten ohne Polestar. Ein anschließender **Ingame-Test in WoW Forever** mit Polestar ist für echte Datenqualität, Routenführung und Fensterlayout erforderlich.
+### Funktionen
+
+- Durchsuchbare Instanz- und Questliste mit Fraktionsfilter, bereits erledigte Quests optional ausblenden.
+- Questgeber und Abgabeorte, einschließlich mehrerer bekannter NPCs/Objekte und hinterlegter Weltkarten-Koordinaten.
+- Questreihe mit vorherigen und nachfolgenden Schritten; jeder Schritt kann separat ausgewählt werden und zeigt seinen eigenen Questgeber.
+- Charakterfortschritt über die verfügbaren WoW-Quest-APIs: **abgeschlossen, im Questlog, abgabebereit, Vorquests fehlen, Stufe zu niedrig, nicht angenommen, gesperrt oder unbekannt**. Unlesbare Zustände werden nicht geraten.
+- Der Status `Nicht angenommen` bedeutet **nicht**, dass der NPC die Quest gerade schon anbietet. Historische `chain`-Angaben werden als Quellenangaben zu früheren Schritten verwendet.
+- **Zum Questgeber** / **Zur Abgabe** setzt, wenn unterstützt, direkt einen WoW-Wegpunkt oder öffnet die passende Karte. Es wird **keine** Polestar-Navigation benötigt.
+- **Liste kopieren** erzeugt eine vollständige Aufstellung der ausgewählten Instanz mit Status, allen bekannten Questgebern, Abgaben und Questreihen.
+- Das WoW-Spiel liefert lokal verfügbare Questnamen. Fehlt der Titel noch im Client-Cache, fragt Paulchen ihn nach und verwendet bis dahin die Quest-ID. Paulchens Bedientexte sind auf Deutsch und Englisch.
+
+Die Lua-5.1-Tests in `tests/dungeon_quest_fixture.lua` laden die **echten gebündelten Daten** und prüfen Auswahlliste, Fraktion, bekannte Instanzquests, Questreihen, Fortschrittszustände und den Betrieb ohne Polestar.
+
+**Noch erforderlich vor Veröffentlichung:** Im WoW-Forever-Client die Anzeige, Kartenkoordinaten, aktualisierte Questnamen, echte Questzustände und Sonderfälle für neu hinzugefügte Forever-Quests prüfen.
 
 ---
+
 
 
 ## Deutsch / English
