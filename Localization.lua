@@ -742,7 +742,6 @@ local enUS = {
     ["Gier"] = "Greed",
     ["Passen"] = "Pass",
     ["Entzaubern"] = "Disenchant",
-    ["Transmogrifikation"] = "Transmog",
     ["Wahl"] = "Choice",
     ["Wurf"] = "Roll",
     ["Noch %d Sek."] = "%d sec left",

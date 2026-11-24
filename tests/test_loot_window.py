@@ -33,7 +33,9 @@ function GetLootSlotInfo() return 44, "loot", 2 end
 function GetLootRollItemLink(id) return links[id] end
 function GetLootRollItemInfo(id)
     local available = rollInfo[id]
-    if available then return 55, "roll item", 1, 3, true, available.need, available.greed end
+    if available then
+        return 55, "roll item", 1, 3, true, available.need, available.greed, nil, nil, nil, nil, nil, available.transmog
+    end
 end
 function GetLootRollTimeLeft(id) return active[id] end
 function RollOnLoot(id, choice) votes[#votes + 1] = { id, choice } end
@@ -47,6 +49,24 @@ C_LootHistory = {
     GetSortedInfoForDrop = function(_, id) return history[id] end,
     GetLootHistoryTime = function() return now end,
 }
+
+local function nativeWidget(kind, name, parent, click, motion)
+    local frame = CreateFrame(kind, name, parent)
+    frame.alpha, frame.click, frame.motion = 1, click, motion
+    function frame:GetAlpha() return self.alpha end
+    function frame:SetAlpha(value) self.alpha = value end
+    function frame:GetChildren() return unpack(self.children) end
+    function frame:IsProtected() return false end
+    function frame:IsMouseClickEnabled() return self.click end
+    function frame:IsMouseMotionEnabled() return self.motion end
+    function frame:SetMouseClickEnabled(value) self.click = value end
+    function frame:SetMouseMotionEnabled(value) self.motion = value end
+    return frame
+end
+native = nativeWidget("Frame", "GroupLootFrame1", UIParent, false, true)
+nativeButton = nativeWidget("Button", nil, native, true, true)
+confirmation = nativeWidget("Frame", "StaticPopup1", UIParent, true, true)
+native:Hide()
 ''')
 load = lua.eval('function(source,name) assert(loadstring(source, "@" .. name))("PaulchenQoL", app) end')
 for name in ("Localization.lua", "Core.lua", "Style.lua"):
@@ -87,7 +107,20 @@ assert(window.items[1].caption:GetText() == "2× Junk" and not window.greed:IsVi
 assert(next(itemData) == nil, "Ordinary junk does not start item data retries")
 
 links[1], rollInfo[1], active[1] = link, { need = true, greed = true }, 60000
+native.rollID = 1
+native:Show()
+assert(native:GetAlpha() == 1 and nativeButton.click, "Native window stays available until Paulchen has this roll")
 fire("START_LOOT_ROLL", 1, 60000)
+assert(native:IsShown() and native:GetAlpha() == 0 and not native.motion and not nativeButton.click and not nativeButton.motion)
+assert(confirmation:GetAlpha() == 1 and confirmation.click)
+window:Hide()
+assert(native:GetAlpha() == 1 and native.motion and nativeButton.click and nativeButton.motion)
+loot.Open()
+assert(native:GetAlpha() == 0)
+native:Hide()
+assert(native:GetAlpha() == 1 and nativeButton.click)
+native:Show()
+assert(native:GetAlpha() == 0, "A native frame shown after Paulchen is also visually suppressed")
 assert(#loot.drops == 2 and #messages == 1 and #votes == 0)
 local roll = loot.drops[1]
 assert(window.need:IsEnabled() and window.greed:IsEnabled() and window.pass:IsEnabled())
@@ -113,6 +146,8 @@ assert(roll.winner == "Mara" and roll.players.Lina.choice == "pass" and not roll
 assert(window.players[1].name:GetText() == "Mara" and window.players[1].number:GetText() == 99)
 assert(window.status:GetText() == "Gewonnen von Mara" and not window.need:IsEnabled())
 fire("CANCEL_LOOT_ROLL", 1)
+native:Hide()
+assert(native:GetAlpha() == 1 and nativeButton.click)
 loot.Roll(roll, 2)
 assert(#votes == 1)
 
@@ -146,5 +181,14 @@ assert(not loot.drops[1].players.Dina and not loot.drops[2].players.Dina,
     "Identical simultaneous rolls stay separate when a chat line does not identify the copy")
 loot.Roll(loot.drops[1], 0)
 assert(#votes == 3 and votes[3][1] == 4 and votes[3][2] == 0)
+fire("CANCEL_ALL_LOOT_ROLLS")
+
+links[5], rollInfo[5], active[5] = junk, { need = true, greed = true, transmog = true }, 60000
+fire("START_LOOT_ROLL", 5, 60000)
+assert(window.greed:GetText() == "Transmog")
+loot.Roll(loot.drops[1], 2)
+assert(#votes == 3, "The shared slot offers Transmog when the native API prefers it")
+window.greed.scripts.OnClick()
+assert(#votes == 4 and votes[4][1] == 5 and votes[4][2] == 4)
 ''')
-print("Loot window: deduplication, localized votes, winner, item-cache retries, eligibility and manual choices passed.")
+print("Loot window: native suppression and restore, deduplication, results, cache retries, and manual choices passed.")

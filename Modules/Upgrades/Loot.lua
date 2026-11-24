@@ -106,15 +106,22 @@ end
 
 local function rollOptions(id)
     if not GetLootRollItemInfo then return end
-    local ok, icon, name, count, _, _, need, greed = pcall(GetLootRollItemInfo, id)
-    if ok then return plain(icon), plain(name), plain(count), plain(need) == true, plain(greed) == true end
+    local ok, icon, name, count, _, _, need, greed, _, _, _, _, _, transmog = pcall(GetLootRollItemInfo, id)
+    if ok then
+        return plain(icon), plain(name), plain(count), plain(need) == true, plain(greed) == true, plain(transmog) == true
+    end
+end
+
+function loot.CanReplaceRoll(id)
+    local drop = byRoll[id]
+    return RollOnLoot and drop and drop.hasOptions
 end
 
 function loot.Roll(drop, choice)
     if not RollOnLoot or loot.TimeLeft(drop) <= 0 or drop.voted or (drop.requestUntil or 0) > GetTime() then return end
-    local _, name, _, need, greed = rollOptions(drop.rollID)
-    if not name or (choice == 1 and not need) or (choice == 2 and not greed) then return end
-    if not (choice == 0 or choice == 1 or choice == 2) then return end
+    local _, name, _, need, greed, transmog = rollOptions(drop.rollID)
+    if not name or not (choice == 0 or choice == 1 and need or choice == 2 and greed and not transmog
+        or choice == 4 and transmog) then return end
     local ok = pcall(RollOnLoot, drop.rollID, choice)
     if ok then drop.requestUntil = GetTime() + 1 end
     if loot.Refresh then loot.Refresh() end
@@ -129,7 +136,7 @@ local function startRoll(id, ms, restored)
     pending[id] = token
     local function load(attempt)
         if pending[id] ~= token then return end
-        local icon, name, count, need, greed = rollOptions(id)
+        local icon, name, count, need, greed, transmog = rollOptions(id)
         local link = read(GetLootRollItemLink, id)
         local itemKey = key(link)
         if itemKey and (name or attempt == 3) then
@@ -138,7 +145,7 @@ local function startRoll(id, ms, restored)
                 return row.slot and not row.rollID and not row.received and GetTime() - row.seen < 3
             end) or addDrop(link, icon, count)
             drop.rollID, drop.deadline, drop.historyTime = id, deadline, historyTime
-            drop.need, drop.greed = need, greed
+            drop.need, drop.greed, drop.transmog, drop.hasOptions = need, greed, transmog, name ~= nil
             byRoll[id] = drop
             showDrop(drop)
         elseif attempt < 3 then

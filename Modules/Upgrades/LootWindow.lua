@@ -5,7 +5,62 @@ local style, L, read = app.style, app.L, app.ReadGameValue
 local window, selected
 local itemOffset, playerOffset = 0, 0
 local itemRows, playerRows = 7, 6
-local choices = { need = "Bedarf", greed = "Gier", pass = "Passen", disenchant = "Entzaubern", transmog = "Transmogrifikation" }
+local choices = { need = "Bedarf", greed = "Gier", pass = "Passen", disenchant = "Entzaubern", transmog = "Transmog" }
+local nativeRolls = {}
+
+local function captureMouse(frame, mouse)
+    if frame:IsForbidden() or frame:IsProtected() then return false end
+    local click = read(frame.IsMouseClickEnabled, frame)
+    local motion = read(frame.IsMouseMotionEnabled, frame)
+    if type(click) ~= "boolean" or type(motion) ~= "boolean" then return false end
+    mouse[frame] = { click, motion }
+    for _, child in ipairs({ frame:GetChildren() }) do
+        if not captureMouse(child, mouse) then return false end
+    end
+    return true
+end
+
+local function syncNativeRoll(frame)
+    local state = nativeRolls[frame]
+    local id = app.Readable(frame.rollID)
+    local visible = window and window:IsVisible() and frame:IsShown()
+
+    if state.mouse and (not visible or state.id ~= id) then
+        frame:SetAlpha(state.alpha)
+        for widget, flags in pairs(state.mouse) do
+            widget:SetMouseClickEnabled(flags[1])
+            widget:SetMouseMotionEnabled(flags[2])
+        end
+        state.mouse = nil
+    end
+
+    -- Native OnHide unregisters cancellation events and clears roll state.
+    if visible and not state.mouse and loot.CanReplaceRoll(id) then
+        local mouse = {}
+        local alpha = read(frame.GetAlpha, frame)
+        if type(alpha) ~= "number" or not captureMouse(frame, mouse) then return end
+        state.id, state.alpha, state.mouse = id, alpha, mouse
+        frame:SetAlpha(0)
+        for widget in pairs(mouse) do
+            widget:SetMouseClickEnabled(false)
+            widget:SetMouseMotionEnabled(false)
+        end
+    end
+end
+
+local function syncNativeRolls()
+    for index = 1, 4 do
+        local frame = _G["GroupLootFrame" .. index]
+        if frame and not frame:IsForbidden() then
+            if not nativeRolls[frame] then
+                nativeRolls[frame] = {}
+                frame:HookScript("OnShow", syncNativeRoll)
+                frame:HookScript("OnHide", syncNativeRoll)
+            end
+            syncNativeRoll(frame)
+        end
+    end
+end
 
 local function button(parent, name, x, y, w, h, action)
     local control = style.TextButton(parent)
@@ -62,7 +117,9 @@ local function updateTimer()
     end
     window.status:SetText(status)
     window.need:SetEnabled(ready and selected.need == true and RollOnLoot ~= nil)
-    window.greed:SetEnabled(ready and selected.greed == true and RollOnLoot ~= nil)
+    local greedLabel = selected.transmog and "Transmog" or "Gier"
+    window.greed:SetText(L(greedLabel))
+    window.greed:SetEnabled(ready and (selected.transmog == true or selected.greed == true) and RollOnLoot ~= nil)
     window.pass:SetEnabled(ready and RollOnLoot ~= nil)
     for _, control in ipairs(window.rollButtons) do control:SetShown(selected.rollID ~= nil) end
 end
@@ -78,6 +135,7 @@ local function createWindow()
     f:EnableMouse(true)
     style.Panel(f, style.background)
     table.insert(UISpecialFrames, f:GetName())
+    f:SetScript("OnHide", syncNativeRolls)
 
     local bar = CreateFrame("Frame", nil, f, "BackdropTemplate")
     bar:SetPoint("TOPLEFT", 1, -1)
@@ -139,7 +197,7 @@ local function createWindow()
     f.gain = style.Label(detail, "", 60, -30, 282, 20, "GameFontHighlightSmall", style.green)
     f.status = style.Label(detail, "", 11, -82, 338, 21, "GameFontNormalSmall", style.gold)
     f.need = button(detail, "Bedarf", 10, -54, 103, 24, function() loot.Roll(selected, 1) end)
-    f.greed = button(detail, "Gier", 125, -54, 103, 24, function() loot.Roll(selected, 2) end)
+    f.greed = button(detail, "Gier", 125, -54, 103, 24, function() loot.Roll(selected, selected.transmog and 4 or 2) end)
     f.pass = button(detail, "Passen", 240, -54, 103, 24, function() loot.Roll(selected, 0) end)
     f.rollButtons = { f.need, f.greed, f.pass }
 
@@ -171,7 +229,11 @@ local function createWindow()
     local elapsed = 0
     f:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + dt
-        if elapsed >= 0.25 then elapsed = 0; updateTimer() end
+        if elapsed >= 0.25 then
+            elapsed = 0
+            updateTimer()
+            if selected and selected.rollID then syncNativeRolls() end
+        end
     end)
     return f
 end
@@ -196,6 +258,7 @@ function loot.Refresh()
     end
     window.detail:SetShown(selected ~= nil)
     window.empty:SetShown(selected == nil)
+    syncNativeRolls()
     if not selected then return end
     window.preview.drop = selected
     window.preview.icon:SetTexture(icon(selected))
