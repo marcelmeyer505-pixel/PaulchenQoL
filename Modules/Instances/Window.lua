@@ -706,6 +706,95 @@ local function changeWorldFloor(delta)
     end
 end
 
+local function canMoveMinimap(frame)
+    if not frame or read(frame.IsForbidden, frame) == true then return false end
+    if frame.CanChangeProtectedState then return read(frame.CanChangeProtectedState, frame) == true end
+    return read(InCombatLockdown) == false
+end
+
+local function restoreMinimap(state)
+    local saved = state.minimapLayout
+    if not saved then return true end
+    local frame = saved.frame
+    if saved.moved then
+        if not canMoveMinimap(frame) then return false end
+        local ok = app.SecureCall(L("Live-Minimap"), function()
+            frame:SetParent(saved.parent)
+            frame:SetScale(saved.scale)
+            frame:SetSize(saved.width, saved.height)
+            frame:SetFrameStrata(saved.strata)
+            frame:SetFrameLevel(saved.level)
+            frame:ClearAllPoints()
+            for _, anchor in ipairs(saved.anchors) do frame:SetPoint(unpack(anchor, 1, 5)) end
+            frame:SetZoom(saved.zoom)
+            frame:SetShown(saved.shown)
+        end)
+        if not ok then return false end
+        saved.moved = nil
+    end
+    if saved.northChanged and not app.SecureCall(L("Live-Minimap"), C_Minimap.SetIgnoreRotateMinimap, saved.north) then
+        return false
+    end
+    state.minimapLayout = nil
+    return true
+end
+
+local function showLiveMinimap(state, size)
+    local frame = Minimap
+    if not frame then return false end
+    local saved = state.minimapLayout
+    if saved and saved.frame == frame and saved.moved and read(frame.GetParent, frame) == state.livePanel then
+        if canMoveMinimap(frame) then
+            local layer, strata = state.livePanel:GetFrameLevel() + 1, state.livePanel:GetFrameStrata()
+            app.SecureCall(L("Live-Minimap"), function()
+                if saved.size ~= size then frame:SetSize(size, size); saved.size = size end
+                if frame:GetFrameLevel() ~= layer then frame:SetFrameLevel(layer) end
+                if frame:GetFrameStrata() ~= strata then frame:SetFrameStrata(strata) end
+            end)
+        end
+        return true
+    end
+    if not canMoveMinimap(frame) then return false end
+    if saved and not restoreMinimap(state) then return false end
+    local ok = app.SecureCall(L("Live-Minimap"), function()
+        local width, height = frame:GetSize()
+        local anchors = {}
+        for index = 1, frame:GetNumPoints() do anchors[index] = { frame:GetPoint(index) } end
+        saved = {
+            frame = frame, parent = frame:GetParent(), anchors = anchors, width = width, height = height,
+            strata = frame:GetFrameStrata(), level = frame:GetFrameLevel(), scale = frame:GetScale(),
+            shown = frame:IsShown(), zoom = frame:GetZoom(),
+            north = read(C_Minimap and C_Minimap.IsRotateMinimapIgnored),
+        }
+        state.minimapLayout = saved
+        if saved.north == false and C_Minimap.SetIgnoreRotateMinimap then
+            saved.northChanged = app.SecureCall(L("Live-Minimap"), C_Minimap.SetIgnoreRotateMinimap, true)
+        end
+        local fixed = read(C_Minimap and C_Minimap.IsRotateMinimapIgnored)
+        local rotating = read(C_CVar and C_CVar.GetCVarBool or GetCVarBool, "rotateMinimap")
+        if fixed ~= true and rotating ~= false then return end
+        saved.moved = true
+        frame:SetParent(state.livePanel)
+        frame:ClearAllPoints()
+        frame:SetScale(1)
+        frame:SetSize(size, size)
+        frame:SetFrameStrata(state.livePanel:GetFrameStrata())
+        frame:SetFrameLevel(state.livePanel:GetFrameLevel() + 1)
+        frame:SetPoint("CENTER", state.livePanel, "CENTER", 0, 0)
+        frame:SetZoom(0)
+        frame:Show()
+        saved.size = size
+    end)
+    if ok and saved and saved.size == size then return true end
+    restoreMinimap(state)
+    return false
+end
+
+local function hideLiveMinimap(state)
+    restoreMinimap(state)
+    state.livePanel:Hide()
+end
+
 local function createWorldOverlay(map)
     local host = map.ScrollContainer
     local panel = CreateFrame("Frame", nil, map, "BackdropTemplate")
@@ -715,6 +804,10 @@ local function createWorldOverlay(map)
     local state = { owner = map, host = host, panel = panel }
     state.map = mapCanvas(panel)
     state.map:SetPoint("CENTER", panel, "CENTER", 0, -4)
+    state.livePanel = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+    state.livePanel:SetAllPoints(state.map)
+    state.livePanel:Hide()
+    style.Panel(state.livePanel, style.background)
     state.map.followFloor = function(floor)
         if state.manualFloor or state.manualEntry then return end
         state.positionFloor, state.selection.floor = floor, floor
@@ -746,6 +839,12 @@ local function createWorldOverlay(map)
     end)
     state.wings:ClearAllPoints()
     state.wings:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -146, -6)
+    state.liveSwitch = button(panel, "Live-Minimap", 0, 0, 114, function()
+        state.liveWanted = not state.liveWanted
+        guide.UpdateWorldOverlay(map)
+    end)
+    state.liveSwitch:ClearAllPoints()
+    state.liveSwitch:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -232, -6)
     state.switch = button(map, "Weltkarte", 0, 0, 126, function()
         state.outdoor = not state.outdoor
         guide.UpdateWorldOverlay(map)
@@ -757,6 +856,12 @@ local function createWorldOverlay(map)
         if HideUIPanel then HideUIPanel(map) elseif map.Hide then map:Hide() end
         guide.Open(entry.key, "loot", floor, stop.loot or stop.name)
     end
+    map:HookScript("OnHide", function() hideLiveMinimap(state) end)
+    local events = CreateFrame("Frame")
+    app.RegisterSupported(events, "PLAYER_REGEN_ENABLED")
+    events:SetScript("OnEvent", function()
+        if not state.liveWanted or not state.livePanel:IsVisible() then restoreMinimap(state) end
+    end)
     return state
 end
 
@@ -764,7 +869,8 @@ function guide.ResetWorldOverlay()
     outdoorRequested = nil
     if worldView then
         worldView.outdoor, worldView.manualEntry, worldView.manualFloor = nil, nil, nil
-        worldView.positionFloor = nil
+        worldView.positionFloor, worldView.liveWanted = nil, nil
+        hideLiveMinimap(worldView)
     end
 end
 
@@ -781,6 +887,7 @@ function guide.UpdateWorldOverlay(map)
     if not enabled then
         app.worldMap.SetMarkerLayerCovered(map, false)
         if worldView then
+            hideLiveMinimap(worldView)
             worldView.panel:Hide()
             worldView.switch:Hide()
         end
@@ -803,17 +910,35 @@ function guide.UpdateWorldOverlay(map)
     state.switch:Show()
     state.panel:SetShown(not state.outdoor)
     app.worldMap.SetMarkerLayerCovered(map, not state.outdoor)
-    if state.outdoor then return end
+    if state.outdoor then hideLiveMinimap(state); return end
     local width, height = state.host:GetSize()
     local fit = math.min((width - 16) / 3, (height - 72) / 2)
-    if fit <= 0 then return end
+    if fit <= 0 then hideLiveMinimap(state); return end
     state.map:SetSize(fit * 3, fit * 2)
     state.candidates = candidates
-    state.wings:SetShown(#candidates > 1)
     local selected = state.manualEntry or entry
     local selectedFloor = state.manualFloor or (selected == entry and (state.positionFloor or floor)) or selected.floors[1]
     state.selection = { entry = selected, floor = selectedFloor, tab = "map" }
+    state.title:SetWidth(math.max(1, math.min(350, width - 368)))
     state.title:SetText(guide.Name(selected))
     state.map:SetFrameLevel(level + 1)
+    state.livePanel:SetFrameLevel(level + 1)
+    local wanted = state.liveWanted
+    local live = wanted and showLiveMinimap(state, math.max(1, math.floor(fit * 2 - 16)))
+    state.liveSwitch:SetShown(Minimap ~= nil)
+    state.liveSwitch:SetText(L(live and "Routenkarte" or "Live-Minimap"))
+    state.wings:SetShown(not live and #candidates > 1)
+    state.prevFloor:SetShown(not live)
+    state.nextFloor:SetShown(not live)
+    state.map:SetShown(not live)
+    if live then
+        state.livePanel:Show()
+        state.floorName:SetText(L("Nahbereich · Norden oben"))
+        state.mapNote:SetText("")
+        return
+    end
+    state.liveWanted = nil
+    hideLiveMinimap(state)
     renderMap(state, state.selection)
+    if wanted then state.mapNote:SetText(L("Live-Minimap nicht verfügbar")) end
 end

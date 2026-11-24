@@ -251,7 +251,7 @@ for path in ("Localization.lua", "Core.lua", "Style.lua", "Config.lua", "QuestMa
 binding = ElementTree.parse(root / "Bindings.xml").getroot().find("./Binding[@name='PAULCHENQOLPLAYERMAP']")
 assert binding is not None
 lua.execute(r'''
-app.SecureCall = function(_, call, ...) call(...) end -- Fail the fixture if any guarded path errors.
+app.SecureCall = function(_, call, ...) call(...); return true end -- Fail the fixture if any guarded path errors.
 realFlightLandmarks, app.mapFlightLandmarks = app.mapFlightLandmarks, {}
 local world, comfort = app.worldMap, app.comfort
 local map = WorldMapFrame
@@ -945,6 +945,72 @@ fire("ZONE_CHANGED_INDOORS")
 flush()
 assert(dungeonCanvas.positionEntry.key == "sm_library" and dungeonCanvas.roomLayer.lines[1]:IsVisible(),
     "A room unique to one wing identifies that wing when the native map ID is missing")
+
+local home = CreateFrame("Frame", nil, UIParent)
+Minimap = CreateFrame("Minimap", nil, home)
+Minimap:SetSize(198, 198)
+Minimap:SetScale(.92)
+Minimap:SetFrameStrata("LOW")
+Minimap:SetFrameLevel(12)
+Minimap:SetPoint("CENTER", home, "CENTER", 12, -8)
+function Minimap:GetZoom() return self.zoom or 3 end
+function Minimap:SetZoom(zoom) self.zoom = zoom end
+function Minimap:CanChangeProtectedState() return not combat end
+local north = false
+C_Minimap = {
+    IsRotateMinimapIgnored = function() return north end,
+    SetIgnoreRotateMinimap = function(value) north = value end,
+}
+function GetCVarBool(name) assert(name == "rotateMinimap"); return true end
+local function restoreChecked()
+    local point, anchor, relative, x, y = Minimap:GetPoint()
+    assert(Minimap:GetParent() == home and not north and Minimap:GetScale() == .92)
+    assert(Minimap:GetWidth() == 198 and Minimap:GetHeight() == 198 and Minimap:GetZoom() == 3)
+    assert(Minimap:GetFrameStrata() == "LOW" and Minimap:GetFrameLevel() == 12 and Minimap:IsVisible())
+    assert(point == "CENTER" and anchor == home and relative == "CENTER" and x == 12 and y == -8)
+end
+guide.UpdateWorldOverlay(map)
+local liveSwitch = textWidget("Live-Minimap")
+liveSwitch.scripts.OnClick()
+local dock = Minimap:GetParent()
+assert(dock ~= home and Minimap:IsVisible() and north and Minimap:GetWidth() > 198 and Minimap:GetZoom() == 0)
+assert(not dungeonCanvas:IsVisible() and liveSwitch.textValue == "Routenkarte")
+Minimap:SetZoom(2)
+local hostWidth, hostHeight = map.ScrollContainer:GetSize()
+map.ScrollContainer:SetSize(hostWidth, hostHeight - 50)
+guide.UpdateWorldOverlay(map)
+assert(Minimap:GetParent() == dock and Minimap:GetZoom() == 2, "Resizing the live view keeps its destination and zoom")
+map.ScrollContainer:SetSize(hostWidth, hostHeight)
+liveSwitch.scripts.OnClick()
+restoreChecked()
+assert(dungeonCanvas:IsVisible())
+
+liveSwitch.scripts.OnClick()
+textWidget("Weltkarte").scripts.OnClick()
+restoreChecked()
+textWidget("Instanzkarte").scripts.OnClick()
+assert(Minimap:GetParent() == dock and north)
+map:Hide()
+restoreChecked()
+map:Show()
+flush()
+assert(Minimap:GetParent() == dock and north, "Reopening the indoor map remembers its live mode")
+combat = true
+map:Hide()
+assert(not Minimap:IsVisible() and Minimap:GetParent() == dock)
+combat = false
+fire("PLAYER_REGEN_ENABLED")
+restoreChecked()
+map:Show()
+flush()
+liveSwitch.scripts.OnClick()
+combat = true
+liveSwitch.scripts.OnClick()
+restoreChecked()
+assert(dungeonCanvas:IsVisible(), "An unavailable Minimap leaves the route view and the HUD in place")
+combat = false
+Minimap, C_Minimap, GetCVarBool = nil, nil, nil
+
 C_Map.GetPlayerMapPosition = oldPositionAPI
 GetPlayerFacing, UnitPosition, GetSubZoneText = nil, nil, nil
 inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
