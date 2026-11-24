@@ -37,7 +37,7 @@ function provider.List()
         result[#result+1] = {
             key = d.key, name = d.name, minLevel = d.minLevel, maxLevel = d.maxLevel,
             kind = "dungeon", forever = d.isForever, sourceQuestCount = count,
-            incomplete = count == 0, instanceID = d.instanceID,
+            incomplete = count == 0 or d.incomplete == true, instanceID = d.instanceID,
         }
     end
     table.sort(result, function(a, b)
@@ -82,7 +82,7 @@ local function place(code)
         return {kind = kind or "unknown", id = id, name = rawID or code}
     end
     local result = {
-        kind = kind == "name" and "object" or kind,
+        kind = p.kind or (kind == "name" and "object" or kind),
         id = p.npcID or p.objectID or p.itemID or id,
         name = p.name or rawID or code,
         map = p.mapID,
@@ -92,6 +92,7 @@ local function place(code)
         y = type(p.y) == "number" and p.y / 100 or nil,
         inside = p.inside == true,
         under = p.under == true,
+        noteDE = p.noteDE, noteEN = p.noteEN,
     }
     local hint = app.dungeonQuestLocationHints and app.dungeonQuestLocationHints[code]
     if hint and not result.map and type(hint.map) == "number"
@@ -204,7 +205,8 @@ local function build(id)
         chain = chain, start = startPoints[1], finish = finishPoints[1],
         givers = startPoints, enders = finishPoints,
         classes = q.classes, sourceVerified = q.verified, chainIncomplete = q.chain == true,
-        source = "DQA-MIT-1.04",
+        source = q.noteSource or "DQA-MIT-1.04",
+        noteDE = q.noteDE, noteEN = q.noteEN, noteReferenceOnly = q.noteReferenceOnly == true,
     }
     if not result.start then result.start = {kind = "unknown", name = "?"} end
     if not result.finish then result.finish = {kind = "unknown", name = "?"} end
@@ -274,7 +276,8 @@ function provider.GuideToPoint(point)
     if mapPoint and C_Map and C_Map.SetUserWaypoint then
         local marker = safe(mapPoint, map, x, y)
         if marker then
-            if safe(C_Map.SetUserWaypoint, marker) == true then
+            local ok, value = pcall(C_Map.SetUserWaypoint, marker)
+            if ok and value ~= false then
                 if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
                     pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
                 end

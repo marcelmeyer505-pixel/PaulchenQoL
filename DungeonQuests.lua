@@ -312,6 +312,16 @@ local function multiplePointText(points, fallback)
     return table.concat(out, "; ")
 end
 
+local function questNote(entry)
+    if not entry then return "" end
+    local note = L(entry.noteDE or "", entry.noteEN or "")
+    if entry.noteReferenceOnly then note = note .. L(" (Classic-Referenz; Forever nicht bestätigt)", " (Classic reference; unconfirmed in Forever)") end
+    if entry.chainIncomplete then
+        note = note .. (note ~= "" and " · " or "") .. L("Vorquests nicht vollständig erfasst.", "Prerequisites not fully recorded.")
+    end
+    return note
+end
+
 local function exportText(data)
     local out = { data.dungeon.name .. " – " .. L("Instanzquests", "Dungeon Quests") }
     out[#out+1] = ("%d/%d %s"):format(data.done, data.total, L("abgeschlossen", "completed"))
@@ -319,6 +329,8 @@ local function exportText(data)
         out[#out+1] = ("[%s] %s (#%d)"):format(stateText(row.status), row.title, row.id)
         out[#out+1] = "  " .. L("Questgeber", "Quest giver") .. ": " .. multiplePointText(row.entry and row.entry.givers, row.giver)
         out[#out+1] = "  " .. L("Abgabe", "Turn-in") .. ": " .. multiplePointText(row.entry and row.entry.enders, row.ender)
+        local hint = questNote(row.entry)
+        if hint ~= "" then out[#out+1] = "  " .. L("Hinweis: ", "Note: ") .. hint end
         local chain = planner.Chain(row.id, data)
         if #chain > 1 then
             local steps = {}
@@ -627,6 +639,8 @@ function planner.Open(key)
                 GameTooltip:AddLine(stateText(self.data.status), stateColor(self.data.status))
                 GameTooltip:AddLine(L("Questgeber: ", "Quest giver: ") .. multiplePointText(self.data.entry and self.data.entry.givers, self.data.giver), 1, 1, 1, true)
                 GameTooltip:AddLine(L("Abgabe bei: ", "Turn in to: ") .. multiplePointText(self.data.entry and self.data.entry.enders, self.data.ender), 1, 1, 1, true)
+                local hint = questNote(self.data.entry)
+                if hint ~= "" then GameTooltip:AddLine(hint, 1, 0.82, 0.3, true) end
                 GameTooltip:Show()
             end)
             row:SetScript("OnLeave", function() GameTooltip:Hide() end)
