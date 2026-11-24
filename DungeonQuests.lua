@@ -290,6 +290,9 @@ local function pointText(point)
             ("Map #" .. point.map), x, y)
         if point.observed then
             result = result .. L(" · bei NPC-Kontakt erfasst", " · observed during NPC interaction")
+        elseif point.referenceOnly then
+            result = result .. L(" · Classic-Referenz, für Forever nicht bestätigt",
+                " · Classic reference, unconfirmed in Forever")
         end
     elseif point.inside then
         result = result .. L(" · in der Instanz, genaue Position unbekannt",
