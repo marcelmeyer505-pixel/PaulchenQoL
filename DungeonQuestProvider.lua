@@ -169,7 +169,11 @@ function provider.QuestFor(q)
     if type(q) ~= "table" then return nil end
     local allowed = q.classes
     if type(allowed) == "table" and #allowed > 0 then
-        local _, class = safe(UnitClass, "player")
+        local class
+        if type(UnitClass) == "function" then
+            local ok, _, token = pcall(UnitClass, "player")
+            if ok then class = token end
+        end
         local exists = false
         for _, token in ipairs(allowed) do
             if token == class then exists = true; break end
