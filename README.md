@@ -13,7 +13,9 @@ Die Erweiterung enthält **35 Instanzen bzw. Instanzflügel** mit zusammen **395
 ### Funktionen
 
 - Durchsuchbare Instanz- und Questliste mit Fraktionsfilter, bereits erledigte Quests optional ausblenden.
-- Questgeber und Abgabeorte, einschließlich mehrerer bekannter NPCs/Objekte und hinterlegter Weltkarten-Koordinaten.
+- Questgeber und Abgabeorte, einschließlich mehrerer bekannter NPCs/Objekte und hinterlegter Weltkarten-Koordinaten. **Fehlende Positionen werden sinnvoll unterschieden:** „in der Instanz, genauer Standort unbekannt“, „Fundort nicht erfasst“ oder „Queststart/Abgabe nicht erfasst“.
+- **Standorte automatisch lernen:** Sprichst du mit einem in den Questdaten verknüpften NPC, merkt sich Paulchen dessen Position während des Questdialogs in den lokalen Charakter-SavedVariables (`PaulchenQoLDB.dungeonQuestLocations`). Diese Beobachtungen werden anderen Spielern nicht als bestätigte Orte präsentiert.
+- **Bodley:** Ein außerhalb der Instanz liegender NPC ohne gesicherten Forever-Standort erhält einen ausdrücklich als *unbestätigte Classic-Referenz* markierten Kartenpunkt. Eine tatsächliche Begegnung im Spiel ersetzt diese Referenz für deinen Charakter.
 - Questreihe mit vorherigen und nachfolgenden Schritten; jeder Schritt kann separat ausgewählt werden und zeigt seinen eigenen Questgeber.
 - Charakterfortschritt über die verfügbaren WoW-Quest-APIs: **abgeschlossen, im Questlog, abgabebereit, Vorquests fehlen, Stufe zu niedrig, nicht angenommen, gesperrt oder unbekannt**. Unlesbare Zustände werden nicht geraten.
 - Der Status `Nicht angenommen` bedeutet **nicht**, dass der NPC die Quest gerade schon anbietet. Historische `chain`-Angaben werden als Quellenangaben zu früheren Schritten verwendet.
