@@ -1,3 +1,9 @@
+## Unreleased – Dungeon quest planner
+
+- New standalone dungeon quest planner, opened through the minimap quick menu or /pq quests.
+- Quest givers and turn-in points, Polestar waypoints, prerequisite and follow-up chains, status per character, chain progress, search and export.
+- Explicit unknown/optional-provider states and German/English UI; new Lua 5.1 regression fixture.
+
 # Changelog
 
 ## 0.12.0 — 2026-11-23
