@@ -1,13 +1,21 @@
 -- Self-contained dungeon quest planner regression tests (Lua 5.1).
 -- No Polestar globals/addon/quest data are loaded. Run from repo root.
+local characterDB, protected = {}, {}
 local app = {
     style = {},
-    Readable = function(v) return v end,
+    Readable = function(v) if v ~= protected then return v end end,
     GetLanguage = function() return "deDE" end,
     RegisterSupported = function() return true end,
+    Settings = function() return characterDB end,
 }
 _G.Polestar = nil
-_G.CreateFrame = function() return { SetScript=function() end, RegisterEvent=function() end } end
+local frames = {}
+_G.CreateFrame = function()
+    local f = { RegisterEvent=function() end }
+    f.SetScript = function(self, event, fn) self[event] = fn end
+    frames[#frames+1] = f
+    return f
+end
 _G.UnitFactionGroup = function() return "Horde" end
 _G.UnitLevel = function() return 60 end
 _G.UnitClass = function() return "Druid", "DRUID", 11 end
@@ -29,6 +37,7 @@ end
 loadAddon("Data/DungeonSeedDungeons.lua")
 loadAddon("Data/DungeonSeedQuests.lua")
 loadAddon("Data/DungeonSeedPlaces.lua")
+loadAddon("Data/DungeonQuestHints.lua")
 loadAddon("DungeonQuestProvider.lua")
 loadAddon("DungeonQuests.lua")
 
@@ -66,9 +75,54 @@ assert(westfallQuest.start and westfallQuest.start.map == 1436, "Deadmines quest
 assert(math.abs(westfallQuest.start.x - 0.562) < 0.00001, "Waypoints need 0..1 coordinates")
 local waypoint
 _G.UiMapPoint = { CreateFromCoordinates = function(map, x, y) return {map=map, x=x, y=y} end }
-_G.C_Map = { SetUserWaypoint = function(point) waypoint=point end }
+_G.C_Map = { SetUserWaypoint = function(point) waypoint = point; return true end }
 assert(provider.GuideToPoint(westfallQuest.start) == true)
 assert(waypoint and waypoint.map == 1436 and math.abs(waypoint.x - 0.562) < 0.00001)
+local openedMap
+_G.C_Map.SetUserWaypoint = function() return false end
+_G.C_Map.OpenWorldMap = function(map) openedMap = map end
+_G.C_SuperTrack = { SetSuperTrackedUserWaypoint = function() error("An unavailable waypoint must not be tracked") end }
+assert(provider.GuideToPoint(westfallQuest.start) and openedMap == 1436)
+
+-- NPCs inside dungeons are known, but must not have invented outdoor coordinates.
+local thaelrid = assert(provider.Quest("BFD", 6561))
+assert(thaelrid.start.kind == "npc" and thaelrid.start.id == 4787)
+assert(thaelrid.start.inside and thaelrid.start.map == nil)
+assert(provider.RecordSighting(6561, "giver", 99999, "Wrong NPC", 1440, 0.45, 0.4) == false)
+assert(provider.RecordSighting(6561, "giver", 4787, "Argent Guard Thaelrid", 1440, 0.45, 0.40))
+assert(characterDB.dungeonQuestLocations[6561].giver.id == 4787)
+local observed = assert(provider.Quest("BFD", 6561)).start
+assert(observed.map == 1440 and observed.observed and observed.x == 0.45)
+
+-- A low-confidence Classic coordinate is shown only as a reference.
+local bodley = assert(provider.Quest("DM_E", 8994)).start
+assert(bodley.id == 16033 and bodley.map == 1428 and bodley.referenceOnly)
+assert(provider.RecordSighting(8994, "giver", 16033, "Bodley", 1428, 0.324, 0.259))
+local confirmed = assert(provider.Quest("DM_E", 8994)).start
+assert(confirmed.observed and not confirmed.referenceOnly)
+assert(math.abs(confirmed.x - 0.324) < 0.00001)
+
+-- The optional live observation hook reads quest ID, NPC and map coordinates.
+_G.GetQuestID = function() return 6561 end
+_G.UnitExists = function(unit) return unit == "npc" end
+_G.UnitGUID = function() return "Creature-0-0-0-0-4787-00000ABC" end
+_G.UnitName = function() return "Argent Guard Thaelrid" end
+_G.C_Map.GetBestMapForUnit = function() return 1440 end
+_G.C_Map.GetPlayerMapPosition = function()
+    return { GetXY=function() return 0.51, 0.55 end }
+end
+for _, f in ipairs(frames) do
+    if f.OnEvent then f:OnEvent("QUEST_DETAIL") end
+end
+assert(characterDB.dungeonQuestLocations[6561].giver.x == 0.51)
+_G.C_Map.GetPlayerMapPosition = function()
+    return { x = 0.9, y = 0.9, GetXY = function() return protected, 0.8 end }
+end
+for _, f in ipairs(frames) do
+    if f.OnEvent then f:OnEvent("QUEST_DETAIL") end
+end
+assert(characterDB.dungeonQuestLocations[6561].giver.x == 0.51,
+    "Protected coordinate components must not replace an existing sighting")
 local chainSource = provider.Quest("WC", 914)
 assert(chainSource and #chainSource.chain == 3)
 assert(provider.Prerequisites(914)[1] == 1489)

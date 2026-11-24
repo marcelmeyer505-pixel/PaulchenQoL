@@ -25,6 +25,7 @@ QuestMap.lua
 Data\DungeonSeedDungeons.lua
 Data\DungeonSeedQuests.lua
 Data\DungeonSeedPlaces.lua
+Data\DungeonQuestHints.lua
 DungeonQuestProvider.lua
 DungeonQuests.lua
 UI.lua
