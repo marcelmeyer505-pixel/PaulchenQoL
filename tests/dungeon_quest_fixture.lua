@@ -61,6 +61,14 @@ assert(reference.title == "Test Quest 4082")
 assert(reference.faction == "H")
 assert(type(reference.givers) == "table" and #reference.givers > 0)
 assert(type(reference.start.name) == "string")
+local westfallQuest = assert(provider.Quest("DM", 166))
+assert(westfallQuest.start and westfallQuest.start.map == 1436, "Deadmines quest giver map")
+assert(math.abs(westfallQuest.start.x - 0.562) < 0.00001, "Waypoints need 0..1 coordinates")
+local waypoint
+_G.UiMapPoint = { CreateFromCoordinates = function(map, x, y) return {map=map, x=x, y=y} end }
+_G.C_Map = { SetUserWaypoint = function(point) waypoint=point end }
+assert(provider.GuideToPoint(westfallQuest.start) == true)
+assert(waypoint and waypoint.map == 1436 and math.abs(waypoint.x - 0.562) < 0.00001)
 local chainSource = provider.Quest("WC", 914)
 assert(chainSource and #chainSource.chain == 3)
 assert(provider.Prerequisites(914)[1] == 1489)
