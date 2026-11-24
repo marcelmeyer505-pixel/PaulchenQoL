@@ -989,6 +989,30 @@ assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() < fullWidth and li
     "The overview and its boss pins stay visible alongside the live minimap without player coordinates")
 assert(dungeonCanvas.lines[1]:IsVisible() and dungeonCanvas.pins[1]:IsVisible())
 assert(MinimapBackdrop:GetAlpha() == 0 and not PaulchenQoLMinimapButton:IsShown() and not launcher:IsShown())
+local artFloor = guide.floors[dungeonCanvas.positionFloor]
+assert(dungeonCanvas.art[1].textureID == artFloor.art[1][1], "The combined view uses the local minimap artwork")
+local firstTexture = dungeonCanvas.art[1]
+local setTexture = firstTexture.SetTexture
+local missing = {}
+for _, part in ipairs(artFloor.art) do missing[part[1]] = true end
+function firstTexture:SetTexture(file, ...)
+    if missing[file] then return false end
+    return setTexture(self, file, ...)
+end
+guide.UpdateWorldOverlay(map)
+assert(firstTexture.textureID == artFloor.tiles[1] and dungeonCanvas.pins[1]:IsVisible(),
+    "Unavailable minimap assets fall back to normal art with all boss pins intact")
+firstTexture.SetTexture = nil
+guide.UpdateWorldOverlay(map)
+local combinedWidth, liveWidth = dungeonCanvas:GetWidth(), Minimap:GetWidth()
+Minimap:SetZoom(1)
+textWidget("Ganze Etage").scripts.OnClick()
+assert(dungeonCanvas:GetWidth() > combinedWidth and Minimap:GetWidth() < liveWidth and Minimap:GetParent() == dock)
+assert(Minimap:IsVisible() and Minimap:GetZoom() == 1 and dungeonCanvas.lines[1]:IsVisible(),
+    "The whole floor expands the route without changing the native zoom or hiding the live map")
+assert(firstTexture.textureID == artFloor.art[1][1] and dungeonCanvas.pins[1]:IsVisible())
+textWidget("Live vergrößern").scripts.OnClick()
+assert(dungeonCanvas:GetWidth() == combinedWidth and Minimap:GetWidth() == liveWidth)
 local boss = dungeonCanvas.positionEntry.stops[1]
 interiorFloor, coords = boss.floor, {x = boss.x, y = boss.y}
 guide.UpdateWorldOverlay(map)
@@ -1023,6 +1047,7 @@ map.ScrollContainer:SetSize(hostWidth, hostHeight)
 liveSwitch.scripts.OnClick()
 restoreChecked()
 assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() == fullWidth)
+assert(dungeonCanvas.art[1].textureID == artFloor.tiles[1], "The normal route tab retains its original artwork")
 
 liveSwitch.scripts.OnClick()
 textWidget("Weltkarte").scripts.OnClick()

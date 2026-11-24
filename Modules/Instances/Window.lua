@@ -305,34 +305,46 @@ local function artTexture(view, index)
     return texture
 end
 
+local function drawMapTiles(view, tiles, mapWidth, mapHeight)
+    for index, file in ipairs(tiles) do
+        local texture = artTexture(view, index)
+        if texture:SetTexture(file) == false then return 0 end
+        local column, row = (index - 1) % 4, math.floor((index - 1) / 4)
+        local w, h = math.min(256, 1002 - column * 256), math.min(256, 668 - row * 256)
+        texture:SetTexCoord(0, w / 256, 0, h / 256)
+        texture:SetSize(w * mapWidth / 1002, h * mapHeight / 668)
+        texture:SetPoint("TOPLEFT", view, "TOPLEFT", column * 256 * mapWidth / 1002, -row * 256 * mapHeight / 668)
+        texture:SetDrawLayer("ARTWORK", 0)
+        texture:Show()
+    end
+    return #tiles
+end
+
+local function drawMinimapTiles(view, tiles, mapWidth, mapHeight)
+    local used = 0
+    for _, part in ipairs(tiles) do
+        local texture = artTexture(view, used + 1)
+        if texture:SetTexture(part[1], "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE", "TRILINEAR") ~= false then
+            texture:SetTexCoord(unpack(part, 6, 13))
+            texture:SetSize(part[4] * mapWidth / 1002, part[5] * mapHeight / 668)
+            texture:SetPoint("TOPLEFT", view, "TOPLEFT", part[2] * mapWidth / 1002, -part[3] * mapHeight / 668)
+            texture:SetDrawLayer("ARTWORK", math.min(7, math.max(-8, part[14] or 0)))
+            texture:Show()
+            used = used + 1
+        end
+    end
+    return used
+end
+
 local function renderArt(view, floor, mapWidth, mapHeight)
     local used = 0
     if floor then
-        local tiles = floor.tiles
-        for index, file in ipairs(tiles) do
-            local texture = artTexture(view, index)
-            if texture:SetTexture(file) == false then used = 0; break end
-            local column, row = (index - 1) % 4, math.floor((index - 1) / 4)
-            local w, h = math.min(256, 1002 - column * 256), math.min(256, 668 - row * 256)
-            texture:SetTexCoord(0, w / 256, 0, h / 256)
-            texture:SetSize(w * mapWidth / 1002, h * mapHeight / 668)
-            texture:SetPoint("TOPLEFT", view, "TOPLEFT", column * 256 * mapWidth / 1002, -row * 256 * mapHeight / 668)
-            texture:SetDrawLayer("ARTWORK", 0)
-            texture:Show()
-            used = index
-        end
-        if used == 0 then
-            for _, part in ipairs(floor.art) do
-                local texture = artTexture(view, used + 1)
-                if texture:SetTexture(part[1], "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE", "TRILINEAR") ~= false then
-                    texture:SetTexCoord(unpack(part, 6, 13))
-                    texture:SetSize(part[4] * mapWidth / 1002, part[5] * mapHeight / 668)
-                    texture:SetPoint("TOPLEFT", view, "TOPLEFT", part[2] * mapWidth / 1002, -part[3] * mapHeight / 668)
-                    texture:SetDrawLayer("ARTWORK", math.min(7, math.max(-8, part[14] or 0)))
-                    texture:Show()
-                    used = used + 1
-                end
-            end
+        if view.preferMinimapArt then
+            used = drawMinimapTiles(view, floor.art, mapWidth, mapHeight)
+            if used == 0 then used = drawMapTiles(view, floor.tiles, mapWidth, mapHeight) end
+        else
+            used = drawMapTiles(view, floor.tiles, mapWidth, mapHeight)
+            if used == 0 then used = drawMinimapTiles(view, floor.art, mapWidth, mapHeight) end
         end
     end
     for index = used + 1, #view.art do view.art[index]:Hide() end
@@ -917,7 +929,7 @@ local function showLiveMinimap(state, size)
         frame:SetSize(size, size)
         frame:SetFrameStrata(state.livePanel:GetFrameStrata())
         frame:SetFrameLevel(state.livePanel:GetFrameLevel() + 1)
-        frame:SetPoint("CENTER", state.livePanel, "CENTER", 0, -10)
+        frame:SetPoint("CENTER", state.livePanel, "CENTER", 0, 0)
         frame:SetZoom(0)
         frame:Show()
         hideMinimapChrome(saved)
@@ -937,13 +949,22 @@ local function layoutLiveViews(state, width, height)
     local dock, pane, canvas = state.livePanel, state.routePane, state.map
     local contentHeight = height - 72
     local sideBySide = width >= 460
-    local paneWidth = sideBySide and (width - 26) / 2 or width - 16
-    local paneHeight = sideBySide and contentHeight or (contentHeight - 10) / 2
-    local liveHeight = math.max(1, math.min(paneHeight, paneWidth + 24))
-    local fit = math.max(1, math.min((paneWidth - 16) / 3, (paneHeight - 38) / 2))
-    dock:SetSize(paneWidth, liveHeight)
+    local liveWidth, routeWidth = width - 16, width - 16
+    local liveLimit, routeLimit = contentHeight, contentHeight
+    if sideBySide then
+        local available = width - 26
+        liveWidth = state.fullFloor and math.min(220, math.max(146, available * .27)) or available / 2
+        routeWidth = available - liveWidth
+    else
+        local available = contentHeight - 10
+        liveLimit = available * (state.fullFloor and .36 or .5)
+        routeLimit = available - liveLimit
+    end
+    local liveHeight = math.max(1, math.min(liveLimit, liveWidth + 40))
+    local fit = math.max(1, math.min((routeWidth - 16) / 3, (routeLimit - 38) / 2))
+    dock:SetSize(liveWidth, liveHeight)
     dock:ClearAllPoints()
-    pane:SetSize(paneWidth, fit * 2 + 38)
+    pane:SetSize(routeWidth, fit * 2 + 38)
     pane:ClearAllPoints()
     if sideBySide then
         dock:SetPoint("LEFT", state.panel, "LEFT", 8, -4)
@@ -955,8 +976,9 @@ local function layoutLiveViews(state, width, height)
     canvas:ClearAllPoints()
     canvas:SetPoint("CENTER", pane, "CENTER", 0, -10)
     canvas:SetSize(fit * 3, fit * 2)
-    canvas.compact = true
-    return math.max(1, math.floor(math.min(paneWidth - 18, liveHeight - 42)))
+    canvas.compact = not state.fullFloor
+    canvas.preferMinimapArt = true
+    return math.max(1, math.floor(math.min(liveWidth - 18, liveHeight - 58)))
 end
 
 local function createWorldOverlay(map)
@@ -972,10 +994,16 @@ local function createWorldOverlay(map)
     state.livePanel:Hide()
     style.Panel(state.livePanel, style.background)
     style.Label(state.livePanel, "Live-Minimap", 10, -5, 160, 22, "GameFontHighlightSmall", style.gold)
+    state.floorZoom = button(state.livePanel, "Ganze Etage", 0, 0, 124, function()
+        state.fullFloor = not state.fullFloor
+        guide.UpdateWorldOverlay(map)
+    end)
+    state.floorZoom:ClearAllPoints()
+    state.floorZoom:SetPoint("BOTTOM", state.livePanel, "BOTTOM", 0, 7)
     state.routePane = CreateFrame("Frame", nil, panel, "BackdropTemplate")
     state.routePane:Hide()
     style.Panel(state.routePane, style.background)
-    style.Label(state.routePane, "Routenübersicht", 10, -5, 160, 22, "GameFontHighlightSmall", style.gold)
+    state.routeTitle = style.Label(state.routePane, "Routenübersicht", 10, -5, 160, 22, "GameFontHighlightSmall", style.gold)
     state.liveRoute = CreateFrame("Frame", nil, state.livePanel)
     state.liveRoute:SetAllPoints(state.livePanel)
     state.liveRoute:EnableMouse(false)
@@ -1051,7 +1079,7 @@ function guide.ResetWorldOverlay()
     outdoorRequested = nil
     if worldView then
         worldView.outdoor, worldView.manualEntry, worldView.manualFloor = nil, nil, nil
-        worldView.positionFloor, worldView.liveWanted = nil, nil
+        worldView.positionFloor, worldView.liveWanted, worldView.fullFloor = nil, nil, nil
         hideLiveMinimap(worldView)
     end
 end
@@ -1112,6 +1140,8 @@ function guide.UpdateWorldOverlay(map)
     state.wings:SetShown(#candidates > 1)
     state.routePane:SetShown(live == true)
     if live then
+        state.floorZoom:SetText(L(state.fullFloor and "Live vergrößern" or "Ganze Etage"))
+        state.routeTitle:SetText(L(state.fullFloor and "Ganze Etage" or "Routenübersicht"))
         renderMap(state, state.selection)
         state.livePanel:Show()
         updateMinimapRoute(state, true)
@@ -1119,7 +1149,7 @@ function guide.UpdateWorldOverlay(map)
     end
     state.liveWanted = nil
     hideLiveMinimap(state)
-    state.map.compact = nil
+    state.map.compact, state.map.preferMinimapArt = nil, nil
     state.map:ClearAllPoints()
     state.map:SetPoint("CENTER", state.panel, "CENTER", 0, -4)
     state.map:SetSize(fit * 3, fit * 2)
