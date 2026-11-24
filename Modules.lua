@@ -70,6 +70,8 @@ function app.OpenModulesMenu(owner)
         menu:CreateButton(app.L("Logbuch · EP und Farmrunden"), function() app.OpenModule("dtl", "farm") end)
         menu:CreateButton(app.L("Paulchen Upgrades"), function() app.OpenModule("upgrades") end)
         menu:CreateButton(app.L("Paulchens Buffwächter"), function() app.OpenDashboard("buffs") end)
+        menu:CreateButton(app.GetLanguage() == "enUS" and "Dungeon quests & quest givers" or "Instanzquests & Questgeber",
+            function() if app.dungeonQuests then app.dungeonQuests.Open() end end)
         menu:CreateButton(app.L("Auktionshaus scannen"), function() app.OpenModule("auction") end)
         menu:CreateButton(app.L("Einstellungen"), app.OpenConfig)
     end)

@@ -224,6 +224,8 @@ function app.CompanionCommand(message)
         value = value and value:lower() or nil
         local names = { de = "deDE", dede = "deDE", german = "deDE", deutsch = "deDE", en = "enUS", enus = "enUS", english = "enUS", englisch = "enUS", auto = "auto" }
         if value and names[value] then write("language", names[value]) else app.OpenConfig() end
+    elseif (cmd == "quests" or cmd == "dungeons") and app.dungeonQuests then
+        app.dungeonQuests.Open()
     elseif cmd == "buffs" and app.buffCheck then
         app.buffCheck.Command((message or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "show" or cmd == "hide" then
@@ -238,7 +240,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, quests, lang auto|de|en]")
     end
     refreshSettings()
 end
