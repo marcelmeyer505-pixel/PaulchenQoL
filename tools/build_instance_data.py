@@ -101,11 +101,9 @@ def parse_sources(addons):
     dr = addons / "ForeverDungeonRoutes" / "Data"
     dj = addons / "ForeverDungeonJournal" / "Data"
     atlas = addons / "AtlasLootClassic_DungeonsAndRaids"
-    for name in ("Dungeons.lua", "Entrances.lua", "Floors.lua", "Pictures.lua", "Minimaps.lua", "DefaultRoutes.lua"):
-        code = contents(dr / name)
-        if name == "Pictures.lua":
-            code = code.split("-- Rooms as in", 1)[0]
-        run(code, name, globals_.routes)
+    for name in ("Dungeons.lua", "Entrances.lua", "Floors.lua", "Rooms.lua", "Pictures.lua", "Minimaps.lua",
+                 "DefaultRoutes.lua"):
+        run(contents(dr / name), name, globals_.routes)
     for name in ("Dungeons.lua", "DungeonEntrances.lua", "QuestMaps.lua", "Bosses.lua"):
         run(contents(dj / name), name, globals_.journal)
     # Only evaluate the loot tables. The trailing code hooks AtlasLoot's own UI.
@@ -196,6 +194,21 @@ def route_data(route, floors, wing, side_floor):
     return paths, stops + side_stops
 
 
+def room_data(rooms, floors):
+    result = []
+    for room in sequence(rooms):
+        boxes = [sequence(box) for box in sequence(room["boxes"])]
+        boxes = [box for box in boxes if len(box) == 6 and box[0] in floors and box[3] > 0 and box[4] > 0]
+        if not boxes:
+            continue
+        names = localized(room)
+        aliases = sorted({value for key, value in room.items()
+                          if key not in ("name", "nameDE") and key.startswith("name") and isinstance(value, str)}
+                         - set(names.values()))
+        result.append({**names, "aliases": aliases, "boxes": boxes})
+    return result
+
+
 def run(addons, output):
     lua, source = parse_sources(addons)
     routes, journal, atlas = source.routes, source.journal, source.atlas
@@ -241,6 +254,9 @@ def run(addons, output):
             wing = ("living", "undead")[index - 1] if key == "stratholme" else None
             side_floor = 280 if key == "maraudon" else None
             record["paths"], record["stops"] = route_data(routes.DefaultRoutes[key], floor_ids, wing, side_floor)
+            rooms = room_data(routes.Rooms[key], floor_ids)
+            if rooms:
+                record["rooms"] = rooms
 
             quest_ids = set()
             quests = []
@@ -338,7 +354,7 @@ def run(addons, output):
     for dungeon in dungeons:
         lines.append("        {")
         for key, value in dungeon.items():
-            if key in ("paths", "stops", "quests", "loot"):
+            if key in ("paths", "stops", "rooms", "quests", "loot"):
                 lines.append(f"            {key} = {{")
                 lines.extend(f"                {serialize(entry)}," for entry in value)
                 lines.append("            },")

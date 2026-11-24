@@ -901,9 +901,25 @@ assert(math.abs(select(4, arrow:GetPoint()) / dungeonCanvas:GetWidth() - .6) < .
 function UnitPosition() return secret, secret, nil, dungeonID end
 updatePosition(dungeonCanvas)
 assert(not arrow:IsShown(), "Protected position data never produces a stale marker")
+assert(dungeonCanvas.roomStatus.text.textValue == "Position nicht verfügbar")
+local room = undead.rooms[1]
+local subzone = room.de
+function GetSubZoneText() return subzone end
+updatePosition(dungeonCanvas)
+local roomLine = dungeonCanvas.roomLayer.lines[1]
+assert(not arrow:IsShown() and roomLine:IsVisible() and dungeonCanvas.roomStatus:IsVisible(),
+    "A reported room has a footprint when the client withholds exact coordinates")
+assert(dungeonCanvas.roomStatus.text.textValue == "Bereich · " .. room.de)
+subzone = secret
+updatePosition(dungeonCanvas)
+assert(not roomLine:IsShown() and dungeonCanvas.roomStatus.text.textValue == "Position nicht verfügbar",
+    "A missing or protected room name clears the last outline")
+subzone = room.name
 coords, facing = {x = .31, y = .42}, .7
 fire("BOSS_KILL", baron.stop.encounters[1])
 flush()
+assert(arrow:IsVisible() and not dungeonCanvas.roomStatus:IsShown() and not roomLine:IsShown(),
+    "Live coordinates take priority over the room outline")
 assert(baron.check:IsVisible() and baron.portrait.desaturated)
 baron.scripts.OnClick(baron)
 assert(guide.selection.entry == undead and guide.selection.boss == "Baron Rivendare")
@@ -919,8 +935,18 @@ interiorFloor = mines.floors[2]
 updatePosition(dungeonCanvas)
 assert(dungeonCanvas.positionFloor == mines.floors[2] and arrow:IsVisible(),
     "The world map follows a known floor change while walking")
+interiorFloor, coords, subzone = nil, secret, "Mast Room"
+updatePosition(dungeonCanvas)
+assert(dungeonCanvas.positionFloor == mines.floors[1] and not arrow:IsShown())
+assert(dungeonCanvas.roomStatus.text.textValue == "Bereich · Mastraum" and dungeonCanvas.roomLayer.lines[1]:IsShown(),
+    "A named subzone can also move the instance view to the right floor without coordinates")
+dungeonID, subzone = 189, "Gallery of Treasures"
+fire("ZONE_CHANGED_INDOORS")
+flush()
+assert(dungeonCanvas.positionEntry.key == "sm_library" and dungeonCanvas.roomLayer.lines[1]:IsVisible(),
+    "A room unique to one wing identifies that wing when the native map ID is missing")
 C_Map.GetPlayerMapPosition = oldPositionAPI
-GetPlayerFacing, UnitPosition = nil, nil
+GetPlayerFacing, UnitPosition, GetSubZoneText = nil, nil, nil
 inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
 fire("PLAYER_ENTERING_WORLD")
 flush()

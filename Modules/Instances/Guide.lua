@@ -3,6 +3,7 @@ local data = app.instanceData
 local guide = { entries = data.dungeons, floors = data.floors, byKey = {}, byID = {}, defeated = {} }
 app.instances = guide
 local L, read = app.L, app.ReadGameValue
+local roomNames = {}
 
 for _, entry in ipairs(guide.entries) do
     guide.byKey[entry.key] = entry
@@ -10,6 +11,25 @@ for _, entry in ipairs(guide.entries) do
         local entries = guide.byID[entry.id] or {}
         entries[#entries + 1] = entry
         guide.byID[entry.id] = entries
+    end
+    if entry.rooms then
+        local names = {}
+        roomNames[entry] = names
+        for _, room in ipairs(entry.rooms) do
+            room.shapes = {}
+            local area, largest = {}, 0
+            for _, box in ipairs(room.boxes) do
+                local floor = box[1]
+                local shapes = room.shapes[floor] or {}
+                room.shapes[floor] = shapes
+                shapes[#shapes + 1] = box
+                area[floor] = (area[floor] or 0) + box[4] * box[5]
+                if area[floor] > largest then room.mainFloor, largest = floor, area[floor] end
+            end
+            names[room.name] = room
+            if room.de then names[room.de] = room end
+            for _, alias in ipairs(room.aliases) do names[alias] = room end
+        end
     end
 end
 
@@ -111,6 +131,25 @@ function guide.RememberWing(entry)
     end
 end
 
+local function namedRoom(entry, name)
+    local names = entry and roomNames[entry]
+    return names and type(name) == "string" and names[name] or nil
+end
+
+local function uniqueRoom(entries, name, preferred)
+    local known = namedRoom(preferred, name)
+    if known then return known, preferred end
+    local found, owner
+    for _, entry in ipairs(entries) do
+        local room = namedRoom(entry, name)
+        if room then
+            if found then return end
+            found, owner = room, entry
+        end
+    end
+    return found, owner
+end
+
 function guide.CurrentMap()
     local id = knownInstance()
     local entries = guide.byID[id]
@@ -124,16 +163,31 @@ function guide.CurrentMap()
             end
         end
     end
-    if encounterEntry and encounterEntry.id == id then return encounterEntry, encounterFloor, entries end
-    local entry = portalEntry and portalEntry.id == id and portalEntry or enteredWing(id)
-    if entry then
-        portalEntry = entry
-        guide.RememberWing(entry)
-    else
-        entry = guide.byKey[rememberedWings()[id]] or entries[1]
-        if entry.id ~= id then entry = entries[1] end
+    local entered = portalEntry and portalEntry.id == id and portalEntry or enteredWing(id)
+    local preferred = entered or guide.byKey[rememberedWings()[id]]
+    if preferred and preferred.id ~= id then preferred = nil end
+    local room, roomEntry = uniqueRoom(entries, read(GetSubZoneText), preferred)
+    if room then
+        guide.RememberWing(roomEntry)
+        local floor = roomEntry == encounterEntry and room.shapes[encounterFloor] and encounterFloor or room.mainFloor
+        return roomEntry, floor, entries
     end
+    if encounterEntry and encounterEntry.id == id then return encounterEntry, encounterFloor, entries end
+    if entered then
+        portalEntry = entered
+        guide.RememberWing(entered)
+    end
+    local entry = preferred or entries[1]
     return entry, entry.floors[1], entries
+end
+
+function guide.PlayerRoom(entry, preferred)
+    if not entry.id or entry.id ~= knownInstance() then return end
+    local room = namedRoom(entry, read(GetSubZoneText))
+    if not room then return nil, nil, true end
+    local best = read(C_Map and C_Map.GetBestMapForUnit, "player")
+    local floor = room.shapes[best] and best or room.shapes[preferred] and preferred or room.mainFloor
+    return room, floor, true
 end
 
 local function projectFloor(floor, north, west)
@@ -212,7 +266,8 @@ function guide.Open(key, tab, floor, boss)
 end
 
 local events = CreateFrame("Frame")
-for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL",
+for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
+    "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL",
     "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }) do
     app.RegisterSupported(events, name)
 end
@@ -237,6 +292,7 @@ events:SetScript("OnEvent", function(_, event, encounter, _, _, _, success)
         return
     end
     local locationChanged = event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA"
+        or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS"
     local isEncounter = event == "ENCOUNTER_START" or event == "ENCOUNTER_END" or event == "BOSS_KILL"
     if locationChanged then
         local id = knownInstance()

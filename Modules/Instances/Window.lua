@@ -401,13 +401,67 @@ local function renderBossPin(pin, stop, index, defeated, highlight)
     pin.check:SetShown(defeated == true)
 end
 
+local roomCorners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
+
+local function renderPlayerRoom(view, room, floor, inside)
+    local text
+    if inside then text = room and app.LF("Bereich · %s", guide.Name(room)) or L("Position nicht verfügbar") end
+    local status = view.roomStatus
+    if status.message ~= text then
+        status.message = text
+        status.text:SetText(text or "")
+        status:SetShown(text ~= nil)
+    end
+    local shapes = room and floor == view.positionFloor and room.shapes[floor] or nil
+    local w, h = view:GetSize()
+    local layer = view.roomLayer
+    if shapes == layer.shapes and w == layer.width and h == layer.height then return end
+    layer.shapes, layer.width, layer.height = shapes, w, h
+    local used = 0
+    for _, box in ipairs(shapes or {}) do
+        local cos, sin = math.cos(box[6]), math.sin(box[6])
+        local points = {}
+        for index, corner in ipairs(roomCorners) do
+            local x, y = corner[1] * box[4] / 2, corner[2] * box[5] / 2
+            local px = box[2] * w + (x * cos - y * sin) * w / 1002
+            local py = -box[3] * h - (x * sin + y * cos) * h / 668
+            points[index] = { px, py }
+        end
+        for i, point in ipairs(points) do
+            local nextPoint = points[i % 4 + 1]
+            used = used + 1
+            local line = layer.lines[used]
+            if not line then
+                line = layer:CreateLine(nil, "ARTWORK")
+                line:SetThickness(2)
+                line:SetColorTexture(style.gold[1], style.gold[2], style.gold[3], .68)
+                layer.lines[used] = line
+            end
+            line:SetStartPoint("TOPLEFT", view, point[1], point[2])
+            line:SetEndPoint("TOPLEFT", view, nextPoint[1], nextPoint[2])
+            line:Show()
+        end
+    end
+    for i = used + 1, #layer.lines do layer.lines[i]:Hide() end
+end
+
 local function updatePlayerMarker(view, follow)
     local marker = view.player
     local floor, x, y, facing = guide.PlayerPosition(view.positionEntry, view.positionFloor)
-    if floor and floor ~= view.positionFloor and follow and view.followFloor then
+    if not floor then
+        local room, roomFloor, inside = guide.PlayerRoom(view.positionEntry, view.positionFloor)
+        if roomFloor and roomFloor ~= view.positionFloor and follow and view.followFloor then
+            view.followFloor(roomFloor)
+        end
+        marker:Hide()
+        renderPlayerRoom(view, room, roomFloor, inside)
+        return
+    end
+    renderPlayerRoom(view)
+    if floor ~= view.positionFloor and follow and view.followFloor then
         view.followFloor(floor)
     end
-    if not floor or floor ~= view.positionFloor then marker:Hide(); return end
+    if floor ~= view.positionFloor then marker:Hide(); return end
     if facing then marker.arrow:SetRotation(facing) end
     marker.arrow:SetShown(facing ~= nil)
     marker.dot:SetShown(facing == nil)
@@ -421,9 +475,12 @@ local function renderMap(f, s)
     local mapWidth, mapHeight = view:GetSize()
     local floor = guide.floors[s.floor]
     local art = renderArt(view, floor, mapWidth, mapHeight)
-    view.overlay:SetFrameLevel(view:GetFrameLevel() + 1)
+    view.roomLayer:SetFrameLevel(view:GetFrameLevel() + 1)
+    view.overlay:SetFrameLevel(view:GetFrameLevel() + 2)
     view.markers:SetFrameLevel(view:GetFrameLevel() + 3)
     view.player:SetFrameLevel(view:GetFrameLevel() + 6)
+    view.roomStatus:SetFrameLevel(view:GetFrameLevel() + 7)
+    view.roomStatus:SetWidth(math.max(1, math.min(300, mapWidth - 10)))
     view.positionEntry, view.positionFloor = entry, s.floor
     local lineCount, pinCount = 0, 0
     for _, path in ipairs(entry.paths) do
@@ -499,6 +556,9 @@ local function mapCanvas(parent)
     local view = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     style.Panel(view, style.background)
     view.art, view.lines, view.pins = {}, {}, {}
+    view.roomLayer = CreateFrame("Frame", nil, view)
+    view.roomLayer:SetAllPoints(view)
+    view.roomLayer.lines = {}
     view.overlay = CreateFrame("Frame", nil, view)
     view.overlay:SetAllPoints(view)
     view.markers = CreateFrame("Frame", nil, view)
@@ -515,6 +575,16 @@ local function mapCanvas(parent)
     player.dot:SetSize(10, 10)
     player.dot:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
     player.dot:SetVertexColor(.43, .92, 1)
+    local status = CreateFrame("Frame", nil, view, "BackdropTemplate")
+    style.Panel(status, style.background, style.edge)
+    status:SetSize(300, 22)
+    status:SetPoint("TOP", view, "TOP", 0, -5)
+    status:Hide()
+    status.text = style.Label(status, "", 0, 0, 292, 22, "GameFontHighlightSmall", style.gold, "CENTER")
+    status.text:ClearAllPoints()
+    status.text:SetPoint("TOPLEFT", status, "TOPLEFT", 4, 0)
+    status.text:SetPoint("BOTTOMRIGHT", status, "BOTTOMRIGHT", -4, 0)
+    view.roomStatus = status
     local elapsed = 0
     view:SetScript("OnUpdate", function(self, delta)
         if not self.positionEntry then return end
