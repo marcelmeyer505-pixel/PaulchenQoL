@@ -88,9 +88,6 @@ local function place(code)
         inside = p.inside == true,
         under = p.under == true,
     }
-    if result.inside and result.map == nil then
-        result.name = result.name .. (app.GetLanguage and app.GetLanguage()=="enUS" and " (inside dungeon)" or " (in der Instanz)")
-    end
     return result
 end
 
