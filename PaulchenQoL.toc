@@ -22,6 +22,10 @@ Flight.lua
 Config.lua
 MountGloves.lua
 QuestMap.lua
+Data\DungeonSeedDungeons.lua
+Data\DungeonSeedQuests.lua
+Data\DungeonSeedPlaces.lua
+DungeonQuestProvider.lua
 DungeonQuests.lua
 UI.lua
 BuffCheck.lua
