@@ -6,6 +6,8 @@ local window, selected
 local itemOffset, playerOffset = 0, 0
 local itemRows, playerRows = 7, 6
 local openRolls = {}
+local resultDisplayTime = 10
+local closeAt, finalResultShown
 local choices = { need = "Bedarf", greed = "Gier", pass = "Passen", disenchant = "Entzaubern", transmog = "Transmog" }
 local nativeRolls = {}
 
@@ -99,6 +101,7 @@ local function icon(drop)
 end
 
 local function updateOpenRolls()
+    local previousCount = #openRolls
     local count, changed = 0, false
     for _, drop in ipairs(loot.drops) do
         if loot.TimeLeft(drop) > 0 then
@@ -108,7 +111,19 @@ local function updateOpenRolls()
             end
         end
     end
-    for index = #openRolls, count + 1, -1 do
+    if count > 0 then
+        closeAt = nil
+    elseif previousCount > 0 then
+        local last = openRolls[1]
+        local now = GetTime()
+        for index = 2, previousCount do
+            local drop = openRolls[index]
+            if (drop.finishedAt or now) > (last.finishedAt or now) then last = drop end
+        end
+        selected, playerOffset = last, 0
+        closeAt, finalResultShown = now + resultDisplayTime, false
+    end
+    for index = previousCount, count + 1, -1 do
         openRolls[index], changed = nil, true
     end
     return changed
@@ -130,6 +145,9 @@ local function updateTimer()
     else
         status = L("Würfeln beendet")
     end
+    if closeAt and not finalResultShown and (selected.winner or selected.allPassed) then
+        closeAt, finalResultShown = GetTime() + resultDisplayTime, true
+    end
     window.status:SetText(status)
     window.need:SetEnabled(ready and selected.need == true and RollOnLoot ~= nil)
     local greedLabel = selected.transmog and "Transmog" or "Gier"
@@ -150,7 +168,11 @@ local function createWindow()
     f:EnableMouse(true)
     style.Panel(f, style.background)
     table.insert(UISpecialFrames, f:GetName())
-    f:SetScript("OnHide", syncNativeRolls)
+    f:SetScript("OnHide", function()
+        closeAt = nil
+        openRolls = {}
+        syncNativeRolls()
+    end)
 
     local bar = CreateFrame("Frame", nil, f, "BackdropTemplate")
     bar:SetPoint("TOPLEFT", 1, -1)
@@ -253,6 +275,7 @@ local function createWindow()
                 updateTimer()
                 if selected then syncNativeRolls() end
             end
+            if closeAt and GetTime() >= closeAt then f:Hide() end
         end
     end)
     return f
