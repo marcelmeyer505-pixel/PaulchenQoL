@@ -2,7 +2,7 @@
 ## Title: Paulchen QoL
 ## Notes: Companion, logbook, upgrades, auction scans and quest turn-ins
 ## Notes-deDE: Begleiter, Logbuch, Upgrades, Auktionsscan und Questabgaben
-## Version: 0.12.0
+## Version: 0.13.0
 ## LoadSavedVariablesFirst: 1
 ## SavedVariables: PaulchenQoLSettings, PaulchenQoLAuctionDB
 ## SavedVariablesPerCharacter: PaulchenQoLDB, PaulchenQoLTimelineDB, PaulchenQoLUpgradesDB

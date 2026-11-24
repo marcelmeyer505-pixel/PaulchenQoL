@@ -1,4 +1,15 @@
-## Unreleased – Standalone dungeon quest planner
+# Changelog
+
+## 0.13.0 — 2026-11-24
+
+- Add world map controls for coordinates, zones, and exploration, plus markers for flight points, portals, crossings, dungeon entrances, and ready quest turn-ins. The map tools run without Leatrix.
+- Open Paulchen's instance map with the regular world map key inside supported dungeons. Pan and zoom the map, follow the route, select bosses to inspect loot, and sort drops by upgrade percentage.
+- Add an opt-in Comfort section for selling gray items while respecting bag markings, automating quest dialogs, and managing travel and map settings.
+- Show eligible group loot rolls in one window with Need, Greed, and Pass, plus upgrade alerts and group results. Advance to the next undecided item after a roll and keep the final result visible for ten seconds.
+- Include supported equipment set bonuses in gear comparisons and flag set effects the active profile cannot score.
+- Improve tab and farm-round layout in the compact Logbook.
+
+### Instance quests
 
 - Bundle the historical MIT-licensed Dungeon Quest Atlas v1.04 reference dataset (35 dungeon entries, 395 quest associations, 480 quest records and 309 locations), with its original license and attribution.
 - The quest planner now works without Polestar or Dungeon Quest Atlas installed. Native WoW waypoints replace the Polestar navigation dependency.
@@ -6,8 +17,6 @@
 - Explicitly label incomplete/unknown Forever content; add Lua 5.1 regression tests against the real bundled dataset.
 - Distinguish in-dungeon NPCs, starting items and genuinely missing questgivers rather than displaying blank coordinates.
 - Automatically remember questgiver/turn-in NPC locations from actual in-game quest dialogs, saved per character; add a visibly unconfirmed Classic Bodley point as fallback.
-
-# Changelog
 
 ## 0.12.0 — 2026-11-23
 

@@ -1,6 +1,6 @@
-# Paulchen QoL v0.12.0
+# Paulchen QoL v0.13.0
 
-## Paulchens Instanz-Questplaner – ohne Polestar (Entwicklungszweig)
+## Paulchens Instanz-Questplaner
 
 Der neue **Instanz-Questplaner läuft vollständig eigenständig**, auch wenn Polestar, Dungeon Quest Atlas und alle anderen Quest-Addons **nicht installiert** sind. Öffne ihn über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder `/pq quests` beziehungsweise `/pq dungeons`.
 
@@ -27,7 +27,7 @@ Die Erweiterung enthält **35 Instanzen bzw. Instanzflügel** mit zusammen **395
 
 Die Lua-5.1-Tests in `tests/dungeon_quest_fixture.lua` laden die **echten gebündelten Daten** und prüfen Auswahlliste, Fraktion, bekannte Instanzquests, Questreihen, Fortschrittszustände und den Betrieb ohne Polestar.
 
-**Noch erforderlich vor Veröffentlichung:** Im WoW-Forever-Client die Anzeige, Kartenkoordinaten, aktualisierte Questnamen, echte Questzustände und Sonderfälle für neu hinzugefügte Forever-Quests prüfen.
+Die Testdaten decken bekannte Instanzquests und mehrere Questzustände ab. Kartenkoordinaten, Questnamen und Fortschritt hängen im Spiel von den Daten des Forever-Clients ab.
 
 ---
 
