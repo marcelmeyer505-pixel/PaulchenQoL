@@ -1,8 +1,9 @@
-## Unreleased – Dungeon quest planner
+## Unreleased – Standalone dungeon quest planner
 
-- New standalone dungeon quest planner, opened through the minimap quick menu or /pq quests.
-- Quest givers and turn-in points, Polestar waypoints, prerequisite and follow-up chains, status per character, chain progress, search and export.
-- Explicit unknown/optional-provider states and German/English UI; new Lua 5.1 regression fixture.
+- Bundle the historical MIT-licensed Dungeon Quest Atlas v1.04 reference dataset (35 dungeon entries, 395 quest associations, 480 quest records and 309 locations), with its original license and attribution.
+- The quest planner now works without Polestar or Dungeon Quest Atlas installed. Native WoW waypoints replace the Polestar navigation dependency.
+- Add searchable dungeon and quest lists, known quest giver/turn-in locations, chain progress, faction filters, completion states and copyable reports.
+- Explicitly label incomplete/unknown Forever content; add Lua 5.1 regression tests against the real bundled dataset.
 
 # Changelog
 
