@@ -784,10 +784,11 @@ local function updateMinimapRoute(state, redraw)
         floor, u, v = guide.PlayerPosition(selection.entry, selection.floor, hint)
         exact = floor ~= nil
         local reference = state.liveReference
-        if exact or reference and playerMoving(state) then
+        if exact then
             state.liveReference = nil
         elseif reference and reference.entry == selection.entry and reference.floor == selection.floor then
-            floor, u, v, manual = reference.floor, reference.x, reference.y, true
+            if playerMoving(state) then reference.stale = true end
+            floor, u, v, manual = reference.floor, reference.x, reference.y, reference
         end
         if floor then
             half = saved.frame:GetWidth() / 2
@@ -795,12 +796,13 @@ local function updateMinimapRoute(state, redraw)
         end
     end
     state.alignButton:SetShown(not exact)
-    state.mapNote:SetText(manual and project and L("Manuell ausgerichtet") or "")
+    state.mapNote:SetText(manual and project and L(manual.stale and "Ausrichtung veraltet" or "Manuell ausgerichtet") or "")
     if not project then
         overlay.floor = nil
         overlay:Hide()
         return
     end
+    overlay:SetAlpha(manual and manual.stale and .72 or 1)
     local entry = selection.entry
     if not redraw and overlay.floor == floor and overlay.entry == entry and overlay.x == u and overlay.y == v
         and overlay.radius == radius and overlay.half == half then return end
@@ -1005,7 +1007,6 @@ local function createWorldOverlay(map)
     state.floorZoom:ClearAllPoints()
     state.floorZoom:SetPoint("BOTTOM", state.livePanel, "BOTTOM", -67, 7)
     state.alignButton = button(state.livePanel, "Position setzen", 0, 0, 124, function()
-        state.liveReference = nil
         state.viewMode = "align"
         guide.UpdateWorldOverlay(map)
     end)
@@ -1092,7 +1093,11 @@ local function createWorldOverlay(map)
             return
         end
         if event == "PLAYER_STARTED_MOVING" then state.moving = true end
-        state.liveReference = nil
+        if event == "PLAYER_LEAVING_WORLD" then
+            state.liveReference = nil
+        elseif state.liveReference then
+            state.liveReference.stale = true
+        end
         if state.livePanel:IsVisible() then updateMinimapRoute(state, true) end
     end)
     return state

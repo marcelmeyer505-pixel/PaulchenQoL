@@ -1068,15 +1068,26 @@ map:Show()
 flush()
 assert(projected:IsVisible(), "The manual alignment survives closing the map while standing still")
 fire("PLAYER_STARTED_MOVING")
-assert(not projected:IsShown() and not dungeonCanvas:IsVisible(), "Moving clears the manual alignment")
+assert(projected:IsVisible() and projected.lines[1]:IsVisible() and projected.pins[1].stop == boss
+    and not dungeonCanvas:IsVisible(), "Moving keeps the route and bosses overlaid on the minimap")
+assert(projected:GetAlpha() < 1 and textWidget("Ausrichtung veraltet"):IsVisible())
+fire("ZONE_CHANGED_INDOORS")
+flush()
+assert(projected:IsVisible() and textWidget("Ausrichtung veraltet"):IsVisible(),
+    "Moving between named areas on the same floor preserves the reference")
 fire("PLAYER_STOPPED_MOVING")
 picker = settingPosition()
 picker.scripts.OnClick()
-assert(projected:IsVisible())
+assert(projected:IsVisible() and projected:GetAlpha() == 1 and textWidget("Manuell ausgerichtet"):IsVisible())
 speed = 1
 dock.scripts.OnUpdate(dock, .11)
-assert(not projected:IsShown(), "A readable speed can also invalidate the manual position")
+assert(projected:IsVisible() and textWidget("Ausrichtung veraltet"):IsVisible(),
+    "A readable speed also marks the last position as stale without hiding it")
 speed = 0
+coords = {x = boss.x + .003, y = boss.y}
+dock.scripts.OnUpdate(dock, .11)
+assert(projected:IsVisible() and projected:GetAlpha() == 1 and select(4, projected.pins[1]:GetPoint()) < 0,
+    "Exact coordinates replace the stale projection when the client provides them")
 Minimap:SetZoom(2)
 local hostWidth, hostHeight = map.ScrollContainer:GetSize()
 map.ScrollContainer:SetSize(hostWidth, hostHeight - 50)

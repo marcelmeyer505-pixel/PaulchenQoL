@@ -927,6 +927,7 @@ local enUS = {
     ["Ganze Etage"] = "Whole Floor",
     ["Position setzen"] = "Set Position",
     ["Manuell ausgerichtet"] = "Manually Aligned",
+    ["Ausrichtung veraltet"] = "Alignment Out of Date",
     ["Stillstehen und Standort anklicken"] = "Stand still and click your location",
     ["Zum Ausrichten stehen bleiben"] = "Stand still to align",
     ["Live-Minimap nicht verfügbar"] = "Live Minimap Unavailable",
