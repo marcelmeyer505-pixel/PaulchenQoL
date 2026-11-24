@@ -97,20 +97,24 @@ local loot = app.upgrades.loot
 loot.Open()
 local window = assert(PaulchenQoLLootWindow)
 assert(window:IsShown() and window.empty:IsVisible() and not window.need:IsVisible())
-lootSlots = { junk }
+window:Hide()
+lootSlots = { junk, link, link }
 fire("LOOT_READY")
 fire("LOOT_OPENED")
 fire("LOOT_CLOSED")
 fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF_MULTIPLE:format(junk, 2))
-assert(#loot.drops == 1 and loot.drops[1].received and not loot.drops[1].gain)
-assert(window.items[1].caption:GetText() == "2× Junk" and not window.greed:IsVisible())
-assert(next(itemData) == nil, "Ordinary junk does not start item data retries")
+fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(link))
+assert(#loot.drops == 0 and not window:IsShown() and not window.items[1]:IsShown())
+assert(next(itemData) == nil and #messages == 0, "Ordinary loot never reaches the group-roll feature")
 
 links[1], rollInfo[1], active[1] = link, { need = true, greed = true }, 60000
 native.rollID = 1
 native:Show()
 assert(native:GetAlpha() == 1 and nativeButton.click, "Native window stays available until Paulchen has this roll")
 fire("START_LOOT_ROLL", 1, 60000)
+fire("START_LOOT_ROLL", 1, 60000)
+fire("LOOT_OPENED")
+fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(link))
 assert(native:IsShown() and native:GetAlpha() == 0 and not native.motion and not nativeButton.click and not nativeButton.motion)
 assert(confirmation:GetAlpha() == 1 and confirmation.click)
 window:Hide()
@@ -121,7 +125,8 @@ native:Hide()
 assert(native:GetAlpha() == 1 and nativeButton.click)
 native:Show()
 assert(native:GetAlpha() == 0, "A native frame shown after Paulchen is also visually suppressed")
-assert(#loot.drops == 2 and #messages == 1 and #votes == 0)
+assert(#loot.drops == 1 and #messages == 1 and #votes == 0)
+assert(window.items[1]:IsVisible() and not window.items[2]:IsShown(), "One row per roll ID")
 local roll = loot.drops[1]
 assert(window.need:IsEnabled() and window.greed:IsEnabled() and window.pass:IsEnabled())
 assert(window.gain:GetText():find("Testprofil", 1, true))
@@ -145,7 +150,11 @@ fire("LOOT_HISTORY_UPDATE_DROP", 35, 7)
 assert(roll.winner == "Mara" and roll.players.Lina.choice == "pass" and not roll.players.Nils)
 assert(window.players[1].name:GetText() == "Mara" and window.players[1].number:GetText() == 99)
 assert(window.status:GetText() == "Gewonnen von Mara" and not window.need:IsEnabled())
+assert(window.noOpenRolls:IsVisible() and not window.items[1]:IsShown() and window.detail:IsVisible(),
+    "A finished roll leaves the queue while its result stays readable")
 fire("CANCEL_LOOT_ROLL", 1)
+fire("START_LOOT_ROLL", 1, 60000)
+assert(#loot.drops == 1 and not window.items[1]:IsShown(), "A delayed repeat does not reopen a completed roll")
 native:Hide()
 assert(native:GetAlpha() == 1 and nativeButton.click)
 loot.Roll(roll, 2)
@@ -153,10 +162,11 @@ assert(#votes == 1)
 
 links[2], active[2] = lateLink, 60000
 fire("START_LOOT_ROLL", 2, 60000)
-assert(#loot.drops == 2)
+fire("START_LOOT_ROLL", 2, 60000)
+assert(#loot.drops == 1)
 rollInfo[2] = { need = false, greed = true }
 advance(0.26)
-assert(#loot.drops == 3 and itemData[44] == "requested")
+assert(#loot.drops == 2 and itemData[44] == "requested")
 assert(not window.need:IsEnabled() and window.greed:IsEnabled())
 itemData[44] = "ready"
 PaulchenQoLUpgradesDB = { lootAlerts = false }
@@ -175,8 +185,10 @@ links[3], rollInfo[3], active[3] = link, { need = true, greed = true }, 60000
 links[4], rollInfo[4], active[4] = link, { need = true, greed = true }, 60000
 fire("START_LOOT_ROLL", 3, 60000)
 fire("START_LOOT_ROLL", 4, 60000)
+fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(link))
 fire("CHAT_MSG_LOOT", LOOT_ROLL_GREED:format("Dina", link))
 assert(loot.drops[1].rollID == 4 and loot.drops[2].rollID == 3)
+assert(window.items[1].drop.rollID == 4 and window.items[2].drop.rollID == 3 and not window.items[3]:IsShown())
 assert(not loot.drops[1].players.Dina and not loot.drops[2].players.Dina,
     "Identical simultaneous rolls stay separate when a chat line does not identify the copy")
 loot.Roll(loot.drops[1], 0)
@@ -190,5 +202,8 @@ loot.Roll(loot.drops[1], 2)
 assert(#votes == 3, "The shared slot offers Transmog when the native API prefers it")
 window.greed.scripts.OnClick()
 assert(#votes == 4 and votes[4][1] == 5 and votes[4][2] == 4)
+active[5] = 0
+window.scripts.OnUpdate(window, 0.3)
+assert(not window.items[1]:IsShown() and window.noOpenRolls:IsVisible())
 ''')
-print("Loot window: native suppression and restore, deduplication, results, cache retries, and manual choices passed.")
+print("Loot window: open group rolls only, roll-ID deduplication, results, native fallback and manual choices passed.")

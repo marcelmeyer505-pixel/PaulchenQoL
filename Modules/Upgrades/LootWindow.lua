@@ -5,6 +5,7 @@ local style, L, read = app.style, app.L, app.ReadGameValue
 local window, selected
 local itemOffset, playerOffset = 0, 0
 local itemRows, playerRows = 7, 6
+local openRolls = {}
 local choices = { need = "Bedarf", greed = "Gier", pass = "Passen", disenchant = "Entzaubern", transmog = "Transmog" }
 local nativeRolls = {}
 
@@ -97,6 +98,22 @@ local function icon(drop)
     return drop.icon or read(C_Item and C_Item.GetItemIconByID, drop.id) or 134400
 end
 
+local function updateOpenRolls()
+    local count, changed = 0, false
+    for _, drop in ipairs(loot.drops) do
+        if loot.TimeLeft(drop) > 0 then
+            count = count + 1
+            if openRolls[count] ~= drop then
+                openRolls[count], changed = drop, true
+            end
+        end
+    end
+    for index = #openRolls, count + 1, -1 do
+        openRolls[index], changed = nil, true
+    end
+    return changed
+end
+
 local function updateTimer()
     if not selected then return end
     local remaining = loot.TimeLeft(selected)
@@ -110,10 +127,8 @@ local function updateTimer()
     elseif active then
         status = app.LF("Noch %d Sek.", math.ceil(remaining))
         if selected.voted then status = status .. " · " .. L(choices[selected.voted]) end
-    elseif selected.rollID then
-        status = L("Würfeln beendet")
     else
-        status = selected.received and L("Erhalten") or L("Gefunden")
+        status = L("Würfeln beendet")
     end
     window.status:SetText(status)
     window.need:SetEnabled(ready and selected.need == true and RollOnLoot ~= nil)
@@ -121,7 +136,7 @@ local function updateTimer()
     window.greed:SetText(L(greedLabel))
     window.greed:SetEnabled(ready and (selected.transmog == true or selected.greed == true) and RollOnLoot ~= nil)
     window.pass:SetEnabled(ready and RollOnLoot ~= nil)
-    for _, control in ipairs(window.rollButtons) do control:SetShown(selected.rollID ~= nil) end
+    for _, control in ipairs(window.rollButtons) do control:SetShown(active) end
 end
 
 local function createWindow()
@@ -156,10 +171,11 @@ local function createWindow()
     list:SetSize(225, 269)
     list:SetPoint("TOPLEFT", 11, -51)
     style.Panel(list, style.header)
-    style.Label(list, "Letzte Beute", 10, 0, 205, 24, "GameFontNormal")
+    style.Label(list, "Zum Würfeln", 10, 0, 205, 24, "GameFontNormal")
+    f.noOpenRolls = style.Label(list, "Keine offenen Würfe.", 10, -26, 205, 25, "GameFontHighlightSmall", style.muted)
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(_, delta)
-        itemOffset = math.max(0, math.min(#loot.drops - itemRows, itemOffset - delta))
+        itemOffset = math.max(0, math.min(#openRolls - itemRows, itemOffset - delta))
         loot.Refresh()
     end)
     f.items = {}
@@ -225,14 +241,18 @@ local function createWindow()
         playerOffset = math.max(0, playerOffset - delta)
         loot.Refresh()
     end)
-    f.empty = style.Label(f, "In dieser Sitzung ist noch keine Beute erfasst.", 249, -117, 351, 32, "GameFontHighlightSmall")
+    f.empty = style.Label(f, "In dieser Sitzung gab es noch keine Gruppenwürfe.", 249, -117, 351, 32, "GameFontHighlightSmall")
     local elapsed = 0
     f:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + dt
         if elapsed >= 0.25 then
             elapsed = 0
-            updateTimer()
-            if selected and selected.rollID then syncNativeRolls() end
+            if updateOpenRolls() then
+                loot.Refresh()
+            else
+                updateTimer()
+                if selected then syncNativeRolls() end
+            end
         end
     end)
     return f
@@ -240,12 +260,14 @@ end
 
 function loot.Refresh()
     if not window or not window:IsShown() then return end
-    itemOffset = math.max(0, math.min(itemOffset, #loot.drops - itemRows))
+    updateOpenRolls()
+    itemOffset = math.max(0, math.min(itemOffset, #openRolls - itemRows))
     local found
     for _, drop in ipairs(loot.drops) do if drop == selected then found = true; break end end
-    if not found then selected, playerOffset = loot.drops[1], 0 end
+    if not found then selected, playerOffset = openRolls[1] or loot.drops[1], 0 end
+    window.noOpenRolls:SetShown(#openRolls == 0)
     for index, item in ipairs(window.items) do
-        local drop = loot.drops[itemOffset + index]
+        local drop = openRolls[itemOffset + index]
         item.drop = drop
         item:SetShown(drop ~= nil)
         if drop then

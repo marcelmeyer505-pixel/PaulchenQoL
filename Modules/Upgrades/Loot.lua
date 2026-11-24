@@ -5,7 +5,7 @@ local gear, read, plain = app.gear, suite.ReadGameValue, suite.Readable
 local history = C_LootHistory
 local loot = { drops = {} }
 app.loot = loot
-local byRoll, slots, announced = {}, {}, {}
+local byRoll, announced = {}, {}
 local lastSound
 
 function app.LootAlertsEnabled()
@@ -37,18 +37,18 @@ local function recentRoll(drop)
     return drop.rollID and GetTime() <= (drop.finishedAt or drop.deadline) + 8
 end
 
-local function addDrop(link, icon, count)
+local function addRoll(rollID, link, icon, count, deadline)
     local id = gear.ItemID(link)
     if not id then return end
     local drop = {
-        id = id, key = key(link), link = link, icon = icon, count = count, players = {}, seen = GetTime(),
+        id = id, rollID = rollID, key = key(link), link = link, icon = icon, count = count, players = {}, deadline = deadline,
         name = link:match("|h%[(.-)%]|h") or read(C_Item and C_Item.GetItemNameByID, id) or ("Item " .. id),
     }
     table.insert(loot.drops, 1, drop)
     for index = #loot.drops, 41, -1 do
         local old = loot.drops[index]
         if loot.TimeLeft(old) == 0 then
-            if old.rollID and byRoll[old.rollID] == old then byRoll[old.rollID] = nil end
+            if byRoll[old.rollID] == old then byRoll[old.rollID] = nil end
             table.remove(loot.drops, index)
         end
     end
@@ -98,12 +98,6 @@ local function checkUpgrade(drop, attempt)
     if loot.Refresh then loot.Refresh() end
 end
 
-local function showDrop(drop)
-    app.ObserveVariant(drop.link)
-    checkUpgrade(drop, 0)
-    if loot.ShowNew then loot.ShowNew(drop) end
-end
-
 local function rollOptions(id)
     if not GetLootRollItemInfo then return end
     local ok, icon, name, count, _, _, need, greed, _, _, _, _, _, transmog = pcall(GetLootRollItemInfo, id)
@@ -114,7 +108,7 @@ end
 
 function loot.CanReplaceRoll(id)
     local drop = byRoll[id]
-    return RollOnLoot and drop and drop.hasOptions
+    return RollOnLoot and drop and drop.hasOptions and loot.TimeLeft(drop) > 0
 end
 
 function loot.Roll(drop, choice)
@@ -129,7 +123,8 @@ end
 
 local pending = {}
 local function startRoll(id, ms, restored)
-    if byRoll[id] or pending[id] then return end
+    local previous = byRoll[id]
+    if pending[id] or previous and (loot.TimeLeft(previous) > 0 or not restored and recentRoll(previous)) then return end
     local deadline = GetTime() + (type(ms) == "number" and ms / 1000 or 60)
     local historyTime = not restored and read(history and history.GetLootHistoryTime) or nil
     local token = {}
@@ -138,16 +133,15 @@ local function startRoll(id, ms, restored)
         if pending[id] ~= token then return end
         local icon, name, count, need, greed, transmog = rollOptions(id)
         local link = read(GetLootRollItemLink, id)
-        local itemKey = key(link)
-        if itemKey and (name or attempt == 3) then
+        if gear.ItemID(link) and (name or attempt == 3) then
             pending[id] = nil
-            local drop = findDrop(itemKey, function(row)
-                return row.slot and not row.rollID and not row.received and GetTime() - row.seen < 3
-            end) or addDrop(link, icon, count)
-            drop.rollID, drop.deadline, drop.historyTime = id, deadline, historyTime
+            local drop = addRoll(id, link, icon, count, deadline)
+            drop.historyTime = historyTime
             drop.need, drop.greed, drop.transmog, drop.hasOptions = need, greed, transmog, name ~= nil
             byRoll[id] = drop
-            showDrop(drop)
+            app.ObserveVariant(drop.link)
+            checkUpgrade(drop, 0)
+            if loot.ShowNew then loot.ShowNew(drop) end
         elseif attempt < 3 then
             C_Timer.After(0.25, function() load(attempt + 1) end)
         else
@@ -155,30 +149,6 @@ local function startRoll(id, ms, restored)
         end
     end
     load(0)
-end
-
-local function captureSlots()
-    for slot = 1, read(GetNumLootItems) or 0 do
-        local link = read(GetLootSlotLink, slot)
-        local itemKey = key(link)
-        if itemKey and (not slots[slot] or slots[slot].key ~= itemKey) then
-            local icon, count
-            if GetLootSlotInfo then
-                local ok, texture, _, quantity = pcall(GetLootSlotInfo, slot)
-                if ok then icon, count = plain(texture), plain(quantity) end
-            end
-            local drop = findDrop(itemKey, function(row)
-                return row.rollID and not row.slot and GetTime() - row.seen < 3
-            end)
-            if drop then
-                drop.slot, slots[slot] = true, drop
-            else
-                drop = addDrop(link, icon, count)
-                drop.slot, slots[slot] = true, drop
-                showDrop(drop)
-            end
-        end
-    end
 end
 
 local states = {}
@@ -247,8 +217,6 @@ local function pattern(global, kind, who, item, value)
     patterns[#patterns + 1] = { "^" .. table.concat(tokens) .. "$", captures, kind, who, item, value }
 end
 
-pattern("LOOT_ITEM_SELF_MULTIPLE", "received", nil, 1, 2)
-pattern("LOOT_ITEM_SELF", "received", nil, 1)
 pattern("LOOT_ROLL_ROLLED_NEED", "need", 3, 2, 1)
 pattern("LOOT_ROLL_ROLLED_GREED", "greed", 3, 2, 1)
 pattern("LOOT_ROLL_ROLLED_DE", "disenchant", 3, 2, 1)
@@ -275,27 +243,14 @@ local function chatLoot(message)
             local itemKey = key(link)
             if not itemKey then return end
             local drop = findDrop(itemKey, recentRoll)
-            if kind == "received" then
-                if drop and (drop.received or drop.winner and drop.winner ~= name) then drop = nil end
-                if not drop then
-                    for _, row in ipairs(loot.drops) do
-                        if row.key == itemKey and row.slot and not row.rollID and not row.received and GetTime() - row.seen < 4 then
-                            drop = row
-                            break
-                        end
-                    end
-                end
-                local fresh = not drop
-                drop = drop or addDrop(link, nil, value)
-                drop.received = true
-                if fresh then showDrop(drop) end
-            elseif drop and kind == "allPassed" then
+            if not drop then return end
+            if kind == "allPassed" then
                 drop.allPassed = true
                 drop.finishedAt = drop.finishedAt or GetTime()
-            elseif drop and name and kind == "winner" then
+            elseif name and kind == "winner" then
                 drop.winner = drop.winner or name
                 drop.finishedAt = drop.finishedAt or GetTime()
-            elseif drop and name then
+            elseif name then
                 local previous = drop.players[name]
                 if not previous or not previous.number or value then
                     drop.players[name] = { choice = kind, number = value }
@@ -308,7 +263,7 @@ local function chatLoot(message)
 end
 
 local events = CreateFrame("Frame")
-for _, event in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "START_LOOT_ROLL", "CANCEL_LOOT_ROLL",
+for _, event in ipairs({ "START_LOOT_ROLL", "CANCEL_LOOT_ROLL",
     "CANCEL_ALL_LOOT_ROLLS", "CHAT_MSG_LOOT", "LOOT_HISTORY_UPDATE_DROP", "PLAYER_ENTERING_WORLD" }) do
     suite.RegisterSupported(events, event)
 end
@@ -320,18 +275,14 @@ events:SetScript("OnEvent", function(_, event, first, second)
         pending[first] = nil
         local drop = byRoll[first]
         if drop then drop.closed, drop.finishedAt = true, drop.finishedAt or GetTime() end
-        byRoll[first] = nil
     elseif event == "CANCEL_ALL_LOOT_ROLLS" then
         for _, drop in pairs(byRoll) do drop.closed, drop.finishedAt = true, drop.finishedAt or GetTime() end
-        byRoll, pending = {}, {}
+        pending = {}
     elseif event == "CHAT_MSG_LOOT" then
         if not chatLoot(first) then return end
     elseif event == "LOOT_HISTORY_UPDATE_DROP" and type(first) == "number" and type(second) == "number" then
         updateHistory(first, second)
-    elseif event == "LOOT_CLOSED" then
-        slots = {}
     elseif event == "PLAYER_ENTERING_WORLD" then
-        slots = {}
         local active = read(GetActiveLootRollIDs)
         if type(active) == "table" then
             for _, id in ipairs(active) do
@@ -339,8 +290,6 @@ events:SetScript("OnEvent", function(_, event, first, second)
                 if type(id) == "number" then startRoll(id, read(GetLootRollTimeLeft, id), true) end
             end
         end
-    elseif event == "LOOT_READY" or event == "LOOT_OPENED" then
-        captureSlots()
     end
     if loot.Refresh then loot.Refresh() end
 end)
