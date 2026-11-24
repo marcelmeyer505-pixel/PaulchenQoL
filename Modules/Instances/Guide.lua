@@ -215,9 +215,9 @@ local function mapFacing(floor)
     return math.atan2(-x, -y * 2 / 3)
 end
 
-function guide.PlayerPosition(entry, preferred, mapHint)
+function guide.PlayerPosition(entry, preferred)
     if not C_Map or not preferred or not entry.id or entry.id ~= knownInstance() then return end
-    local best = mapHint and guide.floors[mapHint] and mapHint or read(C_Map.GetBestMapForUnit, "player")
+    local best = read(C_Map.GetBestMapForUnit, "player")
     local floor
     for _, candidate in ipairs(guide.byID[entry.id] or {}) do
         for _, id in ipairs(candidate.floors) do

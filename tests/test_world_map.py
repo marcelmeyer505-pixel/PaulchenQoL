@@ -11,12 +11,15 @@ lua = LuaRuntime()
 lua.execute(r'''
 app, frames, timers = {}, {}, {}
 secret, clock, playerMap, worldX, combat = {}, 10, 1411, 100, false
+cursorX, cursorY, mouseDown = 250, 320, false
 function issecretvalue(value) return value == secret end
 function GetLocale() return "deDE" end
 function GetTime() return clock end
 function InCombatLockdown() return combat end
 function UnitFactionGroup() return "Horde" end
 function CreateVector2D(x, y) return { x = x, y = y } end
+function GetCursorPosition() return cursorX, cursorY end
+function IsMouseButtonDown(button) return button == "LeftButton" and mouseDown end
 C_Timer = {
     After = function(_, callback) timers[#timers + 1] = callback end,
     NewTicker = function(_, callback)
@@ -76,6 +79,9 @@ local methods = {
     SetClipsChildren = function(self, enabled) self.clipsChildren = enabled end,
     GetScale = function(self) return self.scale or 1 end,
     SetScale = function(self, scale) self.scale = scale end,
+    GetEffectiveScale = function(self) return self.effectiveScale or 1 end,
+    GetLeft = function(self) return self.left or 0 end,
+    GetTop = function(self) return self.top or self:GetHeight() end,
     GetAlpha = function(self) return self.alpha or 1 end,
     SetAlpha = function(self, alpha) self.alpha = alpha end,
     IsMovable = function(self) return self.movable or false end,
@@ -85,6 +91,12 @@ local methods = {
     GetNumPoints = function(self) return self.anchor and 1 or 0 end,
     ClearAllPoints = function(self) self.anchor = nil end,
     GetChildren = function(self) return unpack(self.children) end,
+    SetScrollChild = function(self, child) self.scrollChild = child end,
+    GetHorizontalScroll = function(self) return self.horizontalScroll or 0 end,
+    GetVerticalScroll = function(self) return self.verticalScroll or 0 end,
+    SetHorizontalScroll = function(self, value) self.horizontalScroll = value end,
+    SetVerticalScroll = function(self, value) self.verticalScroll = value end,
+    UpdateScrollChildRect = function() end,
     SetText = function(self, text) self.textValue = text end,
     SetTexture = function(self, id) self.textureID, self.atlasID = id, nil end,
     SetRotation = function(self, radians) self.rotation = radians end,
@@ -627,8 +639,13 @@ local fallbackPin = instancePage.map.pins[1]
 assert(fallbackPin:IsVisible() and fallbackPin.portrait.textureID:match("UI%-RaidTargetingIcon_8$"))
 guide.Open(custom.key, "map")
 assert(guide.selection.floor == custom.floors[1])
+local guideViewport = instancePage.viewport
+guideViewport.scripts.OnMouseWheel(guideViewport, 1)
+assert(instancePage.map:GetWidth() == guideViewport:GetWidth() * 1.25)
 instancePage.nextFloor.scripts.OnClick()
 assert(guide.selection.floor == custom.floors[2])
+assert(instancePage.map:GetWidth() == guideViewport:GetWidth() and guideViewport:GetHorizontalScroll() == 0,
+    "Switching floors in the guide shows the new floor at its base zoom")
 assert(instancePage.map.art[1]:IsShown() and type(instancePage.map.art[1].textureID) == "number")
 
 local collect = app.worldMap.Collect
@@ -951,180 +968,62 @@ assert(dungeonCanvas.positionEntry.key == "sm_library" and dungeonCanvas.roomLay
 local home = CreateFrame("Frame", nil, UIParent)
 Minimap = CreateFrame("Minimap", nil, home)
 Minimap:SetSize(198, 198)
-Minimap:SetScale(.92)
-Minimap:SetFrameStrata("LOW")
-Minimap:SetFrameLevel(12)
 Minimap:SetPoint("CENTER", home, "CENTER", 12, -8)
-function Minimap:GetZoom() return self.zoom or 3 end
-function Minimap:SetZoom(zoom) self.zoom = zoom end
-function Minimap:CanChangeProtectedState() return not combat end
-MinimapBackdrop = CreateFrame("Frame", nil, Minimap)
-MinimapBackdrop:SetAlpha(.85)
-PaulchenQoLMinimapButton = CreateFrame("Button", nil, Minimap)
-local launcher = CreateFrame("Button", nil, Minimap)
-function launcher:GetName() return "LibDBIcon10_Test" end
-local north = false
-C_Minimap = {
-    IsRotateMinimapIgnored = function() return north end,
-    SetIgnoreRotateMinimap = function(value) north = value end,
-    GetViewRadius = function() return 120 end,
-    GetUiMapID = function() return interiorFloor end,
-}
-function GetCVarBool(name) assert(name == "rotateMinimap"); return true end
-local function restoreChecked()
-    local point, anchor, relative, x, y = Minimap:GetPoint()
-    assert(Minimap:GetParent() == home and not north and Minimap:GetScale() == .92)
-    assert(Minimap:GetWidth() == 198 and Minimap:GetHeight() == 198 and Minimap:GetZoom() == 3)
-    assert(Minimap:GetFrameStrata() == "LOW" and Minimap:GetFrameLevel() == 12 and Minimap:IsVisible())
-    assert(point == "CENTER" and anchor == home and relative == "CENTER" and x == 12 and y == -8)
-    assert(MinimapBackdrop:GetAlpha() == .85 and PaulchenQoLMinimapButton:IsShown() and launcher:IsShown())
-end
 guide.UpdateWorldOverlay(map)
-local liveSwitch = textWidget("Live-Minimap")
-local fullWidth = dungeonCanvas:GetWidth()
-liveSwitch.scripts.OnClick()
-local dock = Minimap:GetParent()
-assert(dock ~= home and Minimap:IsVisible() and north and Minimap:GetWidth() > 198 and Minimap:GetZoom() == 0)
-assert(not dungeonCanvas:IsVisible() and liveSwitch.textValue == "Routenkarte",
-    "The live view never shows the floor map beside the minimap")
-assert(MinimapBackdrop:GetAlpha() == 0 and not PaulchenQoLMinimapButton:IsShown() and not launcher:IsShown())
-Minimap:SetZoom(1)
-textWidget("Ganze Etage").scripts.OnClick()
-restoreChecked()
-assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() == fullWidth and dungeonCanvas.lines[1]:IsVisible())
-assert(liveSwitch.textValue == "Zur Live-Minimap")
-local artFloor = guide.floors[dungeonCanvas.positionFloor]
-assert(dungeonCanvas.art[1].textureID == artFloor.art[1][1], "The full-floor view uses the local minimap artwork")
-local firstTexture = dungeonCanvas.art[1]
-local setTexture = firstTexture.SetTexture
-local missing = {}
-for _, part in ipairs(artFloor.art) do missing[part[1]] = true end
-function firstTexture:SetTexture(file, ...)
-    if missing[file] then return false end
-    return setTexture(self, file, ...)
-end
+local viewport = dungeonCanvas:GetParent()
+assert(viewport.scrollChild == dungeonCanvas, "Native scroll viewport clips the zoomed floor")
+local width, height = viewport:GetSize()
+local routeX, routeY = unpack(dungeonCanvas.lines[1].startPoint, 3, 4)
+viewport.left, viewport.top, viewport.effectiveScale = 80, 550, .8
+local pointX, pointY = width * .4, height * .25
+cursorX = (viewport.left + pointX) * viewport.effectiveScale
+cursorY = (viewport.top - pointY) * viewport.effectiveScale
+viewport.scripts.OnMouseWheel(viewport, 1)
+assert(dungeonCanvas:GetWidth() == width * 1.25 and dungeonCanvas:GetHeight() == height * 1.25)
+assert(math.abs(viewport:GetHorizontalScroll() - .25 * pointX) < .001)
+assert(math.abs(viewport:GetVerticalScroll() - .25 * pointY) < .001)
+local pin = dungeonCanvas.pins[1]
+local _, _, _, px, py = pin:GetPoint()
+assert(pin:IsVisible() and px == pin.stop.x * dungeonCanvas:GetWidth() and py == -pin.stop.y * dungeonCanvas:GetHeight())
+assert(dungeonCanvas.lines[1]:IsVisible() and dungeonCanvas.roomStatus:GetParent() == viewport)
+local zoomedRouteX, zoomedRouteY = unpack(dungeonCanvas.lines[1].startPoint, 3, 4)
+assert(math.abs(zoomedRouteX - routeX * 1.25) < .001 and math.abs(zoomedRouteY - routeY * 1.25) < .001)
 guide.UpdateWorldOverlay(map)
-assert(firstTexture.textureID == artFloor.tiles[1] and dungeonCanvas.pins[1]:IsVisible(),
-    "Unavailable minimap assets fall back to normal art with all boss pins intact")
-firstTexture.SetTexture = nil
-guide.UpdateWorldOverlay(map)
-assert(firstTexture.textureID == artFloor.art[1][1] and dungeonCanvas.pins[1]:IsVisible())
-liveSwitch.scripts.OnClick()
-assert(not dungeonCanvas:IsVisible() and Minimap:GetParent() == dock and Minimap:GetZoom() == 1,
-    "Returning from the floor view preserves the live zoom")
-local boss = dungeonCanvas.positionEntry.stops[1]
-interiorFloor, coords = boss.floor, {x = boss.x, y = boss.y}
-guide.UpdateWorldOverlay(map)
-local projected
-for _, frame in ipairs(dock.children) do
-    if frame.pins and frame.lines then projected = frame; break end
-end
-assert(projected and projected:IsVisible() and projected.pins[1].stop == boss)
-assert(select(2, projected.pins[1]:GetPoint()) == Minimap and select(4, projected.pins[1]:GetPoint()) == 0)
-assert(projected.lines[1]:IsVisible())
-for _, line in ipairs(projected.lines) do
-    if line:IsShown() then
-        for _, endpoint in ipairs({line.startPoint, line.endPoint}) do
-            assert(endpoint[2] == Minimap and endpoint[3] ^ 2 + endpoint[4] ^ 2 <= (Minimap:GetWidth() / 2) ^ 2)
-        end
-    end
-end
-coords = {x = boss.x + .003, y = boss.y}
-dock.scripts.OnUpdate(dock, .11)
-assert(projected.pins[1].stop == boss and select(4, projected.pins[1]:GetPoint()) < 0,
-    "Moving east shifts the projected boss west on the north-up minimap")
-coords = secret
-dock.scripts.OnUpdate(dock, .11)
-assert(not projected:IsShown() and not dungeonCanvas:IsVisible(),
-    "Unavailable coordinates never open an unsolicited second map")
-local speed = 0
-function GetUnitSpeed() return speed end
-function dungeonCanvas:GetEffectiveScale() return .8 end
-function dungeonCanvas:GetLeft() return 70 end
-function dungeonCanvas:GetTop() return 500 end
-function GetCursorPosition()
-    return (70 + boss.x * dungeonCanvas:GetWidth()) * .8, (500 - boss.y * dungeonCanvas:GetHeight()) * .8
-end
-local function settingPosition()
-    textWidget("Position setzen").scripts.OnClick()
-    assert(dungeonCanvas:IsVisible() and Minimap:GetParent() == home)
-    for _, child in ipairs(dungeonCanvas.children) do
-        if child:IsVisible() and child.scripts.OnClick then return child end
-    end
-    error("Missing position picker")
-end
-local picker = settingPosition()
-fire("PLAYER_STARTED_MOVING")
-picker.scripts.OnClick()
-assert(dungeonCanvas:IsVisible(), "A moving player cannot set a stationary reference")
-fire("PLAYER_STOPPED_MOVING")
-picker.scripts.OnClick()
-assert(Minimap:GetParent() == dock and not dungeonCanvas:IsVisible() and projected:IsVisible())
-assert(projected.pins[1].stop == boss and math.abs(select(4, projected.pins[1]:GetPoint())) < .001)
-assert(textWidget("Manuell ausgerichtet"):IsVisible())
-map:Hide()
-restoreChecked()
-map:Show()
-flush()
-assert(projected:IsVisible(), "The manual alignment survives closing the map while standing still")
-fire("PLAYER_STARTED_MOVING")
-assert(projected:IsVisible() and projected.lines[1]:IsVisible() and projected.pins[1].stop == boss
-    and not dungeonCanvas:IsVisible(), "Moving keeps the route and bosses overlaid on the minimap")
-assert(projected:GetAlpha() < 1 and textWidget("Ausrichtung veraltet"):IsVisible())
-fire("ZONE_CHANGED_INDOORS")
-flush()
-assert(projected:IsVisible() and textWidget("Ausrichtung veraltet"):IsVisible(),
-    "Moving between named areas on the same floor preserves the reference")
-fire("PLAYER_STOPPED_MOVING")
-picker = settingPosition()
-picker.scripts.OnClick()
-assert(projected:IsVisible() and projected:GetAlpha() == 1 and textWidget("Manuell ausgerichtet"):IsVisible())
-speed = 1
-dock.scripts.OnUpdate(dock, .11)
-assert(projected:IsVisible() and textWidget("Ausrichtung veraltet"):IsVisible(),
-    "A readable speed also marks the last position as stale without hiding it")
-speed = 0
-coords = {x = boss.x + .003, y = boss.y}
-dock.scripts.OnUpdate(dock, .11)
-assert(projected:IsVisible() and projected:GetAlpha() == 1 and select(4, projected.pins[1]:GetPoint()) < 0,
-    "Exact coordinates replace the stale projection when the client provides them")
-Minimap:SetZoom(2)
-local hostWidth, hostHeight = map.ScrollContainer:GetSize()
-map.ScrollContainer:SetSize(hostWidth, hostHeight - 50)
-guide.UpdateWorldOverlay(map)
-assert(Minimap:GetParent() == dock and Minimap:GetZoom() == 2, "Resizing the live view keeps its destination and zoom")
-map.ScrollContainer:SetSize(hostWidth, hostHeight)
-liveSwitch.scripts.OnClick()
-restoreChecked()
-assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() == fullWidth)
-assert(dungeonCanvas.art[1].textureID == artFloor.tiles[1], "The normal route tab retains its original artwork")
+assert(dungeonCanvas:GetWidth() == width * 1.25, "Refreshing the same indoor map preserves the zoom")
 
-liveSwitch.scripts.OnClick()
-textWidget("Weltkarte").scripts.OnClick()
-restoreChecked()
-textWidget("Instanzkarte").scripts.OnClick()
-assert(Minimap:GetParent() == dock and north)
-map:Hide()
-restoreChecked()
-map:Show()
-flush()
-assert(Minimap:GetParent() == dock and north, "Reopening the indoor map remembers its live mode")
-combat = true
-map:Hide()
-assert(not Minimap:IsVisible() and Minimap:GetParent() == dock)
-combat = false
-fire("PLAYER_REGEN_ENABLED")
-restoreChecked()
-map:Show()
-flush()
-liveSwitch.scripts.OnClick()
-combat = true
-liveSwitch.scripts.OnClick()
-restoreChecked()
-assert(dungeonCanvas:IsVisible(), "An unavailable Minimap leaves the route view and the HUD in place")
-combat = false
-Minimap, C_Minimap, GetCVarBool, GetUnitSpeed, GetCursorPosition = nil, nil, nil, nil, nil
-MinimapBackdrop, PaulchenQoLMinimapButton = nil, nil
+local startX, startY = viewport:GetHorizontalScroll(), viewport:GetVerticalScroll()
+mouseDown = true
+viewport.scripts.OnMouseDown(viewport, "LeftButton")
+cursorX, cursorY = cursorX - 20, cursorY + 16
+viewport.scripts.OnUpdate(viewport)
+assert(math.abs(viewport:GetHorizontalScroll() - startX - 25) < .001)
+assert(math.abs(viewport:GetVerticalScroll() - startY - 20) < .001)
+cursorX, cursorY = cursorX - 5000, cursorY + 5000
+viewport.scripts.OnUpdate(viewport)
+assert(viewport:GetHorizontalScroll() == dungeonCanvas:GetWidth() - width)
+assert(viewport:GetVerticalScroll() == dungeonCanvas:GetHeight() - height)
+mouseDown = false
+viewport.scripts.OnUpdate(viewport)
+assert(not viewport.scripts.OnUpdate, "Releasing the mouse outside the viewport stops the drag")
+
+for _ = 1, 12 do viewport.scripts.OnMouseWheel(viewport, 1) end
+assert(dungeonCanvas:GetWidth() == width * 4, "The zoom is limited to 4x")
+local center = (viewport:GetHorizontalScroll() + width / 2) / dungeonCanvas:GetWidth()
+local hostWidth, hostHeight = map.ScrollContainer:GetSize()
+map.ScrollContainer:SetSize(hostWidth, hostHeight - 60)
+guide.UpdateWorldOverlay(map)
+assert(dungeonCanvas:GetWidth() == viewport:GetWidth() * 4)
+assert(math.abs((viewport:GetHorizontalScroll() + viewport:GetWidth() / 2) / dungeonCanvas:GetWidth() - center) < .001)
+for _ = 1, 12 do viewport.scripts.OnMouseWheel(viewport, -1) end
+assert(dungeonCanvas:GetWidth() == viewport:GetWidth() and dungeonCanvas:GetHeight() == viewport:GetHeight())
+assert(viewport:GetHorizontalScroll() == 0 and viewport:GetVerticalScroll() == 0)
+
+map.ScrollContainer:SetSize(hostWidth, hostHeight)
+guide.UpdateWorldOverlay(map)
+local _, target, _, offsetX, offsetY = Minimap:GetPoint()
+assert(Minimap:GetParent() == home and target == home and offsetX == 12 and offsetY == -8)
+assert(Minimap:GetWidth() == 198 and Minimap:GetHeight() == 198)
+Minimap = nil
 
 C_Map.GetPlayerMapPosition = oldPositionAPI
 GetPlayerFacing, UnitPosition, GetSubZoneText = nil, nil, nil
