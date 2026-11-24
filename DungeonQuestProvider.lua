@@ -103,6 +103,72 @@ local function places(list)
     return all
 end
 
+-- Character-local sightings: the player's position while actually speaking
+-- with a known quest giver/turn-in NPC. These are never treated as confirmed
+-- locations for all players or uploaded elsewhere.
+local function observations()
+    local db = app.Settings and app.Settings() or PaulchenQoLDB
+    if type(db) ~= "table" then return nil end
+    if type(db.dungeonQuestLocations) ~= "table" then db.dungeonQuestLocations = {} end
+    return db.dungeonQuestLocations
+end
+
+local function applySighting(points, sighting)
+    if type(sighting) ~= "table" or sighting.kind ~= "npc"
+        or type(sighting.map) ~= "number" or type(sighting.x) ~= "number"
+        or type(sighting.y) ~= "number" then return false end
+    local found = false
+    for _, point in ipairs(points) do
+        if point.kind == "npc" and
+            (point.id == sighting.id or (not point.id and point.name == sighting.name)) then
+            -- Reference coordinates remain the default if already known. Only
+            -- enrich unknown places; preserve source precision and provenance.
+            if not point.map or point.x == nil or point.y == nil then
+                point.map, point.x, point.y = sighting.map, sighting.x, sighting.y
+                point.observed = true
+            end
+            found = true
+        end
+    end
+    if not found and #points == 0 then
+        points[1] = { kind = "npc", id = sighting.id, name = sighting.name,
+            map = sighting.map, x = sighting.x, y = sighting.y, observed = true }
+    end
+    return true
+end
+
+local function sightingFor(id, role)
+    local list = observations()
+    local entry = list and list[id]
+    return type(entry) == "table" and entry[role] or nil
+end
+
+function provider.RecordSighting(id, role, npcID, npcName, map, x, y)
+    if type(id) ~= "number" or id < 1 or (role ~= "giver" and role ~= "ender")
+        or type(npcID) ~= "number" or type(map) ~= "number"
+        or type(x) ~= "number" or type(y) ~= "number"
+        or x < 0 or x > 1 or y < 0 or y > 1 then return false end
+    local record = sources().quests and sources().quests[id]
+    if type(record) ~= "table" then return false end
+    local keys = role == "giver" and record.starts or record.ends
+    -- Only learn from an actual dialogue with a matching existing NPC.
+    -- The exceptional case of a missing start/end list can be learned too.
+    local accepted = type(keys) ~= "table" or #keys == 0
+    for _, code in ipairs(keys or {}) do
+        if code == "npc:" .. npcID then accepted = true; break end
+        local named = sources().places and sources().places[code]
+        if named and named.name == npcName and type(npcName) == "string"
+            and npcName ~= "" and code:match("^name:") then accepted = true; break end
+    end
+    if not accepted then return false end
+    local list = observations()
+    if not list then return false end
+    if type(list[id]) ~= "table" then list[id] = {} end
+    list[id][role] = { kind = "npc", id = npcID, name = npcName,
+        map = map, x = x, y = y }
+    return true
+end
+
 local function toSide(value)
     return value == "Alliance" and "A" or value == "Horde" and "H" or nil
 end
@@ -120,6 +186,8 @@ local function build(id)
     local q = rawQuest(id) or {}
     local startPoints = places(q.starts)
     local finishPoints = places(q.ends)
+    applySighting(startPoints, sightingFor(id, "giver"))
+    applySighting(finishPoints, sightingFor(id, "ender"))
     local chain = type(q.chain) == "table" and q.chain or {}
     local result = {
         id = id, title = titleOf(id), faction = toSide(q.faction),
@@ -220,15 +288,50 @@ function provider.GuideToPoint(point)
     return false
 end
 
-local pending = CreateFrame("Frame")
-if app.RegisterSupported then app.RegisterSupported(pending, "QUEST_DATA_LOAD_RESULT") end
-pending:SetScript("OnEvent", function(_, event, id, success)
-    if event ~= "QUEST_DATA_LOAD_RESULT" or type(id) ~= "number" then return end
-    requested[id] = nil
-    if success then
-        names[id] = nil
-        local name = safe(C_QuestLog and C_QuestLog.GetTitleForQuestID, id)
-        if type(name) == "string" then names[id] = name end
+local function npcIDFromGUID(guid)
+    if type(guid) ~= "string" or not (guid:match("^Creature%-") or guid:match("^Vehicle%-")) then
+        return nil
     end
-    -- The main planner already refreshes on QUEST_DATA_LOAD_RESULT.
+    return tonumber(guid:match("^%a+%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+end
+
+local function observeInteraction(role)
+    local id = safe(GetQuestID)
+    if type(id) ~= "number" or id < 1 then return end
+    if safe(UnitExists, "npc") ~= true then return end
+    local npcID = npcIDFromGUID(safe(UnitGUID, "npc"))
+    local npcName = safe(UnitName, "npc")
+    if not npcID or type(npcName) ~= "string" then return end
+    local map = safe(C_Map and C_Map.GetBestMapForUnit, "player")
+    local position = map and safe(C_Map and C_Map.GetPlayerMapPosition, map, "player")
+    if not position then return end
+    local x, y
+    if type(position.GetXY) == "function" then
+        local ok, a, b = pcall(position.GetXY, position)
+        if ok then x, y = a, b end
+    end
+    x, y = x or position.x, y or position.y
+    if provider.RecordSighting(id, role, npcID, npcName, map, x, y)
+        and app.dungeonQuests and app.dungeonQuests.Refresh then
+        app.dungeonQuests.Refresh()
+    end
+end
+
+local pending = CreateFrame("Frame")
+for _, event in ipairs({"QUEST_DATA_LOAD_RESULT", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE"}) do
+    if app.RegisterSupported then app.RegisterSupported(pending, event) end
+end
+pending:SetScript("OnEvent", function(_, event, id, success)
+    if event == "QUEST_DETAIL" then
+        observeInteraction("giver")
+    elseif event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
+        observeInteraction("ender")
+    elseif event == "QUEST_DATA_LOAD_RESULT" and type(id) == "number" then
+        requested[id] = nil
+        if success then
+            names[id] = nil
+            local name = safe(C_QuestLog and C_QuestLog.GetTitleForQuestID, id)
+            if type(name) == "string" then names[id] = name end
+        end
+    end
 end)
