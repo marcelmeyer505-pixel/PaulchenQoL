@@ -7,11 +7,11 @@ local cream, muted = style.cream, style.muted
 local gold, green, orange = style.gold, style.green, style.orange
 local parchment, ink = { 0.94, 0.84, 0.68 }, { 0.20, 0.11, 0.07 }
 local pageTabs = {
-    { "travel", app.L("Übersicht"), 126, 77, 7, 47, app.L("Reise") },
-    { "logbook", app.logbookLabel, 207, 56, 57, 58 },
-    { "upgrades", "Upgrades", 267, 62, 118, 61 },
-    { "instances", app.L("Instanzen"), 333, 64, 183, 61, app.L("Instanzen") },
-    { "buffs", app.L("Buffs"), 401, 47, 248, 48 },
+    { "travel", app.L("Übersicht"), 70, 41, app.L("Reise") },
+    { "logbook", app.logbookLabel, 54, 53 },
+    { "upgrades", "Upgrades", 60, 56 },
+    { "instances", app.L("Instanzen"), 62, 58 },
+    { "buffs", app.L("Buffs"), 42, 36 },
 }
 local settingsWidth = 88
 local db, dashboard, travelPage, travel
@@ -295,19 +295,27 @@ local function layoutHeader(f, compact, titleHeight)
     local closeSize = compact and 26 or 32
     f.close:SetSize(closeSize, closeSize)
 
+    local x, gap = compact and 6 or 140, compact and 3 or 4
     for _, definition in ipairs(pageTabs) do
-        local key, name, x, w, compactX, compactWidth, compactName = unpack(definition)
+        local key, name, w, compactWidth, compactName = unpack(definition)
         local tab = f.pageTabs[key]
         local tabWidth = compact and compactWidth or w
         tab:ClearAllPoints()
-        tab:SetPoint("TOPLEFT", compact and compactX or x, compact and -2 or -7)
+        tab:SetPoint("TOPLEFT", x, compact and -2 or -7)
         tab:SetWidth(tabWidth)
         tab.text:SetWidth(tabWidth - 8)
-        tab.text:SetText(compact and compactName or name)
+        tab.text:SetText(compact and (compactName or name) or name)
         if key=="buffs" then tab:SetShown(not app.buffCheck or app.buffCheck.Settings().showWindow) end
+        x = x + tabWidth + gap
     end
 
-    local optionWidth = compact and 66 or settingsWidth
+    local optionWidth = compact and 52 or settingsWidth
+    f.settings:ClearAllPoints()
+    if compact then
+        f.settings:SetPoint("TOPRIGHT", f.close, "TOPLEFT", -5, 0)
+    else
+        f.settings:SetPoint("RIGHT", f.header, "RIGHT", -40, 0)
+    end
     f.settings:SetWidth(optionWidth)
     f.settings.text:SetWidth(optionWidth - 8)
     f.settings.text:SetText(compact and app.L("Optionen") or app.L("Einstellungen"))
@@ -407,15 +415,13 @@ local function createDashboard()
     f.body = CreateFrame("Frame", nil, f)
     f.pages, f.pageTabs = {}, {}
     for _, definition in ipairs(pageTabs) do
-        local key, caption, x, w = unpack(definition)
-        local tab = button(header, caption, x, -7, w, 25)
+        local key, caption, tabWidth = unpack(definition)
+        local tab = button(header, caption, 0, -7, tabWidth, 25)
         tab:SetScript("OnClick", function() selectPage(f, key) end)
         f.pageTabs[key] = tab
     end
 
     local settings = button(header, app.L("Einstellungen"), 0, -7, settingsWidth, 25)
-    settings:ClearAllPoints()
-    settings:SetPoint("RIGHT", header, "RIGHT", -40, 0)
     settings:SetScript("OnClick", app.OpenConfig)
     f.settings = settings
     local companionCheck = CreateFrame("CheckButton", nil, header, "UICheckButtonTemplate")
