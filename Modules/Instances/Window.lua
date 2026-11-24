@@ -1,10 +1,10 @@
 local _, app = ...
-local guide, style, L, read = app.instances, app.style, app.L, app.ReadGameValue
+local guide, style, L, read, planner = app.instances, app.style, app.L, app.ReadGameValue, app.dungeonQuests
 local page, queued, mapQueued, worldView, outdoorRequested, loot
 local width, height, rowCount = 984, 546, 13
 local mapWidth, mapHeight = 594, 396
 local mapZoomLevels = { 1, 1.25, 1.6, 2, 2.5, 3.2, 4 }
-local requestedItems, requestedQuests = {}, {}
+local requestedItems = {}
 local tabs = { { "map", "Karte" }, { "quests", "Quests" }, { "loot", "Beute" } }
 
 local function button(parent, text, x, y, w, onClick)
@@ -50,13 +50,6 @@ local function itemUpgrade(pct)
     return app.LocalizeDecimal((pct == 0 and "%.1f %%" or "%+.1f %%"):format(pct)), color
 end
 
-local function requestQuest(id)
-    if not requestedQuests[id] and C_QuestLog and C_QuestLog.RequestLoadQuestByID then
-        requestedQuests[id] = true
-        app.ReadGameValue(C_QuestLog.RequestLoadQuestByID, id)
-    end
-end
-
 local function current()
     if not guide.selection then
         local entry = guide.entries[1]
@@ -85,7 +78,7 @@ end
 local function showQuest(quest)
     local s = current()
     s.tab, s.quest, s.offset = "quests", quest, 0
-    guide.Refresh(true)
+    guide.Refresh()
 end
 
 local function scheduleLoot(scan)
@@ -180,34 +173,68 @@ local function bossUpgrades(rows)
     return app.LF(count == 1 and "%d Upgrade" or "%d Upgrades", count)
 end
 
-local function listRows(s)
-    local rows, entry = {}, s.entry
-    if s.tab == "quests" then
-        if s.quest then
-            local quest = s.quest
-            local status, color = guide.QuestStatus(quest.id)
-            rows[1] = { left = status, right = quest.min and app.LF("Ab Stufe %d", quest.min), color = color }
-            for _, destination in ipairs({ {quest.start, "Questgeber auf der Karte"}, {quest.finish, "Abgabe auf der Karte"} }) do
-                local point = destination[1]
-                if point then
-                    rows[#rows + 1] = { left = L(destination[2]), right = app.worldMap.Name(point[1]),
-                        action = function() guide.ShowWaypoint(point) end }
-                end
-            end
-            if #quest.rewards > 0 then
-                rows[#rows + 1] = { left = L("Questbelohnungen"), color = style.gold }
-                for _, id in ipairs(quest.rewards) do rows[#rows + 1] = { item = id } end
-            end
-        else
-            for _, quest in ipairs(entry.quests) do
-                if guide.AllowedFaction(quest.faction) then
-                    local status, color = guide.QuestStatus(quest.id)
-                    rows[#rows + 1] = { quest = quest, right = status, color = color,
-                        action = function() showQuest(quest) end }
-                end
-            end
+local function questRow(quest)
+    local status, color = planner.DescribeStatus(quest.status)
+    local points = quest.givers or quest.entry.givers or {}
+    local name = points[1] and points[1].name
+    local source = name and (L("Questgeber") .. " · " .. name)
+    return { left = quest.title, right = status, color = color, source = source, questID = quest.id,
+        action = function() showQuest(quest.id) end, tip = { title = quest.title, text = source } }
+end
+
+local function questLocations(rows, label, points)
+    rows[#rows + 1] = { left = L(label), color = style.gold }
+    if #points == 0 then rows[#rows + 1] = { left = L("Unbekannt"), color = style.muted } end
+    for _, point in ipairs(points) do
+        local name = point.name or L("Unbekannt")
+        local row = { left = name, tip = { title = name } }
+        if guide.HasQuestPoint(point) then
+            row.right = app.worldMap.Name(point.map)
+            row.tip.text = (row.right and row.right .. " · " or "")
+                .. app.LocalizeDecimal(("%.1f / %.1f"):format(point.x * 100, point.y * 100))
+            row.action = function() guide.ShowWaypoint({ point.map, point.x, point.y }) end
         end
-    elseif s.tab == "loot" then
+        rows[#rows + 1] = row
+    end
+end
+
+local function questRows(s)
+    local data = guide.QuestSnapshot(s.entry)
+    local rows, detail = {}, planner.FindQuest(s.quest, data)
+    if not detail then
+        s.quest = nil
+        for _, quest in ipairs(data.quests) do rows[#rows + 1] = questRow(quest) end
+        local progress = app.LF("%d/%d abgeschlossen", data.done, #data.quests) .. " · " .. app.LF("%d im Questlog", data.active)
+        if data.incomplete then progress = progress .. " · " .. L("Questdaten unvollständig") end
+        return rows, nil, progress
+    end
+
+    local status, color = planner.DescribeStatus(detail.status)
+    local min = detail.entry.minLevel
+    rows[1] = { left = status, right = min and app.LF("Ab Stufe %d", min), color = color }
+    questLocations(rows, "Questgeber", detail.givers or detail.entry.givers or {})
+    questLocations(rows, "Abgabe", detail.enders or detail.entry.enders or {})
+    local prerequisites = guide.QuestPrerequisites(data, detail.id)
+    if #prerequisites > 0 then
+        local done = 0
+        for _, quest in ipairs(prerequisites) do if quest.status == "DONE" then done = done + 1 end end
+        rows[#rows + 1] = { left = L("Vorquests"), right = ("%d/%d"):format(done, #prerequisites), color = style.gold }
+        for _, quest in ipairs(prerequisites) do rows[#rows + 1] = questRow(quest) end
+    elseif detail.entry.chainIncomplete then
+        rows[#rows + 1] = { left = L("Vorquests"), color = style.gold }
+        rows[#rows + 1] = { left = L("Questdaten unvollständig"), color = style.muted }
+    end
+    if detail.rewards and #detail.rewards > 0 then
+        rows[#rows + 1] = { left = L("Questbelohnungen"), color = style.gold }
+        for _, id in ipairs(detail.rewards) do rows[#rows + 1] = { item = id } end
+    end
+    return rows, detail
+end
+
+local function listRows(s)
+    if s.tab == "quests" then return questRows(s) end
+    local rows, entry = {}, s.entry
+    if s.tab == "loot" then
         local scan = lootFor(entry)
         local items = s.boss and (scan.bosses[s.boss] or {}) or scan.rows
         for i, row in ipairs(items) do rows[i] = row end
@@ -237,17 +264,21 @@ end
 
 local function renderList()
     local f, s = page, current()
-    local rows = listRows(s)
+    local rows, quest, progress = listRows(s)
     local offset = math.min(math.max(s.offset or 0, 0), math.max(#rows - rowCount, 0))
-    local hasItems = s.tab == "loot" or s.tab == "quests" and s.quest and #s.quest.rewards > 0
+    local hasItems = s.tab == "loot" or quest and quest.rewards and #quest.rewards > 0
     s.offset = offset
+    f.questProgress:SetShown(progress ~= nil)
+    f.questProgress:SetText(progress or "")
     f.dropTitle:SetShown(s.tab == "loot")
     f.upgradeTitle:SetShown(hasItems == true)
     for index, widget in ipairs(f.rows) do
         local row = rows[index + offset]
         local id = row and row.item
-        local source = s.tab == "loot" and not s.boss and row and row.source
-        if widget.row and widget.row.item ~= id and GameTooltip and GameTooltip:IsOwned(widget) then GameTooltip:Hide() end
+        local source = row and (s.tab == "quests" or s.tab == "loot" and not s.boss) and row.source
+        local previous = widget.row
+        if previous and (not row or previous.item ~= id or previous.questID ~= row.questID or previous.left ~= row.left)
+            and GameTooltip and GameTooltip:IsOwned(widget) then GameTooltip:Hide() end
         widget.row = row
         widget.link = nil
         widget.icon:SetShown(id ~= nil)
@@ -270,17 +301,16 @@ local function renderList()
                 local quality = read(C_Item and C_Item.GetItemQualityByID, id)
                 local itemColor = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
                 if itemColor then color = { itemColor.r, itemColor.g, itemColor.b } end
-            elseif row.quest then
-                requestQuest(row.quest.id)
-                name = guide.QuestTitle(row.quest)
             else name = row.left end
             widget.link = link
-            widget:SetPoint("TOPLEFT", 8, (hasItems and -53 or -35) - (index - 1) * 25)
+            widget:SetPoint("TOPLEFT", 8, ((hasItems or progress) and -53 or -35) - (index - 1) * 25)
             widget.left:SetPoint("TOPLEFT", id and 30 or 7, 0)
             widget.left:SetWidth(id and (s.tab == "loot" and 161 or 218) or 207)
             widget.left:SetHeight(source and 13 or 24)
             widget.left:SetText(name or "")
             widget.left:SetTextColor(unpack(color))
+            widget.source:SetPoint("TOPLEFT", id and 30 or 7, -12)
+            widget.source:SetWidth(id and 161 or 207)
             widget.source:SetText(source or "")
             widget.right:SetText(row.right or "")
         end
@@ -291,7 +321,7 @@ local function renderList()
     f.previous:SetEnabled(offset > 0)
     f.next:SetEnabled(offset + rowCount < #rows)
     f.listTitle:SetText(s.tab == "loot" and (s.boss or L("Alle Bosse")) or s.tab == "quests"
-        and (s.quest and guide.QuestTitle(s.quest) or L("Instanzquests")) or L("Bossreihenfolge"))
+        and (quest and quest.title or L("Instanzquests")) or L("Bossreihenfolge"))
     f.chooseBoss:SetShown(s.tab == "loot")
     f.backQuest:SetShown(s.tab == "quests" and s.quest ~= nil)
 end
@@ -712,7 +742,9 @@ function guide.GetPage(parent)
                 if group.SetScrollMode then group:SetScrollMode(350) end
                 for _, entry in ipairs(guide.entries) do
                     if (entry.raid == true) == section[2] then
-                        group:CreateButton(guide.Name(entry), function() guide.Open(entry.key) end)
+                    group:CreateButton(guide.Name(entry), function()
+                        guide.Open(entry.key, current().tab == "quests" and "quests" or nil)
+                    end)
                     end
                 end
             end
@@ -747,6 +779,7 @@ function guide.GetPage(parent)
     panel:EnableMouseWheel(true)
     panel:SetScript("OnMouseWheel", function(_, delta) scroll(delta > 0 and -3 or 3) end)
     f.listTitle = style.Label(panel, "", 10, -3, 251, 26, "GameFontNormal", style.gold)
+    f.questProgress = style.Label(panel, "", 10, -28, 322, 20, "GameFontHighlightSmall", style.cream)
     f.dropTitle = style.Label(panel, "Dropchance", 200, -33, 64, 18, "GameFontHighlightSmall", style.muted, "RIGHT")
     f.upgradeTitle = style.Label(panel, "Upgrade %", 272, -33, 58, 18, "GameFontHighlightSmall", style.muted, "RIGHT")
     f.chooseBoss = button(panel, "Bosse", 266, -5, 68, function(self)
@@ -771,10 +804,14 @@ function guide.GetPage(parent)
         row.drop = style.Label(row, "", 192, 0, 64, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
         row.upgrade = style.Label(row, "", 264, 0, 58, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
         row:SetScript("OnEnter", function(self)
-            if not self.row or not self.row.item or not GameTooltip or GameTooltip:IsForbidden() then return end
+            if not self.row or not (self.row.item or self.row.tip) or not GameTooltip or GameTooltip:IsForbidden() then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             if self.link then GameTooltip:SetHyperlink(self.link)
-            elseif GameTooltip.SetItemByID then GameTooltip:SetItemByID(self.row.item) end
+            elseif self.row.item and GameTooltip.SetItemByID then GameTooltip:SetItemByID(self.row.item)
+            elseif self.row.tip then
+                GameTooltip:SetText(self.row.tip.title)
+                if self.row.tip.text then GameTooltip:AddLine(self.row.tip.text, 1, 1, 1, true) end
+            end
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function(self)

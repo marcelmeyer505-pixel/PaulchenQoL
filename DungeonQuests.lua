@@ -152,6 +152,18 @@ local function stateColor(code)
     return unpack(row[3])
 end
 
+function planner.DescribeStatus(code)
+    return stateText(code), (states[code] or states.UNKNOWN)[3]
+end
+
+function planner.DescribeQuest(entry)
+    return {
+        id = entry.id, entry = entry, title = entry.title or ("Quest #" .. entry.id),
+        giver = entry.start, ender = entry.finish,
+        status = status(entry.id, entry, app.DungeonQuestData), chainSize = #(entry.chain or {}),
+    }
+end
+
 local function addUnique(target, seen, value)
     if type(value) == "number" and value > 0 and not seen[value] then
         seen[value] = true
@@ -235,19 +247,23 @@ function planner.Build(key)
     local rows, done, active, unknown = {}, 0, 0, 0
     for _, entry in ipairs(source) do
         if type(entry) == "table" and type(entry.id) == "number" then
-            local code = status(entry.id, entry, d)
+            local row = planner.DescribeQuest(entry)
+            local code = row.status
             if code == "DONE" then done = done + 1 end
             if code == "ACTIVE" or code == "READY" then active = active + 1 end
             if code == "UNKNOWN" then unknown = unknown + 1 end
-            rows[#rows + 1] = {
-                id = entry.id, entry = entry, title = entry.title or ("Quest #" .. entry.id),
-                giver = entry.start, ender = entry.finish,
-                status = code, chainSize = #(entry.chain or {}),
-            }
+            rows[#rows + 1] = row
         end
     end
     return { dungeon = dungeon, quests = rows, done = done, active = active,
         unknown = unknown, provider = d, total = #rows, key = key }, nil
+end
+
+function planner.FindQuest(id, data)
+    if not data or not id then return end
+    for _, row in ipairs(data.quests) do if row.id == id then return row end end
+    local entry = data.key and safe(data.provider and data.provider.Quest, data.key, id)
+    if entry then return planner.DescribeQuest(entry) end
 end
 
 function planner.Chain(id, data)
@@ -450,18 +466,7 @@ local function render()
             row.giver:SetText(pointText(item.giver))
         end
     end
-    local selected
-    for _, row in ipairs(snapshot.quests) do
-        if row.id == selectedQuest then selected = row; break end
-    end
-    if not selected and selectedQuest then
-        local entry = safe(snapshot.provider.Quest, snapshot.key, selectedQuest)
-        if entry then
-            selected = { id = selectedQuest, title = entry.title or ("Quest #" .. selectedQuest),
-                giver = entry.start, ender = entry.finish, entry = entry,
-                status = status(selectedQuest, entry, snapshot.provider) }
-        end
-    end
+    local selected = planner.FindQuest(selectedQuest, snapshot)
     local chain, completed = {}, 0
     if selected then chain, completed = planner.Chain(selectedQuest, snapshot) end
     frame.selected:SetText(selected and (selected.title .. " (#" .. selected.id .. ")") or "")

@@ -54,15 +54,6 @@ function guide.QuestTitle(quest)
     return title and title ~= "" and title or quest.name or ("#" .. quest.id)
 end
 
-function guide.QuestStatus(id)
-    local quests = C_QuestLog
-    if not quests then return L("Offen"), app.style.muted end
-    if read(quests.ReadyForTurnIn, id) then return L("Abgabebereit"), app.style.gold end
-    if read(quests.IsOnQuest, id) then return L("Im Questlog"), app.style.cream end
-    if read(quests.IsQuestFlaggedCompleted, id) then return L("Abgeschlossen"), app.style.green end
-    return L("Offen"), app.style.muted
-end
-
 function guide.OpenWorldMap(mapID)
     local map = WorldMapFrame
     if not map then return end
@@ -272,7 +263,8 @@ end
 local events = CreateFrame("Frame")
 for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
     "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL",
-    "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }) do
+    "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "QUEST_TURNED_IN", "QUEST_ACCEPTED", "QUEST_REMOVED", "PLAYER_LEVEL_UP",
+    "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }) do
     app.RegisterSupported(events, name)
 end
 events:SetScript("OnEvent", function(_, event, encounter, _, _, _, success)

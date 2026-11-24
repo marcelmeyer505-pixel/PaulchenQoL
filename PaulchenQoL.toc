@@ -39,6 +39,7 @@ Modules\Comfort\Vendor.lua
 Modules\Comfort\Quests.lua
 Modules\Instances\Data.lua
 Modules\Instances\Guide.lua
+Modules\Instances\Quests.lua
 Modules\Instances\Window.lua
 Modules\WorldMap\ExplorationData.lua
 Modules\WorldMap\Landmarks.lua

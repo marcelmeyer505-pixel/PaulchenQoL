@@ -536,7 +536,9 @@ for index = 1, provider.used do assert(provider.pins[index].point.kind ~= "dunge
 ''')
 print("Dungeon entrance links, Journal map and quests, Routes fallback and shared entrances passed.")
 
-for path in ("Modules/Instances/Data.lua", "Modules/Instances/Guide.lua", "Modules/Instances/Window.lua"):
+for path in ("Data/DungeonSeedDungeons.lua", "Data/DungeonSeedQuests.lua", "Data/DungeonSeedPlaces.lua",
+             "DungeonQuestProvider.lua", "DungeonQuests.lua", "Modules/Instances/Data.lua",
+             "Modules/Instances/Guide.lua", "Modules/Instances/Quests.lua", "Modules/Instances/Window.lua"):
     load((root / path).read_text(encoding="utf-8-sig"), path)
 lua.execute(r'''
 ForeverDungeonJournal_NS, ForeverDungeonRoutes, AtlasLoot = nil, nil, nil
@@ -582,8 +584,87 @@ assert(instancePage.map.art[1]:IsShown() and instancePage.map.lines[1]:IsShown()
 local bossPin = instancePage.map.pins[1]
 assert(bossPin:IsVisible() and bossPin.portrait.display == bossPin.stop.display)
 assert(bossPin:GetFrameLevel() > instancePage.map.overlay:GetFrameLevel())
+local completed, accepted, ready = {}, {}, {}
+local oldDone, oldOnQuest, oldReady = C_QuestLog.IsQuestFlaggedCompleted, C_QuestLog.IsOnQuest, C_QuestLog.ReadyForTurnIn
+C_QuestLog.IsQuestFlaggedCompleted = function(id) return completed[id] or false end
+C_QuestLog.IsOnQuest = function(id) return accepted[id] or false end
+C_QuestLog.ReadyForTurnIn = function(id) return ready[id] or oldReady(id) end
+local function questWidget(id)
+    for _, widget in ipairs(instancePage.rows) do
+        if widget.row and widget.row.questID == id then return widget end
+    end
+end
+local function rowFor(quests, id)
+    for _, row in ipairs(quests) do if row.id == id then return row end end
+end
+local catalog = {}
+for _, entry in ipairs(guide.entries) do
+    local data = guide.QuestSnapshot(entry)
+    if data.key then
+        assert(not catalog[data.key], "Each catalog wing belongs to exactly one map")
+        catalog[data.key] = data
+    end
+end
+for _, dungeon in ipairs(app.DungeonQuestData.List()) do assert(catalog[dungeon.key], dungeon.key) end
+assert(rowFor(catalog.STRAT_LIVE.quests, 5262) and not rowFor(catalog.STRAT_LIVE.quests, 5263))
+assert(rowFor(catalog.STRAT_UD.quests, 5263) and not rowFor(catalog.STRAT_UD.quests, 5262))
+assert(rowFor(catalog.BRD.quests, 4082) and not rowFor(catalog.BRD.quests, 4126), "Horde sees the right quests")
+assert(rowFor(catalog.WC.quests, 914).rewards[1] == 6504)
+local originalFaction = UnitFactionGroup
+function UnitFactionGroup() return "Alliance" end
+assert(guide.QuestSnapshot(custom).incomplete and rowFor(guide.QuestSnapshot(custom).quests, 96772),
+    "A gap in the new catalog preserves legacy instance quests")
+UnitFactionGroup = originalFaction
+
 textWidget("Quests").scripts.OnClick()
 textWidget("Instanzquests")
+local leaders = assert(questWidget(914))
+assert(leaders.right.textValue == "Vorquests fehlen" and leaders.source.textValue:find("Nara Wildmane", 1, true))
+local matching = 0
+for _, quest in ipairs(guide.QuestSnapshot(wailing).quests) do if quest.id == 914 then matching = matching + 1 end end
+assert(matching == 1, "A quest in both catalogs appears only once")
+assert(instancePage.questProgress.textValue:match("^0/%d+ abgeschlossen"))
+leaders.scripts.OnClick(leaders)
+assert(guide.selection.quest == 914)
+textWidget("Vorquests")
+assert(questWidget(1489) and questWidget(1490), "Prerequisites appear directly in the detail view")
+local firstPrior = questWidget(1489)
+firstPrior.scripts.OnClick(firstPrior)
+assert(guide.selection.quest == 1489 and instancePage.listTitle.textValue == "Quest #1489")
+instancePage.backQuest.scripts.OnClick()
+completed[1489], completed[1490], accepted[914], ready[914] = true, true, true, true
+fire("QUEST_LOG_UPDATE")
+flush()
+assert(questWidget(914).right.textValue == "Abgabebereit" and instancePage.questProgress.textValue:find("1 im Questlog", 1, true))
+completed[914] = true
+fire("QUEST_TURNED_IN", 914)
+flush()
+assert(questWidget(914).right.textValue == "Abgeschlossen")
+assert(instancePage.questProgress.textValue:match("^1/%d+ abgeschlossen"))
+
+local deadmines = guide.byKey.deadmines
+local oldCanSet = C_Map.CanSetUserWaypointOnMap
+C_Map.CanSetUserWaypointOnMap = function(id) return id == 1436 end
+function UnitFactionGroup() return "Alliance" end
+local selector = textWidget("Instanz wählen")
+selector.scripts.OnClick(selector)
+menu.children.Instanzen.children[guide.Name(deadmines)].callback()
+assert(guide.selection.entry == deadmines and guide.selection.tab == "quests", "Switching instances keeps the quest tab open")
+local defias = assert(questWidget(166))
+defias.scripts.OnClick(defias)
+local clicked
+for _, widget in ipairs(instancePage.rows) do
+    if widget.row and widget.row.tip and widget.row.tip.title == "Gryan Stoutmantle" then
+        assert(widget.row.action)
+        widget.scripts.OnClick(widget)
+        clicked = true
+        break
+    end
+end
+assert(clicked and math.abs(selectedWaypoint[2] - .562) < .00001)
+UnitFactionGroup, C_Map.CanSetUserWaypointOnMap = originalFaction, oldCanSet
+C_QuestLog.IsQuestFlaggedCompleted, C_QuestLog.IsOnQuest, C_QuestLog.ReadyForTurnIn = oldDone, oldOnQuest, oldReady
+guide.Open(wailing.key, "quests")
 textWidget("Beute").scripts.OnClick()
 textWidget("Alle Bosse")
 for _, row in ipairs(instancePage.rows) do

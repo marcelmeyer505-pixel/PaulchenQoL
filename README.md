@@ -4,6 +4,8 @@
 
 Der neue **Instanz-Questplaner läuft vollständig eigenständig**, auch wenn Polestar, Dungeon Quest Atlas und alle anderen Quest-Addons **nicht installiert** sind. Öffne ihn über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder `/pq quests` beziehungsweise `/pq dungeons`.
 
+Im Reiter **Instanzen → Quests** siehst du für die gewählte Instanz außerdem den eigenen Fortschritt. Klicke eine Quest für Questgeber, Abgabeorte, verknüpfte Vorquests und bekannte Belohnungen. Bekannte Kartenpunkte kannst du aus dem Reiter öffnen.
+
 ### Eigenständige Datenbank
 
 Die Erweiterung enthält **35 Instanzen bzw. Instanzflügel** mit zusammen **395 Quest-Zuordnungen**, **480 Questdatensätzen** und **309 Questgeber-/Ortsdatensätzen**. Die Daten stammen aus der ausdrücklich MIT-lizenzierten historischen Version **Dungeon Quest Atlas v1.04**, nicht aus dem aktuellen (restriktiver lizenzierten) Release und nicht aus Polestars GPL-Datenbank. Die originalen Lizenz- und Quellenhinweise stehen in `Data/LICENSE-DQA-MIT.txt` und `Data/SOURCES.md`.
