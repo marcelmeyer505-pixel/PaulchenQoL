@@ -98,7 +98,8 @@ local function prerequisiteState(id)
     end
     required(record.pre)
     required(record.preAll)
-    if record.preAny then
+    if type(record.preAny) == "table" and #record.preAny > 0
+        or type(record.preAny) == "number" then
         local any, undecided = false, false
         eachID(record.preAny, function(parent)
             local value = questDone(parent)
@@ -307,6 +308,7 @@ local function exportText(data)
             local steps = {}
             for _, step in ipairs(chain) do
                 steps[#steps+1] = step.title .. " [" .. stateText(step.status) .. "]"
+                    .. " {" .. pointText(step.entry and step.entry.start) .. "}"
             end
             out[#out+1] = "  " .. L("Questreihe", "Quest chain") .. ": " .. table.concat(steps, " > ")
         end
@@ -434,7 +436,13 @@ local function render()
     questOffset = math.max(0, math.min(questOffset, math.max(0, #filtered - #frame.questRows)))
     if selectedQuest then
         local exists = false
-        for _, row in ipairs(snapshot.quests) do if row.id == selectedQuest then exists = true; break end end
+        for _, row in ipairs(snapshot.quests) do
+            if row.id == selectedQuest then exists = true; break end
+            for _, prior in ipairs(row.entry.chain or {}) do
+                if prior == selectedQuest then exists = true; break end
+            end
+            if exists then break end
+        end
         if not exists then selectedQuest = nil end
     end
     if not selectedQuest and snapshot.quests[1] then selectedQuest = snapshot.quests[1].id end
@@ -450,7 +458,17 @@ local function render()
         end
     end
     local selected
-    for _, row in ipairs(snapshot.quests) do if row.id == selectedQuest then selected = row; break end end
+    for _, row in ipairs(snapshot.quests) do
+        if row.id == selectedQuest then selected = row; break end
+    end
+    if not selected and selectedQuest then
+        local entry = safe(snapshot.provider.Quest, snapshot.key, selectedQuest)
+        if entry then
+            selected = { id = selectedQuest, title = entry.title or ("Quest #" .. selectedQuest),
+                giver = entry.start, ender = entry.finish, entry = entry,
+                status = status(selectedQuest, entry, snapshot.provider) }
+        end
+    end
     local chain, completed = {}, 0
     if selected then chain, completed = planner.Chain(selectedQuest, snapshot) end
     frame.selected:SetText(selected and (selected.title .. " (#" .. selected.id .. ")") or "")
@@ -609,6 +627,19 @@ function planner.Open(key)
             local row = styledButton(f, "", 237, -621-(i-1)*25, 635, function(self)
                 if self.step then selectedQuest = self.step.id; chainOffset = 0; render() end
             end)
+            row:SetScript("OnEnter", function(self)
+                local step = self.step
+                if not step then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(step.title, unpack(style.gold))
+                GameTooltip:AddLine(stateText(step.status), stateColor(step.status))
+                GameTooltip:AddLine(L("Questgeber: ", "Quest giver: ")
+                    .. pointText(step.entry and step.entry.start), 1, 1, 1, true)
+                GameTooltip:AddLine(L("Abgabe bei: ", "Turn in to: ")
+                    .. pointText(step.entry and step.entry.finish), 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            row:SetScript("OnLeave", function() GameTooltip:Hide() end)
             f.chainRows[#f.chainRows+1] = row
         end
         styledButton(f, "▲", 880, -621, 70, function()
