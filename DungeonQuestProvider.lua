@@ -88,6 +88,12 @@ local function place(code)
         inside = p.inside == true,
         under = p.under == true,
     }
+    local hint = app.dungeonQuestLocationHints and app.dungeonQuestLocationHints[code]
+    if hint and not result.map and type(hint.map) == "number"
+        and type(hint.x) == "number" and type(hint.y) == "number" then
+        result.map, result.x, result.y = hint.map, hint.x, hint.y
+        result.referenceOnly = hint.referenceOnly == true
+    end
     return result
 end
 
@@ -120,9 +126,10 @@ local function applySighting(points, sighting)
             (point.id == sighting.id or (not point.id and point.name == sighting.name)) then
             -- Reference coordinates remain the default if already known. Only
             -- enrich unknown places; preserve source precision and provenance.
-            if not point.map or point.x == nil or point.y == nil then
+            if not point.map or point.x == nil or point.y == nil or point.referenceOnly then
                 point.map, point.x, point.y = sighting.map, sighting.x, sighting.y
                 point.observed = true
+                point.referenceOnly = false
             end
             found = true
         end
