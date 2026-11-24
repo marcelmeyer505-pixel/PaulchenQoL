@@ -1,7 +1,7 @@
 local _, app = ...
--- Paulchen's dungeon quest planner. Uses Polestar's optional dungeon journal
--- without copying its quest database, loading the whole database, or claiming
--- that unknown prerequisites are complete.
+-- Paulchen's standalone dungeon quest planner.
+-- Independent MIT-licensed quest reference pack, no Polestar dependency.
+-- Unknown prerequisites or unreadable player progress are never guessed.
 local planner = {}
 app.dungeonQuests = planner
 
@@ -26,14 +26,13 @@ local function safe(fn, ...)
 end
 
 local function dataSource()
-    local p = Polestar
-    local d = p and p.Dungeons
-    if type(d) ~= "table" or type(d.List) ~= "function" or type(d.Quests) ~= "function"
-        or type(d.Quest) ~= "function" then return nil, "missing" end
+    local d = app.DungeonQuestData
+    if type(d) ~= "table" or type(d.List) ~= "function"
+        or type(d.Quests) ~= "function" or type(d.Quest) ~= "function" then return nil, "missing" end
     if type(d.Load) == "function" then
-        local ok, result, why = pcall(d.Load)
+        local ok, result, reason = pcall(d.Load)
         if not ok then return nil, "error" end
-        if result ~= true then return nil, why or "unavailable" end
+        if result == false then return nil, reason or "nodata" end
     end
     return d
 end
@@ -48,10 +47,7 @@ local function questDone(id)
     local c = C_QuestLog
     local done = safe(c and c.IsQuestFlaggedCompleted, id)
     if type(done) == "boolean" then return done end
-    local polestar = Polestar
-    done = safe(polestar and polestar.Compat and polestar.Compat.IsQuestCompleted, id)
-    if type(done) == "boolean" then return done end
-    return nil -- never guess completion from an empty or protected API
+    return nil -- Never guess completion from an empty or protected client API.
 end
 
 local function questInLog(id)
@@ -80,8 +76,8 @@ local function eachID(value, callback)
 end
 
 local function prerequisiteState(id)
-    local codex = Polestar and Polestar.Codex
-    local record = safe(codex and codex.Quest, id)
+    local provider = app.DungeonQuestData
+    local record = safe(provider and provider.Prerequisites, id)
     if type(record) ~= "table" then return nil end
     local incomplete, unknown = 0, false
     -- The Codex uses pre/preAll for required predecessor quests and preAny
@@ -96,20 +92,7 @@ local function prerequisiteState(id)
             elseif value == nil then unknown = true end
         end)
     end
-    required(record.pre)
-    required(record.preAll)
-    if type(record.preAny) == "table" and #record.preAny > 0
-        or type(record.preAny) == "number" then
-        local any, undecided = false, false
-        eachID(record.preAny, function(parent)
-            local value = questDone(parent)
-            if value then any = true
-            elseif value == nil then undecided = true end
-        end)
-        if not any then
-            if undecided then unknown = true else incomplete = incomplete + 1 end
-        end
-    end
+    required(record)
     if incomplete > 0 then return "LOCKED" end
     if unknown then return "UNKNOWN" end
     return "CLEAR"
@@ -296,13 +279,20 @@ local function pointText(point)
     return result
 end
 
+local function multiplePointText(points, fallback)
+    if type(points) ~= "table" or #points == 0 then return pointText(fallback) end
+    local out = {}
+    for _, point in ipairs(points) do out[#out+1] = pointText(point) end
+    return table.concat(out, "; ")
+end
+
 local function exportText(data)
     local out = { data.dungeon.name .. " – " .. L("Instanzquests", "Dungeon Quests") }
     out[#out+1] = ("%d/%d %s"):format(data.done, data.total, L("abgeschlossen", "completed"))
     for _, row in ipairs(data.quests) do
         out[#out+1] = ("[%s] %s (#%d)"):format(stateText(row.status), row.title, row.id)
-        out[#out+1] = "  " .. L("Questgeber", "Quest giver") .. ": " .. pointText(row.giver)
-        out[#out+1] = "  " .. L("Abgabe", "Turn-in") .. ": " .. pointText(row.ender)
+        out[#out+1] = "  " .. L("Questgeber", "Quest giver") .. ": " .. multiplePointText(row.entry and row.entry.givers, row.giver)
+        out[#out+1] = "  " .. L("Abgabe", "Turn-in") .. ": " .. multiplePointText(row.entry and row.entry.enders, row.ender)
         local chain = planner.Chain(row.id, data)
         if #chain > 1 then
             local steps = {}
@@ -390,8 +380,8 @@ local function render()
     if not frame or not frame:IsShown() then return end
     local available, reason = planner.ListDungeons()
     if not available then
-        frame.note:SetText(L("Instanzdaten fehlen. Installiere/aktiviere Polestar mit seinem Dungeon-Kodex.",
-            "Dungeon data unavailable. Install/enable Polestar with its Dungeon Codex.")
+        frame.note:SetText(L("Instanzdaten fehlen. Die integrierte Questdatenbank konnte nicht geladen werden.",
+            "Dungeon data unavailable. The bundled quest data could not be loaded.")
             .. (reason and (" [" .. tostring(reason) .. "]") or ""))
         frame.summary:SetText("")
         for _, row in ipairs(frame.dungeonRows) do row:Hide() end
@@ -429,8 +419,11 @@ local function render()
     frame.summary:SetText(("%d %s · %d %s · %d %s · %d %s"):format(snapshot.total,
         L("Quests", "quests"), snapshot.done, L("abgeschlossen", "completed"),
         snapshot.active, L("aktiv", "active"), snapshot.unknown, L("unbekannt", "unknown")))
-    frame.note:SetText(L("Questgeber und Vorquests aus Polestar. Verfügbarkeit ohne bestätigte Daten bleibt ungeprüft.",
-        "Quest givers and chains from Polestar. Availability remains unverified without reliable data."))
+    frame.note:SetText(snapshot.dungeon.incomplete
+        and L("Für diese Instanz fehlen noch erfasste Quests (Datenstand Oktober 2026).",
+            "No quests catalogued yet for this dungeon (October 2026 dataset).")
+        or L("Eigenständige Questdatenbank (MIT, Stand 2026-10). Neuere Forever-Quests können fehlen.",
+            "Built-in quest data (MIT, Oct 2026). Newer Forever quests may be missing."))
     local filtered = {}
     for _, row in ipairs(snapshot.quests) do if questMatches(row) then filtered[#filtered+1] = row end end
     questOffset = math.max(0, math.min(questOffset, math.max(0, #filtered - #frame.questRows)))
@@ -472,8 +465,8 @@ local function render()
     local chain, completed = {}, 0
     if selected then chain, completed = planner.Chain(selectedQuest, snapshot) end
     frame.selected:SetText(selected and (selected.title .. " (#" .. selected.id .. ")") or "")
-    frame.questgiver:SetText(selected and (L("Questgeber: ", "Quest giver: ") .. pointText(selected.giver)) or "")
-    frame.ender:SetText(selected and (L("Abgabe bei: ", "Turn in to: ") .. pointText(selected.ender)) or "")
+    frame.questgiver:SetText(selected and (L("Questgeber: ", "Quest giver: ") .. multiplePointText(selected.entry and selected.entry.givers, selected.giver)) or "")
+    frame.ender:SetText(selected and (L("Abgabe bei: ", "Turn in to: ") .. multiplePointText(selected.entry and selected.entry.enders, selected.ender)) or "")
     frame.gotoGiver:SetEnabled(selected and selected.giver and selected.giver.map and selected.giver.x ~= nil)
     frame.gotoEnder:SetEnabled(selected and selected.ender and selected.ender.map and selected.ender.x ~= nil)
     frame.chainSummary:SetText(#chain > 0 and (L("Questreihe", "Quest chain") .. ": " .. completed .. "/" .. #chain ..
@@ -595,8 +588,8 @@ function planner.Open(key)
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:SetText(self.data.title, unpack(style.gold))
                 GameTooltip:AddLine(stateText(self.data.status), stateColor(self.data.status))
-                GameTooltip:AddLine(L("Questgeber: ", "Quest giver: ") .. pointText(self.data.giver), 1, 1, 1, true)
-                GameTooltip:AddLine(L("Abgabe bei: ", "Turn in to: ") .. pointText(self.data.ender), 1, 1, 1, true)
+                GameTooltip:AddLine(L("Questgeber: ", "Quest giver: ") .. multiplePointText(self.data.entry and self.data.entry.givers, self.data.giver), 1, 1, 1, true)
+                GameTooltip:AddLine(L("Abgabe bei: ", "Turn in to: ") .. multiplePointText(self.data.entry and self.data.entry.enders, self.data.ender), 1, 1, 1, true)
                 GameTooltip:Show()
             end)
             row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -634,9 +627,9 @@ function planner.Open(key)
                 GameTooltip:SetText(step.title, unpack(style.gold))
                 GameTooltip:AddLine(stateText(step.status), stateColor(step.status))
                 GameTooltip:AddLine(L("Questgeber: ", "Quest giver: ")
-                    .. pointText(step.entry and step.entry.start), 1, 1, 1, true)
+                    .. multiplePointText(step.entry and step.entry.givers, step.entry and step.entry.start), 1, 1, 1, true)
                 GameTooltip:AddLine(L("Abgabe bei: ", "Turn in to: ")
-                    .. pointText(step.entry and step.entry.finish), 1, 1, 1, true)
+                    .. multiplePointText(step.entry and step.entry.enders, step.entry and step.entry.finish), 1, 1, 1, true)
                 GameTooltip:Show()
             end)
             row:SetScript("OnLeave", function() GameTooltip:Hide() end)
