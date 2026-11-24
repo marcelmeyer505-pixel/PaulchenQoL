@@ -86,7 +86,7 @@ local categories = {
         { "mapSpiritHealers", "Geistheiler auf der Karte anzeigen" },
         { "mapDungeons", "Instanz- und Raideingänge anzeigen",
             "Öffnet die Innenkarte im Paulchen-Instanzführer." },
-        { "mapInterior", "Innenkarte beim Öffnen in Instanzen", "M öffnet drinnen zuerst die Instanzkarte. Auf der Karte kannst du zur Weltkarte wechseln." },
+        { "mapInterior", "Innenkarte beim Öffnen in Instanzen", "Die Kartentaste öffnet in bekannten Instanzen direkt Paulchens Instanzkarte. Über Weltkarte kommst du zur Außenkarte." },
         { "mapZoneLevels", "Ungefähre Gebietsstufen anzeigen" },
         { "mapFishing", "Ungefähre Angelfertigkeit anzeigen" },
         { "mapReveal", "Unerforschte Karte aufdecken" },

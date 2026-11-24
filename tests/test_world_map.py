@@ -112,6 +112,8 @@ for _, name in ipairs({
     "EnableMouseWheel", "SetEnabled",
 }) do methods[name] = function() end end
 methods.SetVertexColor = function(self, ...) self.tint = {...} end
+methods.SetColorTexture = function(self, ...) self.color = {...} end
+methods.SetAllPoints = function(self, target) self.allPoints = target or self.parent end
 methods.SetStartPoint = function(self, ...) self.startPoint = {...} end
 methods.SetEndPoint = function(self, ...) self.endPoint = {...} end
 function CreateFrame(_, _, parent)
@@ -147,6 +149,7 @@ map.BorderFrame = CreateFrame("Frame", nil, map)
 map.BorderFrame:SetFrameStrata("HIGH")
 map.BorderFrame:SetFrameLevel(70)
 map.BorderFrame.NineSlice = CreateFrame("Frame", nil, map.BorderFrame)
+map.NavBar = CreateFrame("Frame", nil, map)
 map.BlackoutFrame = CreateFrame("Frame", nil, map)
 map.id, map.providers = 1411, {}
 function map:GetMapID() return self.id end
@@ -178,6 +181,29 @@ map:HookScript("OnHide", function()
     for _, provider in ipairs(map.providers) do provider:OnHide() end
 end)
 function ToggleWorldMap() map:SetShown(not map:IsShown()) end
+mapKeys, overrides = { "M" }, {}
+function GetBindingKey(command)
+    assert(command == "TOGGLEWORLDMAP")
+    return unpack(mapKeys)
+end
+function ClearOverrideBindings(owner)
+    assert(not combat)
+    for key, frame in pairs(overrides) do
+        if frame == owner then overrides[key] = nil end
+    end
+end
+function SetOverrideBindingClick(owner, priority, key, name)
+    assert(not combat and not priority and name == "PaulchenQoLInstanceMapBinding")
+    overrides[key] = owner
+end
+function mapKey(key)
+    local handler = overrides[key]
+    if handler then
+        handler.scripts.OnClick(handler, "LeftButton")
+    else
+        for _, native in ipairs(mapKeys) do if native == key then ToggleWorldMap(); return end end
+    end
+end
 function hooksecurefunc(target, name, callback)
     local previous = target[name]
     target[name] = function(...) previous(...); callback(...) end
@@ -210,6 +236,7 @@ local maps = {
     [1411] = {mapID = 1411, name = "Durotar", mapType = 3, parentMapID = 1414},
     [1413] = {mapID = 1413, name = "Brachland", mapType = 3, parentMapID = 1414},
     [1415] = {mapID = 1415, name = "Östliche Königreiche", mapType = 2, parentMapID = 947},
+    [1420] = {mapID = 1420, name = "Tirisfal", mapType = 3, parentMapID = 1415},
     [1423] = {mapID = 1423, name = "Östliche Pestländer", mapType = 3, parentMapID = 1415},
     [1445] = {mapID = 1445, name = "Düstermarschen", mapType = 3, parentMapID = 1414},
     [1454] = {mapID = 1454, name = "Orgrimmar", mapType = 3, parentMapID = 1414},
@@ -318,8 +345,19 @@ for index = 1, waypoints.used do
     if pin.point.name == "Horde" then ownFlight = pin end
 end
 assert(ownFlight and ownFlight:IsVisible(), "A native pin that reports shown cannot suppress the raised marker")
-assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -49)
+assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -31 and not map.NavBar:IsShown())
 assert(map.BorderFrame.NineSlice:GetAlpha() == 0 and not map.BlackoutFrame:IsShown())
+local background
+for _, child in ipairs(map.children) do
+    if child.allPoints == map and child.color and child.color[4] == 1 then background = child end
+end
+assert(background and background:IsShown(), "The compact window has an opaque backing")
+comfort.SetEnabled("mapZoneMenu", false)
+flush()
+assert(map.NavBar:IsShown() and select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -49)
+comfort.SetEnabled("mapZoneMenu", true)
+flush()
+assert(not map.NavBar:IsShown() and select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -31)
 local function widget(text)
     for _, candidate in ipairs(frames) do
         if candidate:IsVisible() and candidate.textValue == text then return candidate end
@@ -345,6 +383,7 @@ comfort.SetEnabled("mapDiscovery", true)
 comfort.SetEnabled("mapShowDiscovered", true)
 flush()
 assert(select(5, map.TitleCanvasSpacerFrame:GetPoint()) == -67 and map.BorderFrame.NineSlice:GetAlpha() == 1)
+assert(map.NavBar:IsShown() and not background:IsShown())
 assert(select(4, widget("Kartenoptionen"):GetPoint()) == 376)
 local provider = map.providers[2]
 assert(provider.used > 1 and provider.tileCount > 0)
@@ -920,7 +959,7 @@ assert(math.abs(select(4, arrow:GetPoint()) / dungeonCanvas:GetWidth() - .6) < .
 function UnitPosition() return secret, secret, nil, dungeonID end
 updatePosition(dungeonCanvas)
 assert(not arrow:IsShown(), "Protected position data never produces a stale marker")
-assert(dungeonCanvas.roomStatus.text.textValue == "Position nicht verfügbar")
+assert(not dungeonCanvas.roomStatus:IsShown(), "The map stays clear when there is no position or room name")
 local room = undead.rooms[1]
 local subzone = room.de
 function GetSubZoneText() return subzone end
@@ -931,7 +970,7 @@ assert(not arrow:IsShown() and roomLine:IsVisible() and dungeonCanvas.roomStatus
 assert(dungeonCanvas.roomStatus.text.textValue == "Bereich · " .. room.de)
 subzone = secret
 updatePosition(dungeonCanvas)
-assert(not roomLine:IsShown() and dungeonCanvas.roomStatus.text.textValue == "Position nicht verfügbar",
+assert(not roomLine:IsShown() and not dungeonCanvas.roomStatus:IsShown(),
     "A missing or protected room name clears the last outline")
 subzone = room.name
 coords, facing = {x = .31, y = .42}, .7
@@ -1025,12 +1064,49 @@ assert(Minimap:GetParent() == home and target == home and offsetX == 12 and offs
 assert(Minimap:GetWidth() == 198 and Minimap:GetHeight() == 198)
 Minimap = nil
 
+assert(overrides.M, "The native world-map key is redirected in a known instance")
+mapKey("M")
+assert(not map:IsShown() and instancePage:IsVisible() and guide.selection.entry.key == "sm_library"
+    and guide.selection.tab == "map" and instancePage.map.lines[1]:IsVisible())
+mapKey("M")
+assert(not instancePage:IsVisible() and not map:IsShown(), "The map key closes Paulchen's open map")
+mapKey("M")
+local area = guide.selection.entry.entrance[1]
+instancePage.worldMap.scripts.OnClick()
+flush()
+assert(map:IsShown() and layer:IsShown() and not instancePage:IsVisible() and map:GetMapID() == area,
+    "The World Map button opens the outdoor zone and restores the outdoor markers")
+mapKey("M")
+assert(instancePage:IsVisible() and not map:IsShown(), "The map key returns from the outdoor map to Paulchen")
+mapKeys = { "ALT-M", "SHIFT-M" }
+fire("UPDATE_BINDINGS")
+assert(not overrides.M and overrides["ALT-M"] and overrides["SHIFT-M"])
+mapKey("ALT-M")
+assert(not instancePage:IsVisible())
+app.comfort.SetEnabled("mapInterior", false)
+assert(not next(overrides))
+mapKey("ALT-M")
+assert(map:IsShown())
+mapKey("ALT-M")
+combat = true
+app.comfort.SetEnabled("mapInterior", true)
+assert(not next(overrides), "Changing the binding waits until combat ends")
+combat = false
+fire("PLAYER_REGEN_ENABLED")
+assert(overrides["ALT-M"])
+dungeonID = -1
+fire("PLAYER_ENTERING_WORLD")
+assert(not next(overrides))
+
 C_Map.GetPlayerMapPosition = oldPositionAPI
 GetPlayerFacing, UnitPosition, GetSubZoneText = nil, nil, nil
 inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
 fire("PLAYER_ENTERING_WORLD")
 flush()
 assert(not guide.CurrentMap())
+assert(not next(overrides), "The native bindings have been restored outside instances")
+mapKey("ALT-M")
+assert(map:IsShown() and not instancePage:IsVisible())
 
 app.upgrades = { gear = { SkillRank = function() return nil end } }
 ''')

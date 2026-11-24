@@ -411,11 +411,8 @@ end
 
 local roomCorners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
 
-local function renderPlayerRoom(view, room, floor, inside)
-    local text
-    if inside then
-        text = room and app.LF("Bereich · %s", guide.Name(room)) or L("Position nicht verfügbar")
-    end
+local function renderPlayerRoom(view, room, floor)
+    local text = room and app.LF("Bereich · %s", guide.Name(room))
     local status = view.roomStatus
     if status.message ~= text then
         status.message = text
@@ -459,12 +456,12 @@ local function updatePlayerMarker(view, follow)
     local marker = view.player
     local floor, x, y, facing = guide.PlayerPosition(view.positionEntry, view.positionFloor)
     if not floor then
-        local room, roomFloor, inside = guide.PlayerRoom(view.positionEntry, view.positionFloor)
+        local room, roomFloor = guide.PlayerRoom(view.positionEntry, view.positionFloor)
         if roomFloor and roomFloor ~= view.positionFloor and follow and view.followFloor then
             view.followFloor(roomFloor)
         end
         marker:Hide()
-        renderPlayerRoom(view, room, roomFloor, inside)
+        renderPlayerRoom(view, room, roomFloor)
         return
     end
     renderPlayerRoom(view)
@@ -604,6 +601,14 @@ function guide.QueueRefresh(drawMap)
     end)
 end
 
+function guide.ToggleMap(entry, floor)
+    if page and page:IsVisible() and current().entry == entry and current().tab == "map" then
+        app.CloseDashboard("instances")
+    else
+        guide.Open(entry.key, "map", floor)
+    end
+end
+
 local function createMap(f, parent)
     local viewport = CreateFrame("ScrollFrame", nil, parent, "BackdropTemplate")
     style.Panel(viewport, style.background)
@@ -694,8 +699,12 @@ function guide.GetPage(parent)
     f:SetSize(width, height)
     f:Hide()
     page = f
-    f.title = style.Label(f, "", 16, -9, 580, 27, "GameFontNormalLarge", style.gold)
-    f.level = style.Label(f, "", 16, -39, 580, 19, "GameFontHighlightSmall", style.muted)
+    f.title = style.Label(f, "", 16, -9, 530, 27, "GameFontNormalLarge", style.gold)
+    f.level = style.Label(f, "", 16, -39, 530, 19, "GameFontHighlightSmall", style.muted)
+    f.worldMap = button(f, "Weltkarte", 558, -13, 126, function()
+        local entry = current().entry
+        guide.OpenWorldMap(entry.entrance and entry.entrance[1] or entry.area)
+    end)
     button(f, "Instanz wählen", 691, -13, 140, function(self)
         menu(self, function(root)
             for _, section in ipairs({ { L("Instanzen"), false }, { L("Schlachtzüge"), true } }) do

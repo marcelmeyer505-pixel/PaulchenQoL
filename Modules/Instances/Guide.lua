@@ -63,6 +63,15 @@ function guide.QuestStatus(id)
     return L("Offen"), app.style.muted
 end
 
+function guide.OpenWorldMap(mapID)
+    local map = WorldMapFrame
+    if not map then return end
+    app.CloseDashboard("instances")
+    if guide.UseOutdoorMap then guide.UseOutdoorMap() end
+    if not map:IsShown() and ToggleWorldMap then ToggleWorldMap() end
+    if mapID and map:IsShown() then app.worldMap.Navigate(map, mapID) end
+end
+
 function guide.ShowWaypoint(point)
     local combat, known = app.comfort.Read(InCombatLockdown)
     if not known or combat or not point or not C_Map then return end
@@ -72,12 +81,7 @@ function guide.ShowWaypoint(point)
             C_SuperTrack.SetSuperTrackedUserWaypoint(true)
         end
     end
-    local map = WorldMapFrame
-    if not map then return end
-    app.CloseDashboard("instances")
-    if guide.UseOutdoorMap then guide.UseOutdoorMap() end
-    if not map:IsShown() and ToggleWorldMap then ToggleWorldMap() end
-    if map:IsShown() then app.worldMap.Navigate(map, point[1]) end
+    guide.OpenWorldMap(point[1])
 end
 
 local function instanceID()
@@ -184,10 +188,10 @@ end
 function guide.PlayerRoom(entry, preferred)
     if not entry.id or entry.id ~= knownInstance() then return end
     local room = namedRoom(entry, read(GetSubZoneText))
-    if not room then return nil, nil, true end
+    if not room then return end
     local best = read(C_Map and C_Map.GetBestMapForUnit, "player")
     local floor = room.shapes[best] and best or room.shapes[preferred] and preferred or room.mainFloor
-    return room, floor, true
+    return room, floor
 end
 
 local function projectFloor(floor, north, west)

@@ -1,7 +1,7 @@
 local _, app = ...
 local world, options, style, L = app.worldMap, app.comfort, app.style, app.L
 local read, plain = app.ReadGameValue, app.Readable
-local view, battlefield, queued
+local view, battlefield, queued, instanceBinding
 
 BINDING_HEADER_PAULCHENQOLMAP = "Paulchen QoL"
 BINDING_NAME_PAULCHENQOLPLAYERMAP = L("Weltkarte am eigenen Standort öffnen")
@@ -39,6 +39,34 @@ function PaulchenQoLOpenPlayerMap()
     if not canEdit() or not WorldMapFrame then return end
     if not WorldMapFrame:IsShown() and ToggleWorldMap then ToggleWorldMap() end
     world.Navigate(WorldMapFrame, playerMapID())
+end
+
+local function activeInstance()
+    if options.Enabled("mapInterior") and app.instances then return app.instances.CurrentMap() end
+end
+
+local function toggleInstanceMap()
+    local entry, floor = activeInstance()
+    if not entry then
+        if ToggleWorldMap then ToggleWorldMap() end
+        return
+    end
+    if WorldMapFrame and WorldMapFrame:IsShown() and ToggleWorldMap then ToggleWorldMap() end
+    app.instances.ToggleMap(entry, floor)
+end
+
+local function syncInstanceBinding()
+    if not (GetBindingKey and SetOverrideBindingClick and ClearOverrideBindings and canEdit()) then return end
+    local keys = activeInstance() and { GetBindingKey("TOGGLEWORLDMAP") } or {}
+    if not instanceBinding then
+        if #keys == 0 then return end
+        instanceBinding = CreateFrame("Button", "PaulchenQoLInstanceMapBinding", UIParent)
+        instanceBinding:SetScript("OnClick", toggleInstanceMap)
+    end
+    ClearOverrideBindings(instanceBinding)
+    for _, key in ipairs(keys) do
+        SetOverrideBindingClick(instanceBinding, false, key, "PaulchenQoLInstanceMapBinding")
+    end
 end
 
 local function showZones(self, map)
@@ -222,7 +250,7 @@ local function setScale(state)
     end
 end
 
-local function compactFrame(state, compact)
+local function compactFrame(state, compact, navigation)
     local map, border = state.map, state.map.BorderFrame
     local parts = { "TitleContainer", "TitleText", "PortraitContainer", "NineSlice", "Bg", "InsetBorderTop" }
     for _, name in ipairs(parts) do
@@ -237,6 +265,16 @@ local function compactFrame(state, compact)
             end
         end
     end
+    state.background:SetShown(compact)
+    local nav = map.NavBar
+    local useZones = compact and navigation and nav ~= nil
+    if useZones then
+        if state.navShown == nil then state.navShown = nav:IsShown() end
+        if nav:IsShown() then nav:Hide() end
+    elseif nav and state.navShown ~= nil then
+        nav:SetShown(state.navShown)
+        state.navShown = nil
+    end
     local spacer = map.TitleCanvasSpacerFrame
     if not spacer or not map.OnFrameSizeChanged then return end
     local offset, y
@@ -245,8 +283,9 @@ local function compactFrame(state, compact)
         if point == "BOTTOMRIGHT" then offset, y = x, anchorY; break end
     end
     if offset == nil then return end
-    local target = compact and -49 or state.compacted and -67
-    state.compacted = compact
+    if state.spacerY ~= y then state.originalSpacerY = y end
+    local target = compact and (useZones and -31 or -49) or state.originalSpacerY
+    state.spacerY = target
     if target and y ~= target then
         spacer:SetPoint("BOTTOMRIGHT", map, "TOPRIGHT", offset, target)
         map:OnFrameSizeChanged()
@@ -282,9 +321,10 @@ local function updateView(state)
     local map = state.map
     if not map:IsVisible() then return end
     local compact = options.Enabled("mapCompact")
+    local navigation, discovery = options.Enabled("mapZoneMenu"), options.Enabled("mapDiscovery")
     local id = read(map.GetMapID, map)
     if canEdit() then
-        compactFrame(state, compact)
+        compactFrame(state, compact, navigation)
         setScale(state)
         local movable = options.Enabled("mapMove")
         if movable ~= state.movable then
@@ -346,7 +386,6 @@ local function updateView(state)
             bar:SetPoint("BOTTOMRIGHT", state.scroll, "BOTTOMRIGHT", -5, 31)
         end
     end
-    local navigation, discovery = options.Enabled("mapZoneMenu"), options.Enabled("mapDiscovery")
     bar:SetShown(compact or navigation or discovery or options.Enabled("mapMove") or options.Enabled("mapScale")
         or options.Enabled("mapBattlefield"))
     bar.zones:SetShown(navigation)
@@ -381,6 +420,11 @@ local function attach()
     view = { map = map, scroll = canvas, baseScale = map:GetScale(), baseMovable = map:IsMovable(),
         alpha = {}, resetAlpha = {}, titanAlpha = {}, hiddenCities = setmetatable({}, { __mode = "k" }) }
     local state = view
+    local background = map:CreateTexture(nil, "BACKGROUND", nil, -8)
+    background:SetAllPoints(map)
+    background:SetColorTexture(style.background[1], style.background[2], style.background[3], 1)
+    background:Hide()
+    state.background = background
     local header = CreateFrame("Frame", nil, map, "BackdropTemplate")
     header:SetHeight(23)
     header:SetFrameStrata("HIGH")
@@ -501,15 +545,21 @@ end
 function world.SettingsChanged()
     world.UpdateCrossings()
     attachBattlefield()
+    syncInstanceBinding()
     world.Refresh()
 end
 
 local events = CreateFrame("Frame")
-for _, event in ipairs({ "PLAYER_LOGIN", "ADDON_LOADED", "TAXI_NODE_STATUS_CHANGED",
+for _, event in ipairs({ "PLAYER_LOGIN", "ADDON_LOADED", "TAXI_NODE_STATUS_CHANGED", "PLAYER_ENTERING_WORLD", "UPDATE_BINDINGS",
     "MAP_EXPLORATION_UPDATED", "ZONE_CHANGED_NEW_AREA", "PLAYER_REGEN_ENABLED", "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED" }) do
     app.RegisterSupported(events, event)
 end
 events:SetScript("OnEvent", function(_, event, name)
+    if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED"
+        or event == "ZONE_CHANGED_NEW_AREA" or event == "UPDATE_BINDINGS" then
+        syncInstanceBinding()
+    end
+    if event == "UPDATE_BINDINGS" then return end
     if event == "PLAYER_LOGIN" or event == "ADDON_LOADED" and name == "Blizzard_WorldMap" then
         if event == "PLAYER_LOGIN" then
             world.UpdateCrossings()
