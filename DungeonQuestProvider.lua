@@ -81,7 +81,10 @@ local function place(code)
         id = p.npcID or p.objectID or p.itemID or id,
         name = p.name or rawID or code,
         map = p.mapID,
-        x = p.x, y = p.y,
+        -- Historical DQA places use map percentages (0..100).
+        -- Keep normalized 0..1 even for points below 1% of the zone.
+        x = type(p.x) == "number" and p.x / 100 or nil,
+        y = type(p.y) == "number" and p.y / 100 or nil,
         inside = p.inside == true,
         under = p.under == true,
     }
