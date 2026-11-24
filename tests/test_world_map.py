@@ -100,6 +100,8 @@ for _, name in ipairs({
     "EnableMouseWheel", "SetEnabled",
 }) do methods[name] = function() end end
 methods.SetVertexColor = function(self, ...) self.tint = {...} end
+methods.SetStartPoint = function(self, ...) self.startPoint = {...} end
+methods.SetEndPoint = function(self, ...) self.endPoint = {...} end
 function CreateFrame(_, _, parent)
     local widget = setmetatable({ parent = parent, shown = true, children = {}, scripts = {}, events = {},
         width = 700, height = 500 }, { __index = methods })
@@ -956,10 +958,17 @@ Minimap:SetPoint("CENTER", home, "CENTER", 12, -8)
 function Minimap:GetZoom() return self.zoom or 3 end
 function Minimap:SetZoom(zoom) self.zoom = zoom end
 function Minimap:CanChangeProtectedState() return not combat end
+MinimapBackdrop = CreateFrame("Frame", nil, Minimap)
+MinimapBackdrop:SetAlpha(.85)
+PaulchenQoLMinimapButton = CreateFrame("Button", nil, Minimap)
+local launcher = CreateFrame("Button", nil, Minimap)
+function launcher:GetName() return "LibDBIcon10_Test" end
 local north = false
 C_Minimap = {
     IsRotateMinimapIgnored = function() return north end,
     SetIgnoreRotateMinimap = function(value) north = value end,
+    GetViewRadius = function() return 120 end,
+    GetUiMapID = function() return interiorFloor end,
 }
 function GetCVarBool(name) assert(name == "rotateMinimap"); return true end
 local function restoreChecked()
@@ -968,13 +977,43 @@ local function restoreChecked()
     assert(Minimap:GetWidth() == 198 and Minimap:GetHeight() == 198 and Minimap:GetZoom() == 3)
     assert(Minimap:GetFrameStrata() == "LOW" and Minimap:GetFrameLevel() == 12 and Minimap:IsVisible())
     assert(point == "CENTER" and anchor == home and relative == "CENTER" and x == 12 and y == -8)
+    assert(MinimapBackdrop:GetAlpha() == .85 and PaulchenQoLMinimapButton:IsShown() and launcher:IsShown())
 end
 guide.UpdateWorldOverlay(map)
 local liveSwitch = textWidget("Live-Minimap")
+local fullWidth = dungeonCanvas:GetWidth()
 liveSwitch.scripts.OnClick()
 local dock = Minimap:GetParent()
 assert(dock ~= home and Minimap:IsVisible() and north and Minimap:GetWidth() > 198 and Minimap:GetZoom() == 0)
-assert(not dungeonCanvas:IsVisible() and liveSwitch.textValue == "Routenkarte")
+assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() < fullWidth and liveSwitch.textValue == "Nur Routenkarte",
+    "The overview and its boss pins stay visible alongside the live minimap without player coordinates")
+assert(dungeonCanvas.lines[1]:IsVisible() and dungeonCanvas.pins[1]:IsVisible())
+assert(MinimapBackdrop:GetAlpha() == 0 and not PaulchenQoLMinimapButton:IsShown() and not launcher:IsShown())
+local boss = dungeonCanvas.positionEntry.stops[1]
+interiorFloor, coords = boss.floor, {x = boss.x, y = boss.y}
+guide.UpdateWorldOverlay(map)
+local projected
+for _, frame in ipairs(dock.children) do
+    if frame.pins and frame.lines then projected = frame; break end
+end
+assert(projected and projected:IsVisible() and projected.pins[1].stop == boss)
+assert(select(2, projected.pins[1]:GetPoint()) == Minimap and select(4, projected.pins[1]:GetPoint()) == 0)
+assert(projected.lines[1]:IsVisible())
+for _, line in ipairs(projected.lines) do
+    if line:IsShown() then
+        for _, endpoint in ipairs({line.startPoint, line.endPoint}) do
+            assert(endpoint[2] == Minimap and endpoint[3] ^ 2 + endpoint[4] ^ 2 <= (Minimap:GetWidth() / 2) ^ 2)
+        end
+    end
+end
+coords = {x = boss.x + .003, y = boss.y}
+dock.scripts.OnUpdate(dock, .11)
+assert(projected.pins[1].stop == boss and select(4, projected.pins[1]:GetPoint()) < 0,
+    "Moving east shifts the projected boss west on the north-up minimap")
+coords = secret
+dock.scripts.OnUpdate(dock, .11)
+assert(not projected:IsShown() and dungeonCanvas.pins[1]:IsVisible(),
+    "Losing readable coordinates clears the direct overlay without hiding the overview")
 Minimap:SetZoom(2)
 local hostWidth, hostHeight = map.ScrollContainer:GetSize()
 map.ScrollContainer:SetSize(hostWidth, hostHeight - 50)
@@ -983,7 +1022,7 @@ assert(Minimap:GetParent() == dock and Minimap:GetZoom() == 2, "Resizing the liv
 map.ScrollContainer:SetSize(hostWidth, hostHeight)
 liveSwitch.scripts.OnClick()
 restoreChecked()
-assert(dungeonCanvas:IsVisible())
+assert(dungeonCanvas:IsVisible() and dungeonCanvas:GetWidth() == fullWidth)
 
 liveSwitch.scripts.OnClick()
 textWidget("Weltkarte").scripts.OnClick()
@@ -1010,6 +1049,7 @@ restoreChecked()
 assert(dungeonCanvas:IsVisible(), "An unavailable Minimap leaves the route view and the HUD in place")
 combat = false
 Minimap, C_Minimap, GetCVarBool = nil, nil, nil
+MinimapBackdrop, PaulchenQoLMinimapButton = nil, nil
 
 C_Map.GetPlayerMapPosition = oldPositionAPI
 GetPlayerFacing, UnitPosition, GetSubZoneText = nil, nil, nil
