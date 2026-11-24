@@ -1,89 +1,91 @@
--- Minimal in-memory Forever/Polestar fixture. Run: lua5.1 tests/dungeon_quest_fixture.lua
+-- Self-contained dungeon quest planner regression tests (Lua 5.1).
+-- No Polestar globals/addon/quest data are loaded. Run from repo root.
 local app = {
     style = {},
-    Readable = function(value) return value end,
+    Readable = function(v) return v end,
     GetLanguage = function() return "deDE" end,
     RegisterSupported = function() return true end,
 }
-_G.CreateFrame = function()
-    return {
-        SetScript = function() end,
-        RegisterEvent = function() end,
-    }
-end
+_G.Polestar = nil
+_G.CreateFrame = function() return { SetScript=function() end, RegisterEvent=function() end } end
 _G.UnitFactionGroup = function() return "Horde" end
 _G.UnitLevel = function() return 60 end
-local done = { [101] = true }
-local active = { [103] = true }
+_G.UnitClass = function() return "Druid", "DRUID", 11 end
+local done = {}
+local active = {}
+local ready = {}
 _G.C_QuestLog = {
+    GetTitleForQuestID = function(id) return "Test Quest " .. id end,
     IsQuestFlaggedCompleted = function(id) return done[id] == true end,
     IsOnQuest = function(id) return active[id] == true end,
-    ReadyForTurnIn = function(id) return false end,
+    ReadyForTurnIn = function(id) return ready[id] == true end,
 }
-local rows = {
-    { id = 103, title = "Third step", faction = "H", chain = { 101, 102 },
-        start = { kind = "npc", name = "Quest NPC", map = 1, x = 0.5, y = 0.6 },
-        finish = { kind = "npc", name = "Turn-in NPC", map = 1, x = 0.4, y = 0.8 } },
-    { id = 104, title = "Fourth step", faction = "H", chain = { 101, 102, 103 },
-        start = { kind = "npc", name = "Quest NPC 2", map = 1, x = 0.5, y = 0.6 } },
-    { id = 105, title = "Alliance step", faction = "A", chain = {} },
-}
-local all = {}
-for _, q in ipairs(rows) do all[q.id] = q end
-all[101] = { id = 101, title = "First step", start = {kind = "npc", name = "Intro NPC"} }
-all[102] = { id = 102, title = "Second step", start = {kind = "npc", name = "Second NPC"} }
+local function loadAddon(path)
+    local chunk, err = loadfile(path)
+    assert(chunk, err)
+    chunk("PaulchenQoL", app)
+end
 
-_G.Polestar = {
-    Dungeons = {
-        Load = function() return true end,
-        List = function() return { {key = "sample", name = "Sample Dungeon"} } end,
-        Quests = function(_, faction)
-            local out = {}
-            for _, q in ipairs(rows) do
-                if not q.faction or q.faction == faction then out[#out + 1] = q end
-            end
-            return out
-        end,
-        Quest = function(_, id) return all[id] end,
-    },
-    Codex = {
-        Quest = function(id)
-            if id == 104 then return {pre = {103}} end
-            if id == 103 then return {pre = {102}} end
-            return {}
-        end
-    }
-}
+loadAddon("Data/DungeonSeedDungeons.lua")
+loadAddon("Data/DungeonSeedQuests.lua")
+loadAddon("Data/DungeonSeedPlaces.lua")
+loadAddon("DungeonQuestProvider.lua")
+loadAddon("DungeonQuests.lua")
 
-local chunk, err = loadfile("DungeonQuests.lua")
-assert(chunk, err)
-chunk("PaulchenQoL", app)
+local provider = assert(app.DungeonQuestData)
+assert(provider.Load() == true)
+local dungeons = provider.List()
+assert(#dungeons == 35, "35 bundled dungeons / wings expected")
+assert(#(app.dungeonQuestSeed.quests or {}) == 0, "quest data is keyed, not an array")
+local questCount, placeCount, references = 0, 0, 0
+for _ in pairs(app.dungeonQuestSeed.quests) do questCount = questCount + 1 end
+for _ in pairs(app.dungeonQuestSeed.places) do placeCount = placeCount + 1 end
+for _, d in ipairs(app.dungeonQuestSeed.dungeons) do references = references + #(d.quests or {}) end
+assert(questCount == 480 and placeCount == 309 and references == 395,
+    "MIT seed counts changed unexpectedly")
+
+assert(#provider.Quests("ALCAZ", "H") == 0, "known missing Forever catalog remains empty")
+assert(provider.Quests("BRD", "H")[1], "BRD Horde quests should exist")
+local function contains(quests, wanted)
+    for _, q in ipairs(quests) do if q.id == wanted then return q end end
+end
+local horde = provider.Quests("BRD", "H")
+local alliance = provider.Quests("BRD", "A")
+assert(contains(horde, 4082), "BRD Horde kill-on-sight quest missing")
+assert(not contains(alliance, 4082), "Horde-only quest shown to Alliance")
+assert(contains(alliance, 4126), "BRD Alliance quest missing")
+assert(not contains(horde, 4126), "Alliance-only quest shown to Horde")
+
+local reference = assert(provider.Quest("BRD", 4082))
+assert(reference.title == "Test Quest 4082")
+assert(reference.faction == "H")
+assert(type(reference.givers) == "table" and #reference.givers > 0)
+assert(type(reference.start.name) == "string")
+local chainSource = provider.Quest("WC", 914)
+assert(chainSource and #chainSource.chain == 3)
+assert(provider.Prerequisites(914)[1] == 1489)
 
 local planner = assert(app.dungeonQuests)
-local list = assert(planner.ListDungeons())
-assert(#list == 1)
-local result = assert(planner.Build("sample"))
-assert(result.total == 2, "Faction filtering must exclude Alliance-only quests")
-assert(result.active == 1 and result.done == 0)
-assert(result.quests[1].status == "ACTIVE")
-assert(result.quests[2].status == "LOCKED", "Quest 104 waits for 103")
-local chain, completed = planner.Chain(104, result)
-assert(#chain == 4 and completed == 1, "Chain should include predecessors and completion progress")
-assert(chain[1].id == 101 and chain[4].id == 104)
-assert(chain[1].status == "DONE")
-assert(chain[2].status == "NOT_STARTED")
-assert(chain[3].status == "ACTIVE")
+local built = assert(planner.Build("BRD"))
+assert(built.total > 15 and built.done == 0)
+assert(contains(built.quests, 4082).status == "NOT_STARTED")
+done[4082] = true
+assert(contains(assert(planner.Build("BRD")).quests, 4082).status == "DONE")
+done[4082] = nil
+active[4082] = true
+assert(contains(assert(planner.Build("BRD")).quests, 4082).status == "ACTIVE")
+ready[4082] = true
+assert(contains(assert(planner.Build("BRD")).quests, 4082).status == "READY")
 
-done[102] = true
-active[103] = nil
-local update = assert(planner.Build("sample"))
-assert(update.quests[1].status == "NOT_STARTED")
-assert(update.quests[2].status == "LOCKED")
-active[103] = true
-_G.C_QuestLog.ReadyForTurnIn = function(id) return id == 103 end
-assert(planner.Build("sample").quests[1].status == "READY")
+local caverns = assert(planner.Build("WC"))
+local quest = assert(contains(caverns.quests, 914))
+assert(quest.status == "LOCKED", "chain predecessors are not yet complete")
+done[1489], done[1490] = true, true
+assert(contains(assert(planner.Build("WC")).quests, 914).status == "NOT_STARTED")
+local chain, completed = planner.Chain(914, planner.Build("WC"))
+assert(#chain == 3 and completed == 2)
+assert(chain[1].id == 1489 and chain[3].id == 914)
 
-_G.Polestar = nil
-local none, reason = planner.ListDungeons()
-assert(none == nil and reason == "missing", "Optional provider must fail safely")
-print("Dungeon quest planner fixture passed.")
+assert(planner.ListDungeons(), "planner must work with Polestar=nil")
+print("Standalone dungeon planner passed: " .. #dungeons .. " dungeons, " ..
+    references .. " quest references, " .. questCount .. " quests, " .. placeCount .. " places.")
