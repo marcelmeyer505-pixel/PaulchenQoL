@@ -262,19 +262,42 @@ function planner.Chain(id, data)
     return makeChain(data.provider, data.key, q, source)
 end
 
+local mapNames = {}
+local function mapName(map)
+    if type(map) ~= "number" then return nil end
+    if mapNames[map] then return mapNames[map] end
+    local info = safe(C_Map and C_Map.GetMapInfo, map)
+    local name = info and app.Readable(info.name)
+    if type(name) == "string" and name ~= "" then mapNames[map] = name end
+    return name
+end
+
 local function pointText(point)
-    if type(point) ~= "table" then return L("Unbekannt", "Unknown") end
-    local kind = point.kind
-    local prefix = kind == "npc" and L("NPC", "NPC")
-        or kind == "object" and L("Objekt", "Object")
-        or kind == "item" and L("Gegenstand", "Item")
-        or L("Quelle", "Source")
+    if type(point) ~= "table" or point.kind == "unknown" then
+        return L("Queststart / Abgabe nicht erfasst", "Quest start / turn-in not recorded")
+    end
+    local prefix = point.kind == "npc" and L("NPC", "NPC")
+        or point.kind == "object" and L("Objekt", "Object")
+        or point.kind == "item" and L("Gegenstand", "Item")
+        or L("Queststart", "Quest start")
     local name = point.name or (point.id and ("#" .. point.id)) or L("Unbekannt", "Unknown")
     local result = prefix .. ": " .. name
-    if type(point.x) == "number" and type(point.y) == "number" then
+    if type(point.x) == "number" and type(point.y) == "number"
+        and type(point.map) == "number" then
         local x, y = point.x, point.y
         if x <= 1 and y <= 1 then x, y = x * 100, y * 100 end
-        result = result .. (" (%.1f, %.1f)"):format(x, y)
+        result = result .. (" · %s (%.1f, %.1f)"):format(mapName(point.map) or
+            ("Map #" .. point.map), x, y)
+        if point.observed then
+            result = result .. L(" · bei NPC-Kontakt erfasst", " · observed during NPC interaction")
+        end
+    elseif point.inside then
+        result = result .. L(" · in der Instanz, genaue Position unbekannt",
+            " · inside dungeon, exact position unknown")
+    elseif point.kind == "item" or point.kind == "object" then
+        result = result .. L(" · Fundort nicht erfasst", " · source location not recorded")
+    else
+        result = result .. L(" · Standort nicht erfasst", " · location not recorded")
     end
     return result
 end
@@ -447,7 +470,16 @@ local function render()
             row.title:SetText((item.id == selectedQuest and "› " or "") .. item.title)
             row.state:SetText(stateText(item.status))
             row.state:SetTextColor(stateColor(item.status))
-            row.giver:SetText(pointText(item.giver))
+            local giver = item.giver
+            if giver and giver.map and giver.x ~= nil then
+                row.giver:SetText(giver.name or L("Koordinaten bekannt", "Coordinates known"))
+            elseif giver and giver.inside then
+                row.giver:SetText(L("In der Instanz", "Inside dungeon"))
+            elseif giver and giver.kind == "unknown" then
+                row.giver:SetText(L("Questgeber unbekannt", "Unknown quest giver"))
+            else
+                row.giver:SetText(giver and giver.name or L("Questgeber unbekannt", "Unknown quest giver"))
+            end
         end
     end
     local selected
@@ -467,8 +499,10 @@ local function render()
     frame.selected:SetText(selected and (selected.title .. " (#" .. selected.id .. ")") or "")
     frame.questgiver:SetText(selected and (L("Questgeber: ", "Quest giver: ") .. multiplePointText(selected.entry and selected.entry.givers, selected.giver)) or "")
     frame.ender:SetText(selected and (L("Abgabe bei: ", "Turn in to: ") .. multiplePointText(selected.entry and selected.entry.enders, selected.ender)) or "")
-    frame.gotoGiver:SetEnabled(selected and selected.giver and selected.giver.map and selected.giver.x ~= nil)
-    frame.gotoEnder:SetEnabled(selected and selected.ender and selected.ender.map and selected.ender.x ~= nil)
+    frame.gotoGiver:SetEnabled(not not (selected and selected.giver and selected.giver.map
+        and selected.giver.x ~= nil and selected.giver.y ~= nil))
+    frame.gotoEnder:SetEnabled(not not (selected and selected.ender and selected.ender.map
+        and selected.ender.x ~= nil and selected.ender.y ~= nil))
     frame.chainSummary:SetText(#chain > 0 and (L("Questreihe", "Quest chain") .. ": " .. completed .. "/" .. #chain ..
         " " .. L("abgeschlossen", "completed") .. " · " .. L("Reihenfolge laut Quelldaten, nicht immer Pflicht-Vorquests.",
         "Source order; not every preceding step is mandatory.")) or "")
@@ -605,14 +639,12 @@ function planner.Open(key)
         f.questgiver = label(f, "", 237, -543, 610, 20, style.cream)
         f.ender = label(f, "", 237, -564, 610, 20, style.cream)
         f.gotoGiver = styledButton(f, L("Zum Questgeber", "Go to quest giver"), 827, -542, 124, function()
-            local data
-            for _, q in ipairs(snapshot and snapshot.quests or {}) do if q.id == selectedQuest then data = q end end
-            if data then openRoute(data.giver, data.title) end
+            local entry = snapshot and safe(snapshot.provider.Quest, snapshot.key, selectedQuest)
+            if entry then openRoute(entry.start, entry.title) end
         end)
         f.gotoEnder = styledButton(f, L("Zur Abgabe", "Go to turn-in"), 827, -569, 124, function()
-            local data
-            for _, q in ipairs(snapshot and snapshot.quests or {}) do if q.id == selectedQuest then data = q end end
-            if data then openRoute(data.ender, data.title) end
+            local entry = snapshot and safe(snapshot.provider.Quest, snapshot.key, selectedQuest)
+            if entry then openRoute(entry.finish, entry.title) end
         end)
         f.chainSummary = label(f, "", 237, -596, 710, 21, style.muted)
         f.chainRows = {}
