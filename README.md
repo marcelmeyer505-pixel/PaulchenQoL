@@ -1,5 +1,20 @@
 # Paulchen QoL v0.12.0
 
+## Paulchens Instanz-Questplaner (Entwicklungszweig)
+
+Öffne den neuen Planer über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder **`/pq quests`** (auch `/pq dungeons`). Die Ansicht nutzt die **optionale** Laufzeitdaten-Schnittstelle von **Polestar.Dungeons** und zeigt bekannte Instanzquests für die eigene Fraktion. Ohne installierten bzw. aktivierten Polestar-Dungeon-Kodex wird eine klare Datenquellenmeldung angezeigt; Paulchen behauptet dann nicht, alle Quests zu kennen.
+
+Der Planer enthält eine durchsuchbare Instanzauswahl und Questliste, die Namen und bekannten Koordinaten von Questgeber und Abgabeort, den persönlichen Queststatus (**abgeschlossen**, **abgabebereit**, **im Questlog**, **Vorquests fehlen**, **noch nicht angenommen**, **Status unbekannt**, **nicht mehr erhältlich** bzw. Klassen-/Fraktions-/Stufenbeschränkungen), eine Reihe mit vorausgehenden und zugehörigen Instanz-Folgequests einschließlich deren eigener Questgeber sowie einen **kopierbaren Questbericht**. Den Questgeber und die Abgabe kannst du mit Polestars vorhandenem Wegpunkt-/Navigationssystem ansteuern, wenn dafür Koordinaten verfügbar sind. Klick auf einen Schritt der Questreihe öffnet seine Details, auch wenn er selbst nur eine Vorquest außerhalb der Instanz ist.
+
+**Datenregeln:** Polestars `chain` ist eine geordnete narrative Questreihe und **nicht automatisch** eine harte Abgabevoraussetzung. Fehlende Pflicht-Vorquests werden nur bei tatsächlich hinterlegten `Codex.Quest`-Voraussetzungen angezeigt (`pre`, `preAll`, `preAny`). Der Abschluss wird über unterstützte WoW-Quest-APIs und ggf. Polestars Kompatibilitätsfunktionen ermittelt; unlesbare/fehlende Statuswerte erscheinen als **unbekannt** und nicht als unerledigt. „Nicht angenommen“ behauptet ausdrücklich nicht, dass der Questgeber die Aufgabe gerade schon anbietet. Die Namen/Koordinaten stammen aus Polestar, und können bei nicht beobachteten Forever-Quests fehlen oder veraltet sein. Questabschlüsse werden **nicht** dauerhaft unabhängig vom Client als erledigt behauptet.
+
+Der Planer lädt nur die Daten der aktuell geöffneten Instanz und verwendet keine eigenen Kopien von Polestars Datenbank. Er überprüft den Stand nach Questlog-/Stufenänderungen, ohne selbst Quests anzunehmen oder geschützte Spielfunktionen auszuführen. Deutsche und englische Oberfläche folgen Paulchens bestehender Sprachauswahl.
+
+Die Lua-5.1-Testdatei `tests/dungeon_quest_fixture.lua` prüft Fraktionsfilter, Questgeber, Vorquests, Reihenfolge, aktiv/abgabebereit/abgeschlossen und das Verhalten ohne Polestar. Ein anschließender **Ingame-Test in WoW Forever** mit Polestar ist für echte Datenqualität, Routenführung und Fensterlayout erforderlich.
+
+---
+
+
 ## Deutsch / English
 
 Paulchen QoL now offers **German and English**. By default, the addon follows the World of Warcraft client locale: `deDE` uses German, while `enUS`, `enGB` and other client locales use English. You can override this independently of your game client in **Paulchen Settings → Language**:
