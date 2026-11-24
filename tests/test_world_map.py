@@ -454,7 +454,7 @@ ForeverDungeonRoutes = {
 }
 UiMapPoint = {CreateFromCoordinates = function(mapID, x, y) return {mapID, x, y} end}
 C_Map.CanSetUserWaypointOnMap = function(id) return id == 1413 end
-C_Map.SetUserWaypoint = function(point) selectedWaypoint = point end
+C_Map.SetUserWaypoint = function(point) selectedWaypoint = point; return true end
 C_SuperTrack = {SetSuperTrackedUserWaypoint = function(active) trackingWaypoint = active end}
 C_EncounterJournal = {
     GetDungeonEntrancesForMap = function(id)
@@ -536,7 +536,7 @@ for index = 1, provider.used do assert(provider.pins[index].point.kind ~= "dunge
 ''')
 print("Dungeon entrance links, Journal map and quests, Routes fallback and shared entrances passed.")
 
-for path in ("Data/DungeonSeedDungeons.lua", "Data/DungeonSeedQuests.lua", "Data/DungeonSeedPlaces.lua",
+for path in ("Data/DungeonSeedDungeons.lua", "Data/DungeonSeedQuests.lua", "Data/DungeonSeedPlaces.lua", "Data/DungeonQuestHints.lua",
              "DungeonQuestProvider.lua", "DungeonQuests.lua", "Modules/Instances/Data.lua",
              "Modules/Instances/Guide.lua", "Modules/Instances/Quests.lua", "Modules/Instances/Window.lua"):
     load((root / path).read_text(encoding="utf-8-sig"), path)
@@ -663,6 +663,38 @@ for _, widget in ipairs(instancePage.rows) do
 end
 assert(clicked and math.abs(selectedWaypoint[2] - .562) < .00001)
 UnitFactionGroup, C_Map.CanSetUserWaypointOnMap = originalFaction, oldCanSet
+
+local function locationWidget(name)
+    for _, widget in ipairs(instancePage.rows) do
+        if widget.row and widget.row.left == name then return widget end
+    end
+end
+guide.Open("stratholme_living", "quests")
+guide.selection.quest = 8968
+guide.Refresh()
+local bodley = assert(locationWidget("Bodley"))
+assert(bodley.right.textValue == "Classic-Referenz" and bodley.row.tip.text:find("für Forever nicht bestätigt", 1, true))
+
+guide.Open("blackfathom", "quests")
+local quest = assert(questWidget(6561))
+quest.scripts.OnClick(quest)
+local thaelrid = assert(locationWidget("Argent Guard Thaelrid"))
+assert(thaelrid.right.textValue == "In der Instanz" and not thaelrid.row.action)
+local oldQuest, oldExists, oldGUID, oldName = GetQuestID, UnitExists, UnitGUID, UnitName
+local oldBestMap, oldMapPosition = C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition
+function GetQuestID() return 6561 end
+function UnitExists(unit) return unit == "npc" end
+function UnitGUID() return "Creature-0-0-0-0-4787-00000ABC" end
+function UnitName() return "Argent Guard Thaelrid" end
+C_Map.GetBestMapForUnit = function() return 1440 end
+C_Map.GetPlayerMapPosition = function() return { GetXY = function() return .41, .31 end } end
+fire("QUEST_DETAIL")
+flush()
+thaelrid = assert(locationWidget("Argent Guard Thaelrid"))
+assert(thaelrid.right.textValue == "Beobachtet" and thaelrid.row.action
+    and thaelrid.row.tip.text:find("41,0 / 31,0", 1, true), "Quest dialogs update the open instance tab")
+GetQuestID, UnitExists, UnitGUID, UnitName = oldQuest, oldExists, oldGUID, oldName
+C_Map.GetBestMapForUnit, C_Map.GetPlayerMapPosition = oldBestMap, oldMapPosition
 C_QuestLog.IsQuestFlaggedCompleted, C_QuestLog.IsOnQuest, C_QuestLog.ReadyForTurnIn = oldDone, oldOnQuest, oldReady
 guide.Open(wailing.key, "quests")
 textWidget("Beute").scripts.OnClick()

@@ -4,6 +4,8 @@
 - The quest planner now works without Polestar or Dungeon Quest Atlas installed. Native WoW waypoints replace the Polestar navigation dependency.
 - Add searchable dungeon and quest lists, known quest giver/turn-in locations, chain progress, faction filters, completion states and copyable reports.
 - Explicitly label incomplete/unknown Forever content; add Lua 5.1 regression tests against the real bundled dataset.
+- Distinguish in-dungeon NPCs, starting items and genuinely missing questgivers rather than displaying blank coordinates.
+- Automatically remember questgiver/turn-in NPC locations from actual in-game quest dialogs, saved per character; add a visibly unconfirmed Classic Bodley point as fallback.
 
 # Changelog
 

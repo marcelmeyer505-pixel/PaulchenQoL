@@ -41,3 +41,27 @@ Dataset characteristics:
 
 Paulchen's own code for interpreting these records, its UI, quest status,
 navigation and caching was separately developed.
+
+## Missing giver locations / observed positions
+
+The historical seed has deliberately missing coordinates for many
+**in-instance** NPCs, quest-start items and objects. These are not invented
+outdoor waypoints. Display text distinguishes a known NPC inside a dungeon
+from a truly unrecorded location and a missing quest start.
+
+When the character actually opens the quest detail, progress or completion
+dialogue at a matching NPC, Paulchen may cache the character's current map
+position against that quest's known NPC ID. Observations are stored only in
+`PaulchenQoLDB.dungeonQuestLocations`, with a separate label, and are not
+distributed as published coordinates for other players. The observed
+location supersedes unconfirmed reference hints; originally sourced
+coordinates remain unchanged.
+
+`Data/DungeonQuestHints.lua` contains an individual, explicitly unconfirmed
+Classic point for **Bodley (NPC 16033)** in Blackrock Mountain, at Burning
+Steppes map 1428 (32.3, 25.8), from:
+- https://foreverdb.net/de/quest/8960-bodleys-unfortunate-fate
+- https://warcraft.wiki.gg/wiki/Bodley
+
+This is a Classic location only; no Forever character sighting was used to
+validate that point. Do not silently upgrade this hint to a verified map pin.

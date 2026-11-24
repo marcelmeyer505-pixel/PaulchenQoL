@@ -176,23 +176,27 @@ end
 local function questRow(quest)
     local status, color = planner.DescribeStatus(quest.status)
     local points = quest.givers or quest.entry.givers or {}
-    local name = points[1] and points[1].name
-    local source = name and (L("Questgeber") .. " · " .. name)
+    local point = points[1]
+    local label = point and point.referenceOnly and "Classic-Referenz" or "Questgeber"
+    local source = point and point.name and (L(label) .. " · " .. point.name)
     return { left = quest.title, right = status, color = color, source = source, questID = quest.id,
-        action = function() showQuest(quest.id) end, tip = { title = quest.title, text = source } }
+        action = function() showQuest(quest.id) end, tip = { title = quest.title, text = planner.FormatLocation(point) } }
 end
 
 local function questLocations(rows, label, points)
     rows[#rows + 1] = { left = L(label), color = style.gold }
-    if #points == 0 then rows[#rows + 1] = { left = L("Unbekannt"), color = style.muted } end
+    if #points == 0 then rows[#rows + 1] = { left = planner.FormatLocation(), color = style.muted } end
     for _, point in ipairs(points) do
         local name = point.name or L("Unbekannt")
-        local row = { left = name, tip = { title = name } }
+        local row = { left = name, tip = { title = name, text = planner.FormatLocation(point) } }
         if guide.HasQuestPoint(point) then
-            row.right = app.worldMap.Name(point.map)
-            row.tip.text = (row.right and row.right .. " · " or "")
-                .. app.LocalizeDecimal(("%.1f / %.1f"):format(point.x * 100, point.y * 100))
+            row.right = point.referenceOnly and L("Classic-Referenz")
+                or point.observed and L("Beobachtet") or app.worldMap.Name(point.map)
             row.action = function() guide.ShowWaypoint({ point.map, point.x, point.y }) end
+        elseif point.inside then
+            row.right = L("In der Instanz")
+        elseif point.kind == "item" or point.kind == "object" then
+            row.right = L("Fundort fehlt")
         end
         rows[#rows + 1] = row
     end
@@ -305,7 +309,7 @@ local function renderList()
             widget.link = link
             widget:SetPoint("TOPLEFT", 8, ((hasItems or progress) and -53 or -35) - (index - 1) * 25)
             widget.left:SetPoint("TOPLEFT", id and 30 or 7, 0)
-            widget.left:SetWidth(id and (s.tab == "loot" and 161 or 218) or 207)
+            widget.left:SetWidth(id and (s.tab == "loot" and 161 or 218) or s.tab == "quests" and not row.right and 305 or 207)
             widget.left:SetHeight(source and 13 or 24)
             widget.left:SetText(name or "")
             widget.left:SetTextColor(unpack(color))

@@ -67,9 +67,9 @@ function guide.ShowWaypoint(point)
     local combat, known = app.comfort.Read(InCombatLockdown)
     if not known or combat or not point or not C_Map then return end
     if read(C_Map.CanSetUserWaypointOnMap, point[1]) == true and UiMapPoint and C_Map.SetUserWaypoint then
-        C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(unpack(point)))
-        if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
-            C_SuperTrack.SetSuperTrackedUserWaypoint(true)
+        local marker = read(UiMapPoint.CreateFromCoordinates, unpack(point))
+        if marker and read(C_Map.SetUserWaypoint, marker) == true then
+            read(C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint, true)
         end
     end
     guide.OpenWorldMap(point[1])
@@ -264,6 +264,7 @@ local events = CreateFrame("Frame")
 for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
     "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL",
     "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "QUEST_TURNED_IN", "QUEST_ACCEPTED", "QUEST_REMOVED", "PLAYER_LEVEL_UP",
+    "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE",
     "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }) do
     app.RegisterSupported(events, name)
 end
@@ -281,6 +282,10 @@ events:SetScript("OnEvent", function(_, event, encounter, _, _, _, success)
         return
     end
     if event == "PLAYER_LEAVING_WORLD" then noteOutside(); return end
+    if event == "QUEST_DETAIL" or event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
+        if guide.selection and guide.selection.tab == "quests" then guide.QueueRefresh() end
+        return
+    end
     if event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
         local id = app.Readable(encounter)
         if type(id) == "number" then guide.LootItemUpdated(id) end
