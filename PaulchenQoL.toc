@@ -44,6 +44,8 @@ Modules\WorldMap\Window.lua
 Overview.lua
 Modules\Upgrades\Catalog.lua
 Modules\Upgrades\Profiles.lua
+Modules\Upgrades\SetBonusData.lua
+Modules\Upgrades\SetBonuses.lua
 Modules\Upgrades\Gear.lua
 Modules\Upgrades\Content.lua
 Modules\Upgrades\Sources.lua

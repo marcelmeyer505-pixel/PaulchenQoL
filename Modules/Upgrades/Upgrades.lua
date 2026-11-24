@@ -14,7 +14,7 @@ local requestBurst, cpuBudget, tailSeconds = 8, 1.5, 20
 local readable = suite.Readable
 
 local itemScores, weaponScores = {}, {}
-local savedScoreVersion = 3
+local savedScoreVersion = 4
 local savedScores, savedEquipment
 local linkScores, savedLinks = {}, nil
 app.On("GEAR_UPDATED", function(what, id)
@@ -297,7 +297,7 @@ function app.RecordIssue(scan, id, message)
 end
 
 function app.IsUpgrade(result, level)
-    return result and result.usable and not result.equipped and result.delta and result.delta > 0
+    return result and result.usable and not result.equipped and not result.unknownSetLoss and result.delta and result.delta > 0
         and (result.minLevel or 0) <= level
 end
 
@@ -358,7 +358,7 @@ local function storeResult(scan, id, item, result)
         itemLevel = itemLevel and itemLevel > 0 and itemLevel or nil,
         requiredLevel = requiredLevel, future = requiredLevel > scan.playerLevel,
         stats = stats,
-        empty = result.empty, sources = sources,
+        empty = result.empty, sources = sources, setEffects = result.setEffects,
     }
 end
 

@@ -6,6 +6,7 @@ local gear, clients = {}, {}
 app.gear, gear.Client = gear, clients
 local readable = suite.Readable
 local items, container = C_Item, C_Container
+local setBonuses = app.setBonuses
 
 local listeners = {}
 function app.On(message, handler)
@@ -204,7 +205,7 @@ function gear.GetItemInfo(link)
     if not id or not (items and items.GetItemInfo) then return end
     local bucket = itemCache[id]
     if bucket and bucket[key] then return bucket[key] end
-    local ok, name, display, quality, ilvl, req, _, _, _, equip, _, _, class, subclass = pcall(items.GetItemInfo, key)
+    local ok, name, display, quality, ilvl, req, _, _, _, equip, _, _, class, subclass, _, _, setID = pcall(items.GetItemInfo, key)
     if not ok then return end
     local inv = gear.EQUIP_LOC[readable(equip)]
     if not (readable(name) and gear.SLOTS_OF[inv]) then return end
@@ -240,6 +241,7 @@ function gear.GetItemInfo(link)
     local info = { id = id, key = key, link = readable(display) or key, inv = inv, stats = stats,
         req = readable(req) or 0, quality = readable(quality), ilvl = readable(ilvl),
         class = readable(class), subclass = readable(subclass), allowed = allowed,
+        setID = setBonuses and setBonuses.ItemSet(id, readable(setID)),
         unique = readable(unique), limit = readable(limit), category = readable(category) }
     if cacheSize >= 6000 then itemCache, cacheSize, bucket = {}, 0, nil end
     bucket = bucket or {}
@@ -275,6 +277,7 @@ function gear.EligibilityKey()
         local rank = skillRank(id)
         fields[#fields + 1] = id .. ":" .. (rank == nil and "?" or rank > 0 and "1" or "0")
     end
+    if setBonuses then fields[#fields + 1] = setBonuses.SkillKey(skillRank) end
     return table.concat(fields, ",")
 end
 
@@ -309,7 +312,7 @@ local function score(info, weights, slot)
     return points
 end
 
-local equipment, results, weights, player, bagWeapons
+local equipment, equippedSets, results, weights, player, bagWeapons
 local resultDependencies = {}
 local resultIDs = {}
 local function clearResult(key)
@@ -342,7 +345,7 @@ function gear.Invalidate(reason)
         app.Fire("GEAR_UPDATED", reason)
         return
     end
-    equipment, results, weights, player, bagWeapons = nil, nil, nil, nil, nil
+    equipment, equippedSets, results, weights, player, bagWeapons = nil, nil, nil, nil, nil, nil
     resultDependencies, resultIDs = {}, {}
     app.Fire("GEAR_UPDATED", reason)
 end
@@ -360,10 +363,11 @@ local function equipped()
         end
     end
     equipment = slots
+    equippedSets = setBonuses and setBonuses.Equipped(slots, skillRank)
     return slots
 end
 
-local function partnerScore(slot, candidate, playerInfo, prof, weightsNow)
+local function forEachPartner(slot, candidate, playerInfo, prof, consider)
     if not bagWeapons then
         bagWeapons = {}
         for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4 do
@@ -377,17 +381,14 @@ local function partnerScore(slot, candidate, playerInfo, prof, weightsNow)
             end
         end
     end
-    local best
     for _, info in ipairs(bagWeapons) do
         local eligible = info.inv == 13 and (slot == 16 or canDualWield(playerInfo, prof))
             or slot == 16 and info.inv == 21
             or slot == 17 and (info.inv == 14 or info.inv == 22 or info.inv == 23)
         if eligible and info.key ~= candidate.key and (not candidate.unique or candidate.id ~= info.id) then
-            local points = score(info, weightsNow, slot)
-            best = best and math.max(best, points) or points
+            consider(info, slot)
         end
     end
-    return best
 end
 
 local function compare(info, estimated)
@@ -402,24 +403,33 @@ local function compare(info, estimated)
     local best
     local function option(slot, subtractOffhand, subtractMainhand)
         local chosen = slots[slot]
-        local old = chosen and chosen.score or 0
-        if subtractOffhand and slots[17] then old = old + slots[17].score end
-        if subtractMainhand and slots[16] then old = old + slots[16].score end
-        local new = score(info, weightsNow, slot)
-        if not estimated and slots[16] and slots[16].info.inv == 17 and info.inv ~= 17 then
-            if slot == 16 then new = new + (partnerScore(17, info, player, prof, weightsNow) or 0)
-            elseif slot == 17 then
-                local main = partnerScore(16, info, player, prof, weightsNow)
-                if not main then return end
-                new = new + main
+        local other = subtractOffhand and slots[17] or subtractMainhand and slots[16]
+        local oldItemPoints = (chosen and chosen.score or 0) + (other and other.score or 0)
+        local newItemPoints = score(info, weightsNow, slot)
+        local function consider(partner, partnerSlot)
+            local old, new = oldItemPoints, newItemPoints
+            if partner then new = new + score(partner, weightsNow, partnerSlot) end
+            local effects, unknownLoss
+            if setBonuses then
+                local oldBonus, newBonus
+                oldBonus, newBonus, effects, unknownLoss = setBonuses.Compare(equippedSets, weightsNow,
+                    info, chosen and chosen.info, other and other.info, partner)
+                old, new = old + oldBonus, new + newBonus
+            end
+            local delta = new - old
+            local known, previousKnown = not unknownLoss, best and not best.unknownSetLoss
+            if not best or known and not previousKnown or known == previousKnown and delta > best.delta then
+                best = { usable = true, slot = slot, minLevel = req, old = old, new = new, delta = delta,
+                    empty = not (chosen or other), inv = info.inv, class = info.class,
+                    setEffects = effects, unknownSetLoss = unknownLoss or nil }
+                if old > 0 then best.pct = delta / old * 100 end
             end
         end
-        local delta = new - old
-        if not best or delta > best.delta then
-            best = { usable = true, slot = slot, minLevel = req, old = old, new = new, delta = delta,
-                empty = not (chosen or subtractMainhand and slots[16] or subtractOffhand and slots[17]),
-                inv = info.inv, class = info.class }
-            if old > 0 then best.pct = delta / old * 100 end
+        if not estimated and slots[16] and slots[16].info.inv == 17 and info.inv ~= 17 and (slot == 16 or slot == 17) then
+            if slot == 16 then consider() end
+            forEachPartner(slot == 16 and 17 or 16, info, player, prof, consider)
+        else
+            consider()
         end
     end
     local limitSlot
@@ -474,7 +484,8 @@ function gear.EstimateRecord(id, record)
     stats.hastePercent = stats.haste
     if ranged[record.inv] then stats.rdps = stats.rdps or stats.dps end
     return compare({ id = id, inv = record.inv, class = record.class, subclass = record.subclass,
-        req = record.req or 0, unique = record.unique, stats = stats }, true)
+        req = record.req or 0, unique = record.unique, stats = stats,
+        setID = setBonuses and setBonuses.ItemSet(id) }, true)
 end
 
 local bagKey, pairingKey, eligibilityKey

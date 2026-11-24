@@ -133,7 +133,7 @@ local function updateTimer()
     if not selected then return end
     local remaining = loot.TimeLeft(selected)
     local active = remaining > 0
-    local ready = active and not selected.voted and (selected.requestUntil or 0) <= GetTime()
+    local ready = loot.CanChoose(selected) == true
     local status
     if selected.winner then
         status = app.LF("Gewonnen von %s", selected.winner)
@@ -155,6 +155,25 @@ local function updateTimer()
     window.greed:SetEnabled(ready and (selected.transmog == true or selected.greed == true) and RollOnLoot ~= nil)
     window.pass:SetEnabled(ready and RollOnLoot ~= nil)
     for _, control in ipairs(window.rollButtons) do control:SetShown(active) end
+end
+
+local function chooseRoll(choice)
+    local current, position = selected, 0
+    for index, drop in ipairs(openRolls) do
+        if drop == current then position = index; break end
+    end
+    if not loot.Roll(current, choice) or #openRolls == 0 then return end
+    if openRolls[position] ~= current then position = position - 1 end
+    for offset = 1, #openRolls do
+        local index = (position + offset - 1) % #openRolls + 1
+        local nextRoll = openRolls[index]
+        if nextRoll ~= current and not nextRoll.requestUntil and loot.CanChoose(nextRoll) then
+            selected, playerOffset = nextRoll, 0
+            itemOffset = math.max(index - itemRows, math.min(itemOffset, index - 1))
+            loot.Refresh()
+            return
+        end
+    end
 end
 
 local function createWindow()
@@ -234,9 +253,9 @@ local function createWindow()
     f.name = style.Label(detail, "", 60, -7, 282, 22, "GameFontNormal", style.gold)
     f.gain = style.Label(detail, "", 60, -30, 282, 20, "GameFontHighlightSmall", style.green)
     f.status = style.Label(detail, "", 11, -82, 338, 21, "GameFontNormalSmall", style.gold)
-    f.need = button(detail, "Bedarf", 10, -54, 103, 24, function() loot.Roll(selected, 1) end)
-    f.greed = button(detail, "Gier", 125, -54, 103, 24, function() loot.Roll(selected, selected.transmog and 4 or 2) end)
-    f.pass = button(detail, "Passen", 240, -54, 103, 24, function() loot.Roll(selected, 0) end)
+    f.need = button(detail, "Bedarf", 10, -54, 103, 24, function() chooseRoll(1) end)
+    f.greed = button(detail, "Gier", 125, -54, 103, 24, function() chooseRoll(selected.transmog and 4 or 2) end)
+    f.pass = button(detail, "Passen", 240, -54, 103, 24, function() chooseRoll(0) end)
     f.rollButtons = { f.need, f.greed, f.pass }
 
     local results = CreateFrame("Frame", nil, detail, "BackdropTemplate")

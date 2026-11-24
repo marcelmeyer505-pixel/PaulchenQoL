@@ -237,5 +237,19 @@ loot.Open()
 advance(11)
 window.scripts.OnUpdate(window, 0.3)
 assert(window:IsShown() and window.preview.drop.rollID == 7, "Manually opened results stay visible")
+
+for id, item in pairs({ [8] = lateLink, [9] = link, [10] = junk }) do
+    links[id], rollInfo[id], active[id] = item, { need = true, greed = true }, 60000
+end
+for id = 8, 10 do fire("START_LOOT_ROLL", id, 60000) end
+assert(window.preview.drop.rollID == 8, "A new roll leaves the current choice in place")
+window.pass.scripts.OnClick()
+assert(votes[#votes][1] == 8 and votes[#votes][2] == 0 and window.preview.drop.rollID == 10)
+window.greed.scripts.OnClick()
+assert(votes[#votes][1] == 10 and votes[#votes][2] == 2 and window.preview.drop.rollID == 9)
+advance(2)
+window.need.scripts.OnClick()
+assert(votes[#votes][1] == 9 and votes[#votes][2] == 1 and window.preview.drop.rollID == 9)
+assert(#votes == 7, "Jumping to another item never places a vote on it")
 ''')
 print("Loot window: active rolls, deduplication, native fallback, choices, and the ten-second result hold passed.")

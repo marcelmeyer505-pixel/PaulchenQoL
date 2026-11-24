@@ -45,11 +45,13 @@ local function addComparison(tooltip, data)
             status = result.pct and ("%+.1f %%"):format(result.pct) or suite.LF("%+.2f Punkte", result.delta)
             status = suite.LocalizeDecimal(status)
             if result.empty then status = status .. suite.L(" · Freier Platz") end
-            if result.delta > 0 then r, g, b = 0.54, 0.88, 0.60
+            if result.unknownSetLoss then r, g, b = 0.95, 0.76, 0.43
+            elseif result.delta > 0 then r, g, b = 0.54, 0.88, 0.60
             elseif result.delta < 0 then r, g, b = 0.94, 0.50, 0.45 end
         end
     end
     tooltip:AddDoubleLine("Paulchen · " .. app.ProfileName(), status, 0.98, 0.76, 0.42, r, g, b)
+    if app.setBonuses then app.setBonuses.AddTooltipLines(tooltip, result) end
     added[tooltip] = { link = link, lines = tooltip.NumLines and readable(tooltip:NumLines()) }
 end
 

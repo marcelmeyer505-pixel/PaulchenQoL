@@ -111,14 +111,21 @@ function loot.CanReplaceRoll(id)
     return RollOnLoot and drop and drop.hasOptions and loot.TimeLeft(drop) > 0
 end
 
+function loot.CanChoose(drop)
+    return RollOnLoot ~= nil and drop ~= nil and drop.hasOptions and loot.TimeLeft(drop) > 0
+        and not drop.voted and (drop.requestUntil or 0) <= GetTime()
+end
+
 function loot.Roll(drop, choice)
-    if not RollOnLoot or loot.TimeLeft(drop) <= 0 or drop.voted or (drop.requestUntil or 0) > GetTime() then return end
+    if not loot.CanChoose(drop) then return end
     local _, name, _, need, greed, transmog = rollOptions(drop.rollID)
     if not name or not (choice == 0 or choice == 1 and need or choice == 2 and greed and not transmog
         or choice == 4 and transmog) then return end
-    local ok = pcall(RollOnLoot, drop.rollID, choice)
+    local ok, accepted = pcall(RollOnLoot, drop.rollID, choice)
+    ok = ok and plain(accepted) ~= false
     if ok then drop.requestUntil = GetTime() + 1 end
     if loot.Refresh then loot.Refresh() end
+    return ok
 end
 
 local pending = {}

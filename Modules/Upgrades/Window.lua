@@ -246,6 +246,7 @@ local function tip(row)
     else gain = gain .. suite.L(" Punkte") end
     local equipped = item.empty and suite.L("Freier Slot") or number(item.old, 2)
     GameTooltip:AddDoubleLine(equipped .. " -> " .. number(item.new, 2) .. suite.L(" Punkte"), gain, 0.8, 0.83, 0.88, unpack(GREEN))
+    if app.setBonuses then app.setBonuses.AddTooltipLines(GameTooltip, item) end
     if item.future then GameTooltip:AddLine(suite.L("Tragbar ab Charakterstufe ") .. item.requiredLevel, unpack(GOLD)) end
     local action, quest = rowAction(entry)
     if isAuction(source) then
