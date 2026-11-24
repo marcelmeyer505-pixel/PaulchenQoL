@@ -7,6 +7,10 @@
 - Distinguish in-dungeon NPCs, starting items and genuinely missing questgivers rather than displaying blank coordinates.
 - Automatically remember questgiver/turn-in NPC locations from actual in-game quest dialogs, saved per character; add a visibly unconfirmed Classic Bodley point as fallback.
 
+- Add nine source-linked Forever quest entries across Excavation Site, City of Dalaran and Drowned City; mark partial coverage explicitly.
+- Correct two Forever turn-ins, add historical Dire Maul references, and expose bilingual quest notes in tooltips and reports.
+- Preserve NPC type for named quest givers and handle native waypoint APIs that return no value.
+
 # Changelog
 
 ## 0.12.0 — 2026-11-23
