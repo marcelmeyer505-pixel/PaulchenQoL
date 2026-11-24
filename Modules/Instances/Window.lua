@@ -1,6 +1,6 @@
 local _, app = ...
 local guide, style, L, read = app.instances, app.style, app.L, app.ReadGameValue
-local page, queued, mapQueued, worldView, outdoorRequested
+local page, queued, mapQueued, worldView, outdoorRequested, loot
 local width, height, rowCount = 984, 546, 13
 local mapWidth, mapHeight = 594, 396
 local requestedItems, requestedQuests = {}, {}
@@ -32,14 +32,21 @@ local function itemText(id)
     return name or app.LF("Gegenstand #%d", id), link
 end
 
-local function itemUpgrade(link)
+local function compareItem(link)
     local gear = app.upgrades and app.upgrades.gear
-    local result = link and gear and read(gear.CompareToEquipped, link)
-    if not result or not result.usable then return "–", style.muted end
-    if result.equipped then return "0 %", style.muted end
-    if not result.pct then return "–", style.muted end
-    local color = result.pct > 0 and style.green or result.pct < 0 and style.orange or style.muted
-    return app.LocalizeDecimal(("%+.1f %%"):format(result.pct)), color
+    return link and gear and read(gear.CompareToEquipped, link) or nil
+end
+
+local function upgradePercent(result)
+    if not result or not result.usable then return end
+    if result.equipped then return 0 end
+    return result.pct
+end
+
+local function itemUpgrade(pct)
+    if not pct then return "–", style.muted end
+    local color = pct > 0 and style.green or pct < 0 and style.orange or style.muted
+    return app.LocalizeDecimal((pct == 0 and "%.1f %%" or "%+.1f %%"):format(pct)), color
 end
 
 local function requestQuest(id)
@@ -80,6 +87,98 @@ local function showQuest(quest)
     guide.Refresh(true)
 end
 
+local function scheduleLoot(scan)
+    if scan.scheduled or scan.next > #scan.queue or not page:IsVisible() then return end
+    scan.scheduled = true
+    C_Timer.After(0, function()
+        scan.scheduled = nil
+        if loot ~= scan or not page:IsVisible() or current().entry ~= scan.entry or current().tab == "quests" then return end
+        local upgrades = app.upgrades
+        local level = upgrades and upgrades.gear and read(upgrades.gear.PlayerLevel)
+        local deadline = debugprofilestop and debugprofilestop() + 2
+        -- Spread tooltip and stat reads across frames, including on large raid loot tables.
+        for _ = 1, 16 do
+            local id = scan.queue[scan.next]
+            if not id then break end
+            scan.next = scan.next + 1
+            local rating = scan.items[id]
+            rating.queued = nil
+            local _, link = itemText(id)
+            local result = compareItem(link)
+            rating.pct = upgradePercent(result)
+            rating.upgrade = level and upgrades.IsUpgrade and upgrades.IsUpgrade(result, level)
+            rating.checked = true
+            if deadline and debugprofilestop() >= deadline then break end
+        end
+        if scan.next > #scan.queue then scan.queue, scan.next = {}, 1 end
+        guide.QueueRefresh()
+        scheduleLoot(scan)
+    end)
+end
+
+local function lootFor(entry)
+    if not loot or loot.entry ~= entry then
+        loot = { entry = entry, items = {}, rows = {}, bosses = {}, queue = {}, next = 1 }
+        local names = {}
+        for _, stop in ipairs(entry.stops) do
+            if stop.loot then names[stop.loot] = guide.Name(stop) end
+        end
+        for _, boss in ipairs(entry.loot) do
+            local rows, seen = {}, {}
+            loot.bosses[boss.name] = rows
+            for _, item in ipairs(boss.items) do
+                local id, rate, faction = unpack(item)
+                if not seen[id] and guide.AllowedFaction(faction) then
+                    seen[id] = true
+                    local rating = loot.items[id]
+                    if not rating then
+                        rating = { queued = true }
+                        loot.items[id] = rating
+                        loot.queue[#loot.queue + 1] = id
+                    end
+                    local row = { item = id, rate = rate, rating = rating, source = names[boss.name] or boss.name }
+                    rows[#rows + 1] = row
+                    loot.rows[#loot.rows + 1] = row
+                end
+            end
+        end
+    end
+    scheduleLoot(loot)
+    return loot
+end
+
+function guide.LootItemUpdated(id)
+    local rating = loot and loot.items[id]
+    if rating and not rating.queued then
+        rating.queued = true
+        loot.queue[#loot.queue + 1] = id
+        scheduleLoot(loot)
+    end
+end
+
+function guide.RefreshLoot()
+    loot = nil
+    guide.QueueRefresh()
+end
+
+local function sortLoot(a, b)
+    local left, right = a.rating.pct or -math.huge, b.rating.pct or -math.huge
+    if left ~= right then return left > right end
+    if a.rate ~= b.rate then return a.rate > b.rate end
+    if a.item ~= b.item then return a.item < b.item end
+    return a.source < b.source
+end
+
+local function bossUpgrades(rows)
+    local count, pending = 0, false
+    for _, row in ipairs(rows or {}) do
+        if row.rating.upgrade then count = count + 1 end
+        if not row.rating.checked then pending = true end
+    end
+    if pending then return "…" end
+    return app.LF(count == 1 and "%d Upgrade" or "%d Upgrades", count)
+end
+
 local function listRows(s)
     local rows, entry = {}, s.entry
     if s.tab == "quests" then
@@ -108,29 +207,21 @@ local function listRows(s)
             end
         end
     elseif s.tab == "loot" then
-        for _, boss in ipairs(entry.loot) do
-            if not s.boss or boss.name == s.boss then
-                local start = #rows
-                rows[#rows + 1] = { left = boss.name, color = style.gold }
-                for _, item in ipairs(boss.items) do
-                    if guide.AllowedFaction(item[3]) then
-                        rows[#rows + 1] = { item = item[1], drop = item[2] > 0
-                            and app.LocalizeDecimal(("%.1f"):format(item[2])) .. " %" or nil }
-                    end
-                end
-                if #rows == start + 1 then rows[#rows] = nil end
-            end
-        end
+        local scan = lootFor(entry)
+        local items = s.boss and (scan.bosses[s.boss] or {}) or scan.rows
+        for i, row in ipairs(items) do rows[i] = row end
+        table.sort(rows, sortLoot)
     else
+        local scan = lootFor(entry)
         for index, stop in ipairs(entry.stops) do
             local done = guide.IsDefeated(entry, index)
             local name = guide.Name(stop)
             rows[#rows + 1] = { left = stop.alternate and name or ("%d. %s"):format(index, name),
-                right = done and L("Besiegt") or nil,
+                right = bossUpgrades(scan.bosses[stop.loot]),
                 color = done and style.green or style.cream, action = function()
                     s.floor = stop.floor
                     s.highlight = index
-                    guide.Refresh(true)
+                    showLoot(stop.loot or stop.name)
                 end }
         end
     end
@@ -154,21 +245,27 @@ local function renderList()
     for index, widget in ipairs(f.rows) do
         local row = rows[index + offset]
         local id = row and row.item
+        local source = s.tab == "loot" and not s.boss and row and row.source
+        if widget.row and widget.row.item ~= id and GameTooltip and GameTooltip:IsOwned(widget) then GameTooltip:Hide() end
         widget.row = row
         widget.link = nil
         widget.icon:SetShown(id ~= nil)
         widget.drop:SetShown(id ~= nil and s.tab == "loot")
         widget.upgrade:SetShown(id ~= nil)
+        widget.source:SetShown(type(source) == "string")
         if row then
             local name, link
             local color = row.color or style.cream
             if id then
                 name, link = itemText(id)
                 widget.icon:SetTexture(read(C_Item and C_Item.GetItemIconByID or GetItemIcon, id) or 134400)
-                local value, valueColor = itemUpgrade(link)
+                local pct
+                if row.rating then pct = row.rating.pct
+                else pct = upgradePercent(compareItem(link)) end
+                local value, valueColor = itemUpgrade(pct)
                 widget.upgrade:SetText(value)
                 widget.upgrade:SetTextColor(unpack(valueColor))
-                widget.drop:SetText(row.drop or "–")
+                widget.drop:SetText(row.rate and row.rate > 0 and app.LocalizeDecimal(("%.1f %%"):format(row.rate)) or "–")
                 local quality = read(C_Item and C_Item.GetItemQualityByID, id)
                 local itemColor = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
                 if itemColor then color = { itemColor.r, itemColor.g, itemColor.b } end
@@ -180,8 +277,10 @@ local function renderList()
             widget:SetPoint("TOPLEFT", 8, (hasItems and -53 or -35) - (index - 1) * 25)
             widget.left:SetPoint("TOPLEFT", id and 30 or 7, 0)
             widget.left:SetWidth(id and (s.tab == "loot" and 161 or 218) or 207)
+            widget.left:SetHeight(source and 13 or 24)
             widget.left:SetText(name or "")
             widget.left:SetTextColor(unpack(color))
+            widget.source:SetText(source or "")
             widget.right:SetText(row.right or "")
         end
         widget:SetShown(row ~= nil)
@@ -302,6 +401,21 @@ local function renderBossPin(pin, stop, index, defeated, highlight)
     pin.check:SetShown(defeated == true)
 end
 
+local function updatePlayerMarker(view, follow)
+    local marker = view.player
+    local floor, x, y, facing = guide.PlayerPosition(view.positionEntry, view.positionFloor)
+    if floor and floor ~= view.positionFloor and follow and view.followFloor then
+        view.followFloor(floor)
+    end
+    if not floor or floor ~= view.positionFloor then marker:Hide(); return end
+    if facing then marker.arrow:SetRotation(facing) end
+    marker.arrow:SetShown(facing ~= nil)
+    marker.dot:SetShown(facing == nil)
+    marker:ClearAllPoints()
+    marker:SetPoint("CENTER", view, "TOPLEFT", x * view:GetWidth(), -y * view:GetHeight())
+    marker:Show()
+end
+
 local function renderMap(f, s)
     local view, entry = f.map, s.entry
     local mapWidth, mapHeight = view:GetSize()
@@ -309,6 +423,8 @@ local function renderMap(f, s)
     local art = renderArt(view, floor, mapWidth, mapHeight)
     view.overlay:SetFrameLevel(view:GetFrameLevel() + 1)
     view.markers:SetFrameLevel(view:GetFrameLevel() + 3)
+    view.player:SetFrameLevel(view:GetFrameLevel() + 6)
+    view.positionEntry, view.positionFloor = entry, s.floor
     local lineCount, pinCount = 0, 0
     for _, path in ipairs(entry.paths) do
         if path.floor == s.floor then
@@ -347,6 +463,7 @@ local function renderMap(f, s)
     for index, id in ipairs(entry.floors) do if s.floor == id then number = index; break end end
     f.prevFloor:SetEnabled(number and number > 1 or false)
     f.nextFloor:SetEnabled(number and number < #entry.floors or false)
+    updatePlayerMarker(view)
 end
 
 function guide.Refresh(drawMap)
@@ -386,6 +503,27 @@ local function mapCanvas(parent)
     view.overlay:SetAllPoints(view)
     view.markers = CreateFrame("Frame", nil, view)
     view.markers:SetAllPoints(view)
+    local player = CreateFrame("Frame", nil, view)
+    player:SetSize(27, 27)
+    player:Hide()
+    view.player = player
+    player.arrow = player:CreateTexture(nil, "OVERLAY")
+    player.arrow:SetAllPoints()
+    player.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
+    player.dot = player:CreateTexture(nil, "OVERLAY")
+    player.dot:SetPoint("CENTER")
+    player.dot:SetSize(10, 10)
+    player.dot:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+    player.dot:SetVertexColor(.43, .92, 1)
+    local elapsed = 0
+    view:SetScript("OnUpdate", function(self, delta)
+        if not self.positionEntry then return end
+        elapsed = elapsed + delta
+        if elapsed < .05 then return end
+        elapsed = 0
+        updatePlayerMarker(self, true)
+    end)
+    view:SetScript("OnHide", function() player:Hide() end)
     if view.SetClipsChildren then view:SetClipsChildren(true) end
     return view
 end
@@ -426,7 +564,7 @@ function guide.GetPage(parent)
     end
     local view = mapCanvas(f)
     f.map = view
-    f.openBoss = function(stop) showLoot(stop.loot) end
+    f.openBoss = function(stop) showLoot(stop.loot or stop.name) end
     view:SetSize(mapWidth, mapHeight)
     view:SetPoint("TOPLEFT", 16, -98)
     f.mapNote = style.Label(f, "", 16, -503, 245, 22, "GameFontHighlightSmall", style.muted)
@@ -460,6 +598,7 @@ function guide.GetPage(parent)
         row.icon:SetSize(19, 19)
         row.icon:SetPoint("LEFT", 5, 0)
         row.left = style.Label(row, "", 7, 0, 207, 24, "GameFontHighlightSmall", style.cream)
+        row.source = style.Label(row, "", 30, -12, 161, 11, "GameFontDisableSmall", style.muted)
         row.right = style.Label(row, "", 216, 0, 104, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
         row.drop = style.Label(row, "", 192, 0, 64, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
         row.upgrade = style.Label(row, "", 264, 0, 58, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
@@ -506,6 +645,11 @@ local function createWorldOverlay(map)
     local state = { owner = map, host = host, panel = panel }
     state.map = mapCanvas(panel)
     state.map:SetPoint("CENTER", panel, "CENTER", 0, -4)
+    state.map.followFloor = function(floor)
+        if state.manualFloor or state.manualEntry then return end
+        state.positionFloor, state.selection.floor = floor, floor
+        renderMap(state, state.selection)
+    end
     state.title = style.Label(panel, "", 12, -7, 350, 26, "GameFontNormal", style.gold)
     state.floorName = style.Label(panel, "", 45, 0, 300, 23, "GameFontHighlightSmall", style.cream)
     state.floorName:ClearAllPoints()
@@ -541,7 +685,7 @@ local function createWorldOverlay(map)
     state.openBoss = function(stop)
         local entry, floor = state.selection.entry, state.selection.floor
         if HideUIPanel then HideUIPanel(map) elseif map.Hide then map:Hide() end
-        guide.Open(entry.key, "loot", floor, stop.loot)
+        guide.Open(entry.key, "loot", floor, stop.loot or stop.name)
     end
     return state
 end
@@ -550,6 +694,7 @@ function guide.ResetWorldOverlay()
     outdoorRequested = nil
     if worldView then
         worldView.outdoor, worldView.manualEntry, worldView.manualFloor = nil, nil, nil
+        worldView.positionFloor = nil
     end
 end
 
@@ -577,6 +722,7 @@ function guide.UpdateWorldOverlay(map)
     if state.detectedEntry ~= entry or state.detectedFloor ~= floor then
         state.detectedEntry, state.detectedFloor = entry, floor
         state.manualEntry, state.manualFloor = nil, nil
+        state.positionFloor = nil
     end
     local level = math.max(map:GetFrameLevel(), state.host:GetFrameLevel()) + 100
     state.panel:SetFrameStrata(map:GetFrameStrata())
@@ -595,7 +741,7 @@ function guide.UpdateWorldOverlay(map)
     state.candidates = candidates
     state.wings:SetShown(#candidates > 1)
     local selected = state.manualEntry or entry
-    local selectedFloor = state.manualFloor or (selected == entry and floor) or selected.floors[1]
+    local selectedFloor = state.manualFloor or (selected == entry and (state.positionFloor or floor)) or selected.floors[1]
     state.selection = { entry = selected, floor = selectedFloor, tab = "map" }
     state.title:SetText(guide.Name(selected))
     state.map:SetFrameLevel(level + 1)

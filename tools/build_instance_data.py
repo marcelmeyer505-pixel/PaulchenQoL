@@ -234,6 +234,9 @@ def run(addons, output):
                 floor = routes.Floors[floor_id]
                 floors[floor_id] = {**localized(floor), "tiles": sequence(floor["tiles"]),
                                     "art": [sequence(tile) for tile in sequence(routes.MinimapArt[floor_id])]}
+                position = sequence(floor["frame"]) or sequence(floor["world"])
+                if position:
+                    floors[floor_id]["position"] = position
 
             wing = ("living", "undead")[index - 1] if key == "stratholme" else None
             side_floor = 280 if key == "maraudon" else None

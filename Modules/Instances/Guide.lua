@@ -136,6 +136,62 @@ function guide.CurrentMap()
     return entry, entry.floors[1], entries
 end
 
+local function projectFloor(floor, north, west)
+    local position = guide.floors[floor] and guide.floors[floor].position
+    if not position then return end
+    local a, b, c, d, e, f = unpack(position)
+    local x, y
+    if f then
+        x, y = a * north + b * west + c, d * north + e * west + f
+    else
+        x, y = (d - west) / (d - b), (c - north) / (c - a)
+    end
+    if app.ValidMapPoint(x, y) then return x, y end
+end
+
+local function mapFacing(floor)
+    local facing = read(GetPlayerFacing)
+    if type(facing) ~= "number" then return end
+    local position = guide.floors[floor] and guide.floors[floor].position
+    if not position or not position[6] then return facing end
+    -- The reference artwork for some floors is rotated. Project the direction as well as the point.
+    local north, west = math.cos(facing), math.sin(facing)
+    local x = position[1] * north + position[2] * west
+    local y = position[4] * north + position[5] * west
+    return math.atan2(-x, -y * 2 / 3)
+end
+
+function guide.PlayerPosition(entry, preferred)
+    if not C_Map or not preferred or not entry.id or entry.id ~= knownInstance() then return end
+    local best = read(C_Map.GetBestMapForUnit, "player")
+    local floor
+    for _, candidate in ipairs(guide.byID[entry.id] or {}) do
+        for _, id in ipairs(candidate.floors) do
+            if best == id then
+                if candidate ~= entry then return end
+                floor = id
+            end
+        end
+    end
+    local selected = floor or preferred
+    local x, y = app.worldMap.Vector(read(C_Map.GetPlayerMapPosition, selected, "player"))
+    if app.ValidMapPoint(x, y) then return selected, x, y, mapFacing(selected) end
+    if not UnitPosition then return end
+    local ok, north, west, _, mapID = pcall(UnitPosition, "player")
+    if not ok then return end
+    north, west, mapID = app.Readable(north), app.Readable(west), app.Readable(mapID)
+    if type(north) ~= "number" or type(west) ~= "number" or mapID and mapID ~= entry.id then return end
+    x, y = projectFloor(selected, north, west)
+    if x then return selected, x, y, mapFacing(selected) end
+    if floor then return end
+    for _, id in ipairs(entry.floors) do
+        if id ~= selected then
+            x, y = projectFloor(id, north, west)
+            if x then return id, x, y, mapFacing(id) end
+        end
+    end
+end
+
 function guide.IsDefeated(entry, index)
     return guide.defeated[entry.key] and guide.defeated[entry.key][index]
 end
@@ -165,13 +221,21 @@ events:SetScript("OnEvent", function(_, event, encounter, _, _, _, success)
         if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(.5, noteOutside) end
         local upgrades = app.upgrades
         if upgrades and upgrades.On then
-            upgrades.On("GEAR_UPDATED", function()
-                if guide.selection and guide.selection.tab ~= "map" then guide.QueueRefresh() end
+            upgrades.On("GEAR_UPDATED", function(reason, id)
+                if reason == "bagItems" then return end
+                if reason == "items" and id then guide.LootItemUpdated(id)
+                else guide.RefreshLoot() end
             end)
         end
         return
     end
     if event == "PLAYER_LEAVING_WORLD" then noteOutside(); return end
+    if event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
+        local id = app.Readable(encounter)
+        if type(id) == "number" then guide.LootItemUpdated(id) end
+        if guide.selection and guide.selection.tab == "quests" and guide.selection.quest then guide.QueueRefresh() end
+        return
+    end
     local locationChanged = event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA"
     local isEncounter = event == "ENCOUNTER_START" or event == "ENCOUNTER_END" or event == "BOSS_KILL"
     if locationChanged then

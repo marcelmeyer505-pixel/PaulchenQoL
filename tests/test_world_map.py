@@ -25,7 +25,7 @@ C_Timer = {
     end,
 }
 function flush()
-    for _ = 1, 12 do
+    for _ = 1, 96 do
         if #timers == 0 then return end
         local work = timers
         timers = {}
@@ -87,6 +87,7 @@ local methods = {
     GetChildren = function(self) return unpack(self.children) end,
     SetText = function(self, text) self.textValue = text end,
     SetTexture = function(self, id) self.textureID, self.atlasID = id, nil end,
+    SetRotation = function(self, radians) self.rotation = radians end,
     SetDesaturated = function(self, value) self.desaturated = value end,
     SetAtlas = function(self, id) self.atlasID, self.textureID = id, nil end,
 }
@@ -532,44 +533,75 @@ textWidget("Quests").scripts.OnClick()
 textWidget("Instanzquests")
 textWidget("Beute").scripts.OnClick()
 textWidget("Alle Bosse")
-textWidget(wailing.loot[1].name)
-local bossItem
 for _, row in ipairs(instancePage.rows) do
     if row.row and row.row.item then
         assert(row.left.textValue:match("^Gegenstand #%d+$"))
         assert(row.icon:IsShown() and row.icon.textureID == 134400 and row.upgrade.textValue == "–")
-        bossItem = row.row.item
+        assert(row.source:IsShown() and row.source.textValue ~= "")
         break
     end
 end
-assert(bossItem)
-local compared
+local bossItem, second, other
+for _, group in ipairs(wailing.loot) do
+    if group.name == bossPin.stop.loot then
+        bossItem, second = group.items[1][1], group.items[2][1]
+    end
+end
+for _, group in ipairs(wailing.loot) do
+    if group.name ~= bossPin.stop.loot and #group.items > 0 then
+        other = group.items[1][1]
+        if other ~= bossItem and other ~= second then break end
+    end
+end
+assert(bossItem and second and other and other ~= bossItem and other ~= second)
+local scored, available = {}, {}
+local scores = { [bossItem] = 12.5, [second] = 32, [other] = 45 }
 local onGearUpdate
-local pct = 12.5
 app.upgrades = {
     On = function(message, handler) assert(message == "GEAR_UPDATED"); onGearUpdate = handler end,
-    gear = { CompareToEquipped = function(link)
-        compared = link
-        return { usable = true, pct = pct }
-    end },
+    IsUpgrade = function(result, level) return result and result.delta > 0 and result.minLevel <= level end,
+    gear = {
+        PlayerLevel = function() return 60 end,
+        CompareToEquipped = function(link)
+            local id = tonumber(link:match("item:(%d+)"))
+            scored[id] = true
+            return { usable = true, pct = scores[id], delta = scores[id], minLevel = 20 }
+        end,
+    },
 }
 C_Item = {
     GetItemInfo = function(id)
-        if id == bossItem then return "Geladene Beute", "item:" .. id end
+        if available[id] then return "Geladene Beute " .. id, "item:" .. id end
     end,
     GetItemIconByID = function(id)
-        if id == bossItem then return 135123 end
+        if available[id] then return 135123 end
     end,
 }
 fire("PLAYER_LOGIN")
-fire("ITEM_DATA_LOAD_RESULT", bossItem, true)
 flush()
-local loaded = textWidget("Geladene Beute"):GetParent()
-assert(compared == "item:" .. bossItem and loaded.icon.textureID == 135123 and loaded.upgrade.textValue == "+12,5 %")
-pct = -5
-onGearUpdate()
+for id in pairs(scores) do
+    available[id] = true
+    fire("ITEM_DATA_LOAD_RESULT", id, true)
+end
 flush()
+assert(instancePage.rows[1].row.item == other and instancePage.rows[2].row.item == second,
+    "The all-boss loot list sorts across sources by numeric upgrade percent")
+local loaded = textWidget("Geladene Beute " .. bossItem):GetParent()
+assert(scored[bossItem] and loaded.icon.textureID == 135123 and loaded.upgrade.textValue == "+12,5 %")
+instancePage.tabs.map.scripts.OnClick()
+local firstBoss = instancePage.rows[1]
+assert(firstBoss.right.textValue == "2 Upgrades")
+firstBoss.scripts.OnClick(firstBoss)
+assert(guide.selection.boss == bossPin.stop.loot and guide.selection.tab == "loot")
+assert(instancePage.rows[1].row.item == second and instancePage.rows[2].row.item == bossItem,
+    "Clicking a boss row opens that boss only and keeps percent sorting")
+scores[bossItem] = -5
+onGearUpdate("profile")
+flush()
+loaded = textWidget("Geladene Beute " .. bossItem):GetParent()
 assert(loaded.upgrade.textValue == "-5,0 %")
+instancePage.tabs.map.scripts.OnClick()
+assert(instancePage.rows[1].right.textValue == "1 Upgrade")
 app.upgrades = nil
 C_Item = nil
 
@@ -838,12 +870,57 @@ for _, frame in ipairs(frames) do
 end
 assert(baron and baron.portrait.display == baron.stop.display and hasVisibleRoute(),
     "Opening the world map inside Stratholme shows the local bosses and route")
+local dungeonCanvas = baron:GetParent():GetParent()
+local arrow = dungeonCanvas.player
+local function updatePosition(canvas) canvas.scripts.OnUpdate(canvas, .06) end
+local coords, facing = {x = .28, y = .41}, .3
+function GetPlayerFacing() return facing end
+local oldPositionAPI = C_Map.GetPlayerMapPosition
+C_Map.GetPlayerMapPosition = function(id)
+    if id == interiorFloor then return coords end
+    return oldPositionAPI(id)
+end
+updatePosition(dungeonCanvas)
+local _, _, _, x, y = arrow:GetPoint()
+assert(arrow:IsVisible() and arrow.arrow.rotation == .3 and not arrow.dot:IsShown())
+assert(x == .28 * dungeonCanvas:GetWidth() and y == -.41 * dungeonCanvas:GetHeight())
+coords, facing = {x = .32, y = .43}, math.pi / 2
+updatePosition(dungeonCanvas)
+assert(arrow.arrow.rotation == facing and select(4, arrow:GetPoint()) == .32 * dungeonCanvas:GetWidth())
+coords = secret
+function UnitPosition()
+    local rect = guide.floors[interiorFloor].position
+    local north = rect[3] - (rect[3] - rect[1]) * .4
+    local west = rect[4] - (rect[4] - rect[2]) * .6
+    return north, west, 0, dungeonID
+end
+facing = secret
+updatePosition(dungeonCanvas)
+assert(arrow:IsVisible() and arrow.dot:IsShown() and not arrow.arrow:IsShown())
+assert(math.abs(select(4, arrow:GetPoint()) / dungeonCanvas:GetWidth() - .6) < .0001)
+function UnitPosition() return secret, secret, nil, dungeonID end
+updatePosition(dungeonCanvas)
+assert(not arrow:IsShown(), "Protected position data never produces a stale marker")
+coords, facing = {x = .31, y = .42}, .7
 fire("BOSS_KILL", baron.stop.encounters[1])
 flush()
 assert(baron.check:IsVisible() and baron.portrait.desaturated)
 baron.scripts.OnClick(baron)
 assert(guide.selection.entry == undead and guide.selection.boss == "Baron Rivendare")
 assert(instancePage:IsVisible() and instancePage.map.lines[1]:IsVisible())
+assert(instancePage.map.player:IsVisible() and instancePage.map.player.arrow.rotation == .7)
+local mines = guide.byKey.deadmines
+dungeonID, interiorFloor = mines.id, mines.floors[1]
+map:Show()
+fire("PLAYER_ENTERING_WORLD")
+flush()
+assert(dungeonCanvas.positionFloor == mines.floors[1])
+interiorFloor = mines.floors[2]
+updatePosition(dungeonCanvas)
+assert(dungeonCanvas.positionFloor == mines.floors[2] and arrow:IsVisible(),
+    "The world map follows a known floor change while walking")
+C_Map.GetPlayerMapPosition = oldPositionAPI
+GetPlayerFacing, UnitPosition = nil, nil
 inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
 fire("PLAYER_ENTERING_WORLD")
 flush()
