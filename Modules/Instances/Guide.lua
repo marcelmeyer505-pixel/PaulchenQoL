@@ -145,22 +145,30 @@ function guide.MarkDefeated(entry, index)
     guide.defeated[entry.key][index] = true
 end
 
-function guide.Open(key, tab, floor)
+function guide.Open(key, tab, floor, boss)
     local entry = guide.byKey[key]
     if not entry then return end
-    guide.selection = { entry = entry, tab = tab or "map", floor = floor or entry.floors[1] }
+    guide.selection = {
+        entry = entry, tab = tab == "route" and "map" or tab or "map", floor = floor or entry.floors[1], boss = boss,
+    }
     app.OpenDashboard("instances")
     if guide.Refresh then guide.Refresh(true) end
 end
 
 local events = CreateFrame("Frame")
 for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_LEAVING_WORLD", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "ENCOUNTER_START", "ENCOUNTER_END", "BOSS_KILL",
-    "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED" }) do
+    "QUEST_LOG_UPDATE", "QUEST_DATA_LOAD_RESULT", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }) do
     app.RegisterSupported(events, name)
 end
 events:SetScript("OnEvent", function(_, event, encounter, _, _, _, success)
     if event == "PLAYER_LOGIN" then
         if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(.5, noteOutside) end
+        local upgrades = app.upgrades
+        if upgrades and upgrades.On then
+            upgrades.On("GEAR_UPDATED", function()
+                if guide.selection and guide.selection.tab ~= "map" then guide.QueueRefresh() end
+            end)
+        end
         return
     end
     if event == "PLAYER_LEAVING_WORLD" then noteOutside(); return end

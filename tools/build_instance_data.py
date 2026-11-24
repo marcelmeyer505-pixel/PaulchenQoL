@@ -106,7 +106,7 @@ def parse_sources(addons):
         if name == "Pictures.lua":
             code = code.split("-- Rooms as in", 1)[0]
         run(code, name, globals_.routes)
-    for name in ("Dungeons.lua", "DungeonEntrances.lua", "QuestMaps.lua"):
+    for name in ("Dungeons.lua", "DungeonEntrances.lua", "QuestMaps.lua", "Bosses.lua"):
         run(contents(dj / name), name, globals_.journal)
     # Only evaluate the loot tables. The trailing code hooks AtlasLoot's own UI.
     blob = contents(atlas / "data.lua")
@@ -158,6 +158,44 @@ def atlas_loot(location, source):
     return loot
 
 
+def route_data(route, floors, wing, side_floor):
+    if route is None:
+        return [], []
+    variants = [route] if route["paths"] is not None else sequence(route)
+    if wing is not None:
+        variants = [option for option in variants if option["id"] == "default:" + wing]
+    # The purple and orange entrances are separate approaches to the same inner cave.
+    # Other alternate routes revisit the same locations with a different itinerary.
+    paths, stops, side_stops, seen_paths, seen_stops = [], [], [], set(), set()
+    for index, option in enumerate(variants):
+        alternate = index > 0
+        for part in sequence(option["paths"]):
+            floor = part["floor"]
+            points = tuple(sequence(part["pts"]))
+            identity = (floor, points)
+            if floor in floors and (not alternate or floor == side_floor) and identity not in seen_paths:
+                seen_paths.add(identity)
+                paths.append({"floor": floor, "side": alternate or part["kind"] == "side", "pts": list(points)})
+        for stop in sequence(option["stops"]):
+            floor = stop["floor"]
+            identity = (floor, normal(stop["name"]))
+            encounters = integers(stop["encounters"])
+            is_boss = stop["kind"] == "boss"
+            if not (is_boss or stop["kind"] in ("optional", "rare") and encounters):
+                continue
+            if floor not in floors or identity in seen_stops:
+                continue
+            seen_stops.add(identity)
+            marker = {**localized(stop), "floor": floor, "x": stop["x"], "y": stop["y"],
+                      "encounters": encounters}
+            if alternate or not is_boss:
+                marker["alternate"] = True
+                side_stops.append(marker)
+            else:
+                stops.append(marker)
+    return paths, stops + side_stops
+
+
 def run(addons, output):
     lua, source = parse_sources(addons)
     routes, journal, atlas = source.routes, source.journal, source.atlas
@@ -197,13 +235,9 @@ def run(addons, output):
                 floors[floor_id] = {**localized(floor), "tiles": sequence(floor["tiles"]),
                                     "art": [sequence(tile) for tile in sequence(routes.MinimapArt[floor_id])]}
 
-            route = routes.DefaultRoutes[key]
-            record["paths"] = [{"floor": part["floor"], "side": part["kind"] == "side", "pts": sequence(part["pts"])}
-                               for part in sequence(route and route["paths"]) if part["floor"] in floor_ids]
-            record["stops"] = [{**localized(stop), "floor": stop["floor"], "x": stop["x"], "y": stop["y"],
-                                "encounters": integers(stop["encounters"])}
-                               for stop in sequence(route and route["stops"])
-                               if stop["kind"] == "boss" and stop["floor"] in floor_ids]
+            wing = ("living", "undead")[index - 1] if key == "stratholme" else None
+            side_floor = 280 if key == "maraudon" else None
+            record["paths"], record["stops"] = route_data(routes.DefaultRoutes[key], floor_ids, wing, side_floor)
 
             quest_ids = set()
             quests = []
@@ -249,9 +283,28 @@ def run(addons, output):
             for boss in sorted(loot.values(), key=lambda row: row["name"]):
                 boss["items"].sort(key=lambda item: item[0])
                 record["loot"].append(boss)
-            by_name = {normal(name): name for name in loot}
+            by_name = {normal(name): boss for name, boss in loot.items()}
+            by_npc = {npc: boss for boss in record["loot"] for npc in boss["npcs"]}
+            journal_bosses = {}
+            for boss in sequence(jd and jd["bosses"]):
+                for name in [boss["name"], *sequence(boss["aliases"])]:
+                    if isinstance(name, str):
+                        journal_bosses[normal(name)] = boss
             for stop in record["stops"]:
-                stop["loot"] = by_name.get(normal(stop["name"]))
+                key_name = normal(stop["name"])
+                journal_boss = journal_bosses.get(key_name)
+                boss = by_name.get(key_name)
+                if boss is None and journal_boss is not None:
+                    boss = by_name.get(normal(journal_boss["name"]))
+                npcs = integers(journal_boss["npcID"]) if journal_boss is not None else []
+                if boss is None:
+                    boss = next((by_npc[npc] for npc in npcs if npc in by_npc), None)
+                if boss:
+                    stop["loot"] = boss["name"]
+                npcs.extend(boss["npcs"] if boss else [])
+                display = next((journal.STATIC_DISPLAY_IDS[npc] for npc in npcs if journal.STATIC_DISPLAY_IDS[npc]), None)
+                if display:
+                    stop["display"] = display
             dungeons.append(record)
 
     # These AtlasLoot raid entries have no published route with the installed Routes data.

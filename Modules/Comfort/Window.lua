@@ -6,7 +6,7 @@ app.comfort = comfort
 local defaults = {
     sellSummary = true,
     mapCompact = true, mapMouseCoords = true, mapPlayerCoords = true, mapZoneMenu = true,
-    mapCoordsBackground = true, mapDungeons = true, mapInterior = true, mapInteriorRoute = true,
+    mapCoordsBackground = true, mapDungeons = true, mapInterior = true,
     mapNoBlackout = true, mapNoFade = true, mapFlight = true, mapPortals = true, mapCrossings = true, mapLearnCrossings = true,
 }
 
@@ -87,7 +87,6 @@ local categories = {
         { "mapDungeons", "Instanz- und Raideingänge anzeigen",
             "Öffnet die Innenkarte im Paulchen-Instanzführer." },
         { "mapInterior", "Innenkarte beim Öffnen in Instanzen", "M öffnet drinnen zuerst die Instanzkarte. Auf der Karte kannst du zur Weltkarte wechseln." },
-        { "mapInteriorRoute", "Route auf der Instanzkarte anzeigen", nil, "mapInterior" },
         { "mapZoneLevels", "Ungefähre Gebietsstufen anzeigen" },
         { "mapFishing", "Ungefähre Angelfertigkeit anzeigen" },
         { "mapReveal", "Unerforschte Karte aufdecken" },

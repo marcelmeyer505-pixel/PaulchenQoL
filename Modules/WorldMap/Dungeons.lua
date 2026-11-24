@@ -218,7 +218,6 @@ local function actions(entry)
             guide.Open(dungeon.key, tab)
         end
         if #dungeon.floors > 0 then add("Innenkarte öffnen", function() open("map") end, true) end
-        if #dungeon.paths > 0 then add("Route öffnen", function() open("route") end) end
         if #dungeon.quests > 0 then add("Instanzquests öffnen", function() open("quests") end) end
         if #dungeon.loot > 0 then add("Bosse und Beute öffnen", function() open("loot") end) end
     elseif record and frame then

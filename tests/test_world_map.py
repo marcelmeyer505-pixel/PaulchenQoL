@@ -63,6 +63,7 @@ local methods = {
     IsMouseOver = function() return true end,
     SetSize = function(self, width, height) self.width, self.height = width, height end,
     SetHeight = function(self, height) self.height = height end,
+    SetWidth = function(self, width) self.width = width end,
     GetSize = function(self) return self.width, self.height end,
     GetParent = function(self) return self.parent end,
     SetParent = function(self, parent) self.parent = parent end,
@@ -86,6 +87,7 @@ local methods = {
     GetChildren = function(self) return unpack(self.children) end,
     SetText = function(self, text) self.textValue = text end,
     SetTexture = function(self, id) self.textureID, self.atlasID = id, nil end,
+    SetDesaturated = function(self, value) self.desaturated = value end,
     SetAtlas = function(self, id) self.atlasID, self.textureID = id, nil end,
 }
 for _, name in ipairs({
@@ -484,6 +486,7 @@ for path in ("Modules/Instances/Data.lua", "Modules/Instances/Guide.lua", "Modul
     load((root / path).read_text(encoding="utf-8-sig"), path)
 lua.execute(r'''
 ForeverDungeonJournal_NS, ForeverDungeonRoutes, AtlasLoot = nil, nil, nil
+function SetPortraitTextureFromCreatureDisplayID(texture, display) texture.display = display end
 local guide = app.instances
 local map = WorldMapFrame
 local wailing = assert(guide.byKey.wailingcaverns)
@@ -519,19 +522,75 @@ entrance.scripts.OnClick(entrance, "LeftButton")
 assert(guide.selection.entry == wailing and guide.selection.tab == "map")
 textWidget("Höhlen des Wehklagens")
 textWidget("Bossreihenfolge")
-textWidget("Route").scripts.OnClick()
-textWidget("Schematische Route")
+assert(not instancePage.tabs.route and instancePage.tabs.map:IsShown())
+assert(instancePage.map.art[1]:IsShown() and instancePage.map.lines[1]:IsShown(),
+    "The standard interior map shows its art and route together")
+local bossPin = instancePage.map.pins[1]
+assert(bossPin:IsVisible() and bossPin.portrait.display == bossPin.stop.display)
+assert(bossPin:GetFrameLevel() > instancePage.map.overlay:GetFrameLevel())
 textWidget("Quests").scripts.OnClick()
 textWidget("Instanzquests")
 textWidget("Beute").scripts.OnClick()
 textWidget("Alle Bosse")
 textWidget(wailing.loot[1].name)
+local bossItem
 for _, row in ipairs(instancePage.rows) do
     if row.row and row.row.item then
         assert(row.left.textValue:match("^Gegenstand #%d+$"))
+        assert(row.icon:IsShown() and row.icon.textureID == 134400 and row.upgrade.textValue == "–")
+        bossItem = row.row.item
         break
     end
 end
+assert(bossItem)
+local compared
+local onGearUpdate
+local pct = 12.5
+app.upgrades = {
+    On = function(message, handler) assert(message == "GEAR_UPDATED"); onGearUpdate = handler end,
+    gear = { CompareToEquipped = function(link)
+        compared = link
+        return { usable = true, pct = pct }
+    end },
+}
+C_Item = {
+    GetItemInfo = function(id)
+        if id == bossItem then return "Geladene Beute", "item:" .. id end
+    end,
+    GetItemIconByID = function(id)
+        if id == bossItem then return 135123 end
+    end,
+}
+fire("PLAYER_LOGIN")
+fire("ITEM_DATA_LOAD_RESULT", bossItem, true)
+flush()
+local loaded = textWidget("Geladene Beute"):GetParent()
+assert(compared == "item:" .. bossItem and loaded.icon.textureID == 135123 and loaded.upgrade.textValue == "+12,5 %")
+pct = -5
+onGearUpdate()
+flush()
+assert(loaded.upgrade.textValue == "-5,0 %")
+app.upgrades = nil
+C_Item = nil
+
+for _, key in ipairs({"stratholme_living", "stratholme_undead", "diremaul_north", "maraudon", "zulgurub",
+    "ruinsofahnqiraj", "templeofahnqiraj"}) do
+    local entry = guide.byKey[key]
+    assert(#entry.paths > 0 and #entry.stops > 0, "Built-in route variant missing for " .. key)
+end
+local living, undead = guide.byKey.stratholme_living, guide.byKey.stratholme_undead
+for _, entry in ipairs({living, undead}) do
+    guide.Open(entry.key, "map")
+    local pin = instancePage.map.pins[1]
+    assert(pin:IsVisible() and pin.stop.floor == entry.floors[1] and pin.stop.loot)
+    assert(pin.portrait.display == pin.stop.display)
+    pin.scripts.OnClick(pin)
+    assert(guide.selection.tab == "loot" and guide.selection.boss == pin.stop.loot)
+    assert(instancePage.map.lines[1]:IsVisible(), "Selecting boss loot keeps the route on the map")
+end
+guide.Open("zulgurub", "map")
+local fallbackPin = instancePage.map.pins[1]
+assert(fallbackPin:IsVisible() and fallbackPin.portrait.textureID:match("UI%-RaidTargetingIcon_8$"))
 guide.Open(custom.key, "map")
 assert(guide.selection.floor == custom.floors[1])
 instancePage.nextFloor.scripts.OnClick()
@@ -747,10 +806,7 @@ local function hasVisibleRoute()
     return false
 end
 assert(hasVisibleRoute())
-app.comfort.SetEnabled("mapInteriorRoute", false)
-flush()
-assert(not hasVisibleRoute())
-app.comfort.SetEnabled("mapInteriorRoute", true)
+app.comfort.SetEnabled("mapInteriorRoute", false) -- Legacy opt-out must not hide the route.
 flush()
 assert(hasVisibleRoute())
 textWidget("Weltkarte").scripts.OnClick()
@@ -772,6 +828,22 @@ map:Hide()
 map:Show()
 flush()
 textWidget("Scharlachrotes Kloster: Bibliothek")
+local undead = guide.byKey.stratholme_undead
+dungeonID, interiorFloor = undead.id, undead.floors[1]
+fire("PLAYER_ENTERING_WORLD")
+flush()
+local baron
+for _, frame in ipairs(frames) do
+    if frame:IsVisible() and frame.stop and frame.stop.name == "Baron Rivendare" then baron = frame; break end
+end
+assert(baron and baron.portrait.display == baron.stop.display and hasVisibleRoute(),
+    "Opening the world map inside Stratholme shows the local bosses and route")
+fire("BOSS_KILL", baron.stop.encounters[1])
+flush()
+assert(baron.check:IsVisible() and baron.portrait.desaturated)
+baron.scripts.OnClick(baron)
+assert(guide.selection.entry == undead and guide.selection.boss == "Baron Rivendare")
+assert(instancePage:IsVisible() and instancePage.map.lines[1]:IsVisible())
 inDungeon, dungeonID, interiorFloor, outdoorMap = false, nil, nil, nil
 fire("PLAYER_ENTERING_WORLD")
 flush()

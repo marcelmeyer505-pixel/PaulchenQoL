@@ -4,7 +4,7 @@ local page, queued, mapQueued, worldView, outdoorRequested
 local width, height, rowCount = 984, 546, 13
 local mapWidth, mapHeight = 594, 396
 local requestedItems, requestedQuests = {}, {}
-local tabs = { { "map", "Karte" }, { "route", "Route" }, { "quests", "Quests" }, { "loot", "Beute" } }
+local tabs = { { "map", "Karte" }, { "quests", "Quests" }, { "loot", "Beute" } }
 
 local function button(parent, text, x, y, w, onClick)
     local b = style.TextButton(parent)
@@ -30,6 +30,16 @@ local function itemText(id)
         app.ReadGameValue(C_Item.RequestLoadItemDataByID, id)
     end
     return name or app.LF("Gegenstand #%d", id), link
+end
+
+local function itemUpgrade(link)
+    local gear = app.upgrades and app.upgrades.gear
+    local result = link and gear and read(gear.CompareToEquipped, link)
+    if not result or not result.usable then return "–", style.muted end
+    if result.equipped then return "0 %", style.muted end
+    if not result.pct then return "–", style.muted end
+    local color = result.pct > 0 and style.green or result.pct < 0 and style.orange or style.muted
+    return app.LocalizeDecimal(("%+.1f %%"):format(result.pct)), color
 end
 
 local function requestQuest(id)
@@ -104,7 +114,7 @@ local function listRows(s)
                 rows[#rows + 1] = { left = boss.name, color = style.gold }
                 for _, item in ipairs(boss.items) do
                     if guide.AllowedFaction(item[3]) then
-                        rows[#rows + 1] = { item = item[1], right = item[2] > 0
+                        rows[#rows + 1] = { item = item[1], drop = item[2] > 0
                             and app.LocalizeDecimal(("%.1f"):format(item[2])) .. " %" or nil }
                     end
                 end
@@ -114,7 +124,9 @@ local function listRows(s)
     else
         for index, stop in ipairs(entry.stops) do
             local done = guide.IsDefeated(entry, index)
-            rows[#rows + 1] = { left = ("%d. %s"):format(index, guide.Name(stop)), right = done and L("Besiegt") or nil,
+            local name = guide.Name(stop)
+            rows[#rows + 1] = { left = stop.alternate and name or ("%d. %s"):format(index, name),
+                right = done and L("Besiegt") or nil,
                 color = done and style.green or style.cream, action = function()
                     s.floor = stop.floor
                     s.highlight = index
@@ -135,20 +147,41 @@ local function renderList()
     local f, s = page, current()
     local rows = listRows(s)
     local offset = math.min(math.max(s.offset or 0, 0), math.max(#rows - rowCount, 0))
+    local hasItems = s.tab == "loot" or s.tab == "quests" and s.quest and #s.quest.rewards > 0
     s.offset = offset
+    f.dropTitle:SetShown(s.tab == "loot")
+    f.upgradeTitle:SetShown(hasItems == true)
     for index, widget in ipairs(f.rows) do
         local row = rows[index + offset]
+        local id = row and row.item
         widget.row = row
+        widget.link = nil
+        widget.icon:SetShown(id ~= nil)
+        widget.drop:SetShown(id ~= nil and s.tab == "loot")
+        widget.upgrade:SetShown(id ~= nil)
         if row then
             local name, link
-            if row.item then name, link = itemText(row.item)
+            local color = row.color or style.cream
+            if id then
+                name, link = itemText(id)
+                widget.icon:SetTexture(read(C_Item and C_Item.GetItemIconByID or GetItemIcon, id) or 134400)
+                local value, valueColor = itemUpgrade(link)
+                widget.upgrade:SetText(value)
+                widget.upgrade:SetTextColor(unpack(valueColor))
+                widget.drop:SetText(row.drop or "–")
+                local quality = read(C_Item and C_Item.GetItemQualityByID, id)
+                local itemColor = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+                if itemColor then color = { itemColor.r, itemColor.g, itemColor.b } end
             elseif row.quest then
                 requestQuest(row.quest.id)
                 name = guide.QuestTitle(row.quest)
             else name = row.left end
             widget.link = link
+            widget:SetPoint("TOPLEFT", 8, (hasItems and -53 or -35) - (index - 1) * 25)
+            widget.left:SetPoint("TOPLEFT", id and 30 or 7, 0)
+            widget.left:SetWidth(id and (s.tab == "loot" and 161 or 218) or 207)
             widget.left:SetText(name or "")
-            widget.left:SetTextColor(unpack(row.color or style.cream))
+            widget.left:SetTextColor(unpack(color))
             widget.right:SetText(row.right or "")
         end
         widget:SetShown(row ~= nil)
@@ -173,9 +206,9 @@ local function artTexture(view, index)
     return texture
 end
 
-local function renderArt(view, floor, scheme, mapWidth, mapHeight)
+local function renderArt(view, floor, mapWidth, mapHeight)
     local used = 0
-    if floor and not scheme then
+    if floor then
         local tiles = floor.tiles
         for index, file in ipairs(tiles) do
             local texture = artTexture(view, index)
@@ -207,13 +240,77 @@ local function renderArt(view, floor, scheme, mapWidth, mapHeight)
     return used > 0
 end
 
-local function renderMap(f, s, showRoute)
+local function createBossPin(view, openBoss)
+    local pin = CreateFrame("Button", nil, view.markers)
+    pin:SetSize(30, 30)
+    pin.ring = pin:CreateTexture(nil, "BACKGROUND")
+    pin.ring:SetAllPoints()
+    pin.ring:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+    pin.fill = pin:CreateTexture(nil, "BORDER")
+    pin.fill:SetSize(26, 26)
+    pin.fill:SetPoint("CENTER")
+    pin.fill:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+    pin.fill:SetVertexColor(.13, .09, .06)
+    pin.portrait = pin:CreateTexture(nil, "ARTWORK")
+    pin.portrait:SetSize(24, 24)
+    pin.portrait:SetPoint("CENTER")
+    pin.badge = pin:CreateTexture(nil, "OVERLAY", nil, -1)
+    pin.badge:SetSize(15, 15)
+    pin.badge:SetPoint("BOTTOMRIGHT", 3, -3)
+    pin.badge:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+    pin.badge:SetVertexColor(.18, .11, .05)
+    pin.rank = pin:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    pin.rank:SetPoint("CENTER", pin.badge, "CENTER")
+    pin.check = pin:CreateTexture(nil, "OVERLAY")
+    pin.check:SetSize(15, 15)
+    pin.check:SetPoint("CENTER", pin.badge, "CENTER")
+    pin.check:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+    pin:SetScript("OnClick", function(self) openBoss(self.stop) end)
+    pin:SetScript("OnEnter", function(self)
+        if not GameTooltip or GameTooltip:IsForbidden() then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(guide.Name(self.stop), unpack(style.gold))
+        if self.check:IsShown() then GameTooltip:AddLine(L("Besiegt"), unpack(style.green)) end
+        if self.stop.loot then GameTooltip:AddLine(L("Linksklick zeigt die Beute."), unpack(style.cream)) end
+        GameTooltip:Show()
+    end)
+    local function hideTip(self)
+        if GameTooltip and GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end
+    pin:SetScript("OnLeave", hideTip)
+    pin:SetScript("OnHide", hideTip)
+    return pin
+end
+
+local function renderBossPin(pin, stop, index, defeated, highlight)
+    pin.stop = stop
+    if pin.display ~= (stop.display or false) then
+        pin.display = stop.display or false
+        local ok, result
+        if stop.display and SetPortraitTextureFromCreatureDisplayID then
+            ok, result = pcall(SetPortraitTextureFromCreatureDisplayID, pin.portrait, stop.display)
+        end
+        if not ok or result == false then
+            pin.portrait:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+        end
+    end
+    pin.portrait:SetDesaturated(defeated == true)
+    pin.ring:SetVertexColor(unpack(defeated and style.green or highlight and style.cream or style.gold))
+    pin.badge:SetShown(defeated == true or not stop.alternate)
+    pin.rank:SetShown(not defeated and not stop.alternate)
+    pin.rank:SetText(index)
+    pin.check:SetShown(defeated == true)
+end
+
+local function renderMap(f, s)
     local view, entry = f.map, s.entry
     local mapWidth, mapHeight = view:GetSize()
     local floor = guide.floors[s.floor]
-    local art = renderArt(view, floor, s.tab == "route", mapWidth, mapHeight)
+    local art = renderArt(view, floor, mapWidth, mapHeight)
+    view.overlay:SetFrameLevel(view:GetFrameLevel() + 1)
+    view.markers:SetFrameLevel(view:GetFrameLevel() + 3)
     local lineCount, pinCount = 0, 0
-    for _, path in ipairs(showRoute and entry.paths or {}) do
+    for _, path in ipairs(entry.paths) do
         if path.floor == s.floor then
             for i = 1, #path.pts - 3, 2 do
                 local x, y, nextX, nextY = unpack(path.pts, i, i + 3)
@@ -233,27 +330,12 @@ local function renderMap(f, s, showRoute)
     for index, stop in ipairs(entry.stops) do
         if stop.floor == s.floor then
             pinCount = pinCount + 1
-            local pin = view.pins[pinCount]
-            if not pin then
-                pin = style.TextButton(view.overlay)
-                pin:SetSize(22, 22)
-                pin:SetScript("OnClick", function(self) f.openBoss(self.stop) end)
-                pin:SetScript("OnEnter", function(self)
-                    if not GameTooltip or GameTooltip:IsForbidden() then return end
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText(guide.Name(self.stop), unpack(style.gold))
-                    GameTooltip:Show()
-                end)
-                pin:SetScript("OnLeave", function(self)
-                    if GameTooltip and GameTooltip:IsOwned(self) then GameTooltip:Hide() end
-                end)
-                view.pins[pinCount] = pin
-            end
-            pin.stop = stop
+            local pin = view.pins[pinCount] or createBossPin(view, f.openBoss)
+            view.pins[pinCount] = pin
+            pin:SetFrameLevel(view.markers:GetFrameLevel() + 1)
             pin:ClearAllPoints()
             pin:SetPoint("CENTER", view, "TOPLEFT", stop.x * mapWidth, -stop.y * mapHeight)
-            pin:SetText(tostring(index))
-            style.SetButtonState(pin, s.highlight == index or guide.IsDefeated(entry, index))
+            renderBossPin(pin, stop, index, guide.IsDefeated(entry, index), s.highlight == index)
             pin:Show()
         end
     end
@@ -280,7 +362,7 @@ function guide.Refresh(drawMap)
         .. (locked and " · " .. L("Im Inhaltsfilter gesperrt") or ""))
     page.entrance:SetEnabled(entry.entrance ~= nil)
     for key, tab in pairs(page.tabs) do style.SetButtonState(tab, key == s.tab) end
-    if drawMap then renderMap(page, s, true) end
+    if drawMap then renderMap(page, s) end
     renderList()
 end
 
@@ -302,6 +384,8 @@ local function mapCanvas(parent)
     view.art, view.lines, view.pins = {}, {}, {}
     view.overlay = CreateFrame("Frame", nil, view)
     view.overlay:SetAllPoints(view)
+    view.markers = CreateFrame("Frame", nil, view)
+    view.markers:SetAllPoints(view)
     if view.SetClipsChildren then view:SetClipsChildren(true) end
     return view
 end
@@ -357,6 +441,8 @@ function guide.GetPage(parent)
     panel:EnableMouseWheel(true)
     panel:SetScript("OnMouseWheel", function(_, delta) scroll(delta > 0 and -3 or 3) end)
     f.listTitle = style.Label(panel, "", 10, -3, 251, 26, "GameFontNormal", style.gold)
+    f.dropTitle = style.Label(panel, "Dropchance", 200, -33, 64, 18, "GameFontHighlightSmall", style.muted, "RIGHT")
+    f.upgradeTitle = style.Label(panel, "Upgrade %", 272, -33, 58, 18, "GameFontHighlightSmall", style.muted, "RIGHT")
     f.chooseBoss = button(panel, "Bosse", 266, -5, 68, function(self)
         menu(self, function(root)
             root:CreateButton(L("Alle Bosse"), function() showLoot(nil) end)
@@ -369,10 +455,14 @@ function guide.GetPage(parent)
     f.rows = {}
     for index = 1, rowCount do
         local row = style.Button(panel)
-        row:SetPoint("TOPLEFT", 8, -35 - (index - 1) * 27)
-        row:SetSize(326, 25)
+        row:SetSize(326, 24)
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(19, 19)
+        row.icon:SetPoint("LEFT", 5, 0)
         row.left = style.Label(row, "", 7, 0, 207, 24, "GameFontHighlightSmall", style.cream)
         row.right = style.Label(row, "", 216, 0, 104, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
+        row.drop = style.Label(row, "", 192, 0, 64, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
+        row.upgrade = style.Label(row, "", 264, 0, 58, 24, "GameFontHighlightSmall", style.muted, "RIGHT")
         row:SetScript("OnEnter", function(self)
             if not self.row or not self.row.item or not GameTooltip or GameTooltip:IsForbidden() then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -451,8 +541,7 @@ local function createWorldOverlay(map)
     state.openBoss = function(stop)
         local entry, floor = state.selection.entry, state.selection.floor
         if HideUIPanel then HideUIPanel(map) elseif map.Hide then map:Hide() end
-        guide.Open(entry.key, "loot", floor)
-        showLoot(stop.loot)
+        guide.Open(entry.key, "loot", floor, stop.loot)
     end
     return state
 end
@@ -509,5 +598,6 @@ function guide.UpdateWorldOverlay(map)
     local selectedFloor = state.manualFloor or (selected == entry and floor) or selected.floors[1]
     state.selection = { entry = selected, floor = selectedFloor, tab = "map" }
     state.title:SetText(guide.Name(selected))
-    renderMap(state, state.selection, app.comfort.Enabled("mapInteriorRoute"))
+    state.map:SetFrameLevel(level + 1)
+    renderMap(state, state.selection)
 end
