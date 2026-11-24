@@ -1,3 +1,10 @@
+## Unreleased – Standalone dungeon quest planner
+
+- Bundle the historical MIT-licensed Dungeon Quest Atlas v1.04 reference dataset (35 dungeon entries, 395 quest associations, 480 quest records and 309 locations), with its original license and attribution.
+- The quest planner now works without Polestar or Dungeon Quest Atlas installed. Native WoW waypoints replace the Polestar navigation dependency.
+- Add searchable dungeon and quest lists, known quest giver/turn-in locations, chain progress, faction filters, completion states and copyable reports.
+- Explicitly label incomplete/unknown Forever content; add Lua 5.1 regression tests against the real bundled dataset.
+
 # Changelog
 
 ## 0.12.0 — 2026-11-23

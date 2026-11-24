@@ -74,6 +74,8 @@ function app.OpenModulesMenu(owner)
         end
         menu:CreateButton(app.L("Instanzführer"), function() app.OpenDashboard("instances") end)
         menu:CreateButton(app.L("Paulchens Buffwächter"), function() app.OpenDashboard("buffs") end)
+        menu:CreateButton(app.GetLanguage() == "enUS" and "Dungeon quests & quest givers" or "Instanzquests & Questgeber",
+            function() if app.dungeonQuests then app.dungeonQuests.Open() end end)
         menu:CreateButton(app.L("Auktionshaus scannen"), function() app.OpenModule("auction") end)
         if app.comfort and app.comfort.Enabled("mapMinimap") and ToggleWorldMap then
             menu:CreateButton(app.L("Weltkarte"), ToggleWorldMap)

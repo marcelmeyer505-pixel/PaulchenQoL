@@ -20,3 +20,5 @@ jobs:
           done
       - name: Verify language selection and translated dialogues
         run: lua5.1 tests/localization_fixture.lua
+      - name: Verify dungeon quest planner and progress states
+        run: lua5.1 tests/dungeon_quest_fixture.lua

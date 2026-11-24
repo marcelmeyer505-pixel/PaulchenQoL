@@ -1,5 +1,34 @@
 # Paulchen QoL v0.12.0
 
+## Paulchens Instanz-Questplaner – ohne Polestar (Entwicklungszweig)
+
+Der neue **Instanz-Questplaner läuft vollständig eigenständig**, auch wenn Polestar, Dungeon Quest Atlas und alle anderen Quest-Addons **nicht installiert** sind. Öffne ihn über **Rechtsklick auf Paulchens Minimapknopf → Instanzquests & Questgeber** oder `/pq quests` beziehungsweise `/pq dungeons`.
+
+### Eigenständige Datenbank
+
+Die Erweiterung enthält **35 Instanzen bzw. Instanzflügel** mit zusammen **395 Quest-Zuordnungen**, **480 Questdatensätzen** und **309 Questgeber-/Ortsdatensätzen**. Die Daten stammen aus der ausdrücklich MIT-lizenzierten historischen Version **Dungeon Quest Atlas v1.04**, nicht aus dem aktuellen (restriktiver lizenzierten) Release und nicht aus Polestars GPL-Datenbank. Die originalen Lizenz- und Quellenhinweise stehen in `Data/LICENSE-DQA-MIT.txt` und `Data/SOURCES.md`.
+
+**Datenstand Oktober 2026:** Sieben neuere Forever-Instanzen stehen im damaligen Datensatz noch ohne Questzuordnungen: Alcaz Prison, Blackmaw Hold, City of Dalaran, Excavation Site, Krol'dok Stronghold, Shaper's Terrace und The Drowned City. Auch andere Einträge können noch fehlen oder veraltet sein. Der Planer kennzeichnet diese Fälle ausdrücklich und behauptet **keine Vollständigkeit**, solange die Questdaten das nicht belegen.
+
+### Funktionen
+
+- Durchsuchbare Instanz- und Questliste mit Fraktionsfilter, bereits erledigte Quests optional ausblenden.
+- Questgeber und Abgabeorte, einschließlich mehrerer bekannter NPCs/Objekte und hinterlegter Weltkarten-Koordinaten.
+- Questreihe mit vorherigen und nachfolgenden Schritten; jeder Schritt kann separat ausgewählt werden und zeigt seinen eigenen Questgeber.
+- Charakterfortschritt über die verfügbaren WoW-Quest-APIs: **abgeschlossen, im Questlog, abgabebereit, Vorquests fehlen, Stufe zu niedrig, nicht angenommen, gesperrt oder unbekannt**. Unlesbare Zustände werden nicht geraten.
+- Der Status `Nicht angenommen` bedeutet **nicht**, dass der NPC die Quest gerade schon anbietet. Historische `chain`-Angaben werden als Quellenangaben zu früheren Schritten verwendet.
+- **Zum Questgeber** / **Zur Abgabe** setzt, wenn unterstützt, direkt einen WoW-Wegpunkt oder öffnet die passende Karte. Es wird **keine** Polestar-Navigation benötigt.
+- **Liste kopieren** erzeugt eine vollständige Aufstellung der ausgewählten Instanz mit Status, allen bekannten Questgebern, Abgaben und Questreihen.
+- Das WoW-Spiel liefert lokal verfügbare Questnamen. Fehlt der Titel noch im Client-Cache, fragt Paulchen ihn nach und verwendet bis dahin die Quest-ID. Paulchens Bedientexte sind auf Deutsch und Englisch.
+
+Die Lua-5.1-Tests in `tests/dungeon_quest_fixture.lua` laden die **echten gebündelten Daten** und prüfen Auswahlliste, Fraktion, bekannte Instanzquests, Questreihen, Fortschrittszustände und den Betrieb ohne Polestar.
+
+**Noch erforderlich vor Veröffentlichung:** Im WoW-Forever-Client die Anzeige, Kartenkoordinaten, aktualisierte Questnamen, echte Questzustände und Sonderfälle für neu hinzugefügte Forever-Quests prüfen.
+
+---
+
+
+
 ## Deutsch / English
 
 Paulchen QoL now offers **German and English**. By default, the addon follows the World of Warcraft client locale: `deDE` uses German, while `enUS`, `enGB` and other client locales use English. You can override this independently of your game client in **Paulchen Settings → Language**:

@@ -233,6 +233,8 @@ function app.CompanionCommand(message)
     elseif (cmd == "komfort" or cmd == "comfort") and app.comfort then
         if window then window:Hide() end
         app.comfort.Open()
+    elseif (cmd == "quests" or cmd == "dungeons") and app.dungeonQuests then
+        app.dungeonQuests.Open()
     elseif cmd == "buffs" and app.buffCheck then
         app.buffCheck.Command((message or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "show" or cmd == "hide" then
@@ -247,7 +249,7 @@ function app.CompanionCommand(message)
     elseif cmd == "" then
         app.OpenConfig()
     else
-        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, instances, loot, lang auto|de|en]")
+        print("Paulchen QoL · /pq [show, hide, reset, test, debug, buffs, comfort, map, instances, quests, loot, lang auto|de|en]")
     end
     refreshSettings()
 end
